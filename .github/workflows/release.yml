@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check plugin version matches release tag
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          header=$(grep -m1 -E '^Version:' sync-pilot.php | sed -E 's/^Version:[[:space:]]*//; s/[[:space:]]+$//')
+          meta=$(grep -m1 "\['version'\]" sync-pilot.php | sed -E "s/.*= '([^']+)'.*/\1/")
+          echo "tag=$tag header=$header meta=$meta"
+          if [ "$tag" != "$header" ] || [ "$tag" != "$meta" ]; then
+            echo "::error::Release tag ($tag), plugin header ($header) and syncpilot_meta version ($meta) must be identical"
+            exit 1
+          fi
+
+      - name: Build plugin ZIP
+        run: |
+          mkdir -p /tmp/sync-pilot
+          rsync -r \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='composer.json' \
+            --exclude='composer.lock' \
+            --exclude='*.md' \
+            --exclude='*.txt' \
+            ./ /tmp/sync-pilot/sync-pilot/
+          cd /tmp/sync-pilot
+          zip -r sync-pilot.zip sync-pilot/
+
+      - name: Attach ZIP to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: /tmp/sync-pilot/sync-pilot.zip
