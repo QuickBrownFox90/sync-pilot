@@ -58,7 +58,7 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 	<form method="post" id="migrate-form" action="#migrate" enctype="multipart/form-data">
 
 		<?php if( count( $this->settings['profiles'] ) > 0 ){ ?>
-			<a href="<?php echo $this->plugin_base; ?>" class="return-to-profile-selection clearfix">&larr; <?php _e( 'Back to select a saved profile', 'sync-pilot' ); ?></a>
+			<a href="<?php echo $this->plugin_base; ?>" class="return-to-profile-selection clearfix">&larr; <?php _e( 'Back to select a saved profile', self::TEXT_DOMAIN ); ?></a>
 		<?php } ?>
 
 		<div class="option-section">
@@ -67,20 +67,20 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 				<li>
 					<label for="savefile">
 					<input id="savefile" type="radio" value="savefile" name="action"<?php echo ( $loaded_profile['action'] == 'savefile' ? ' checked="checked"' : ''  ); ?> />
-					<?php _e( 'Export File', 'sync-pilot' ); ?>
+					<?php _e( 'Export File', self::TEXT_DOMAIN ); ?>
 					</label>
 					<ul>
 						<li>
 							<label for="save_computer">
 							<input id="save_computer" type="checkbox" value="1" name="save_computer"<?php $this->maybe_checked( $loaded_profile['save_computer'] ); ?> />
-							<?php _e( 'Save as file to your computer', 'sync-pilot' ); ?>
+							<?php _e( 'Save as file to your computer', self::TEXT_DOMAIN ); ?>
 							</label>
 						</li>
 						<?php if ( $this->gzip() ) : ?>
 							<li>
 								<label for="gzip_file">
 									<input id="gzip_file" type="checkbox" value="1" name="gzip_file"<?php $this->maybe_checked( $loaded_profile['gzip_file'] ); ?> />
-									<?php _e( 'Compress file with gzip', 'sync-pilot' ); ?>
+									<?php _e( 'Compress file with gzip', self::TEXT_DOMAIN ); ?>
 								</label>
 							</li>
 						<?php endif; ?>
@@ -89,7 +89,7 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 				<li class="pull-list">
 					<label for="pull">
 					<input id="pull" type="radio" value="pull" name="action"<?php echo ( $loaded_profile['action'] == 'pull' ? ' checked="checked"' : ''  ); ?> />
-					<?php _e( 'Pull', 'sync-pilot' ); ?><span class="option-description"><?php _e( 'Replace this site\'s db with remote db', 'sync-pilot' ); ?></span>
+					<?php _e( 'Pull', self::TEXT_DOMAIN ); ?><span class="option-description"><?php _e( 'Replace this site\'s db with remote db', self::TEXT_DOMAIN ); ?></span>
 					</label>
 					<ul>
 						<li></li>
@@ -98,7 +98,7 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 				<li class="push-list">
 					<label for="push">
 					<input id="push" type="radio" value="push" name="action"<?php echo ( $loaded_profile['action'] == 'push' ? ' checked="checked"' : ''  ); ?> />
-					<?php _e( 'Push', 'sync-pilot' ); ?><span class="option-description"><?php _e( 'Replace remote db with this site\'s db', 'sync-pilot' ); ?></span>
+					<?php _e( 'Push', self::TEXT_DOMAIN ); ?><span class="option-description"><?php _e( 'Replace remote db with this site\'s db', self::TEXT_DOMAIN ); ?></span>
 					</label>
 					<ul>
 						<li></li>
@@ -107,7 +107,7 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 			</ul>
 
 			<div class="connection-info-wrapper clearfix">
-				<textarea class="pull-push-connection-info" name="connection_info" placeholder="<?php _e( 'Connection Info - Site URL &amp; Secret Key', 'sync-pilot' ); ?>"><?php echo ( isset( $loaded_profile['connection_info'] ) ? $loaded_profile['connection_info'] : '' ); ?></textarea>
+				<textarea class="pull-push-connection-info" name="connection_info" placeholder="<?php _e( 'Connection Info - Site URL &amp; Secret Key', self::TEXT_DOMAIN ); ?>"><?php echo ( isset( $loaded_profile['connection_info'] ) ? $loaded_profile['connection_info'] : '' ); ?></textarea>
 				<br />
 				<div class="basic-access-auth-wrapper clearfix">
 					<input type="text" name="auth_username" class="auth-username auth-credentials" placeholder="Username" autocomplete="off" />
@@ -117,21 +117,21 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 			</div>
 
 			<div class="notification-message warning-notice ssl-notice inline-message">
-				<strong><?php _e( 'SSL Disabled', 'sync-pilot' ); ?></strong> &mdash; <?php _e( 'We couldn\'t connect over SSL but regular http (no SSL) appears to be working so we\'ve switched to that. If you run a push or pull, your data will be transmitted unencrypted. Most people are fine with this, but just a heads up.', 'sync-pilot' ); ?>
+				<strong><?php _e( 'SSL Disabled', self::TEXT_DOMAIN ); ?></strong> &mdash; <?php _e( 'We couldn\'t connect over SSL but regular http (no SSL) appears to be working so we\'ve switched to that. If you run a push or pull, your data will be transmitted unencrypted. Most people are fine with this, but just a heads up.', self::TEXT_DOMAIN ); ?>
 			</div>
 
 		</div>
 
-		<p class="connection-status"><?php _e( 'Please enter the connection information above to continue.', 'sync-pilot' ); ?></p>
+		<p class="connection-status"><?php _e( 'Please enter the connection information above to continue.', self::TEXT_DOMAIN ); ?></p>
 
 		<div class="notification-message error-notice different-plugin-version-notice inline-message" style="display: none;">
-			<b><?php _e( 'Version Mismatch', 'sync-pilot' ); ?></b> &mdash; <?php printf( __( 'We\'ve detected you have version <span class="remote-version"></span> of SyncPilot at <span class="remote-location"></span> but are using %1$s here. Please go to the <a href="%2$s">Plugins page</a> on both installs and check for updates.', 'sync-pilot' ), $GLOBALS['syncpilot_meta'][$this->plugin_slug]['version'], network_admin_url( 'plugins.php' ) ); ?>
+			<b><?php _e( 'Version Mismatch', self::TEXT_DOMAIN ); ?></b> &mdash; <?php printf( __( 'We\'ve detected you have version <span class="remote-version"></span> of SyncPilot at <span class="remote-location"></span> but are using %1$s here. Please go to the <a href="%2$s">Plugins page</a> on both installs and check for updates.', self::TEXT_DOMAIN ), $GLOBALS['syncpilot_meta'][$this->plugin_slug]['version'], network_admin_url( 'plugins.php' ) ); ?>
 		</div>
 
 		<div class="notification-message error-notice directory-permission-notice inline-message" style="display: none;">
-			<strong><?php _e( 'Cannot Access Uploads Directory', 'sync-pilot' ); ?></strong> &mdash;
+			<strong><?php _e( 'Cannot Access Uploads Directory', self::TEXT_DOMAIN ); ?></strong> &mdash;
 			<?php
-				_e( 'We require write permissions to the standard WordPress uploads directory. Without this permission exports are unavailable. Please grant 755 permissions on the following directory:', 'sync-pilot' );
+				_e( 'We require write permissions to the standard WordPress uploads directory. Without this permission exports are unavailable. Please grant 755 permissions on the following directory:', self::TEXT_DOMAIN );
 				echo $this->get_upload_info( 'path' );
 			?>
 		</div>
@@ -140,11 +140,11 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 
 			<div class="option-section">
 				<div class="header-wrapper clearfix">
-					<div class="option-heading find-heading"><?php _e( 'Find', 'sync-pilot' ); ?></div>
-					<div class="option-heading replace-heading"><?php _e( 'Replace', 'sync-pilot' ); ?></div>
+					<div class="option-heading find-heading"><?php _e( 'Find', self::TEXT_DOMAIN ); ?></div>
+					<div class="option-heading replace-heading"><?php _e( 'Replace', self::TEXT_DOMAIN ); ?></div>
 				</div>
 
-				<p class="no-replaces-message"><?php _e( 'Doesn\'t look we have any replaces yet, <a href="#" class="js-action-link add-replace">add one?</a>', 'sync-pilot' ); ?></p>
+				<p class="no-replaces-message"><?php _e( 'Doesn\'t look we have any replaces yet, <a href="#" class="js-action-link add-replace">add one?</a>', self::TEXT_DOMAIN ); ?></p>
 
 				<table id="find-and-replace-sort" class="clearfix replace-fields">
 					<tbody>
@@ -223,8 +223,8 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 					</tbody>
 				</table>
 
-				<div id="new-url-missing-warning" class="warning inline-message missing-replace"><?php printf( __( '<strong>New URL Missing</strong> &mdash; Please enter the protocol-relative URL of the remote website in the "New URL" field. If you are unsure of what this URL should be, please consult <a href="%s" target="_blank">our documentation</a> on find and replace fields.', 'sync-pilot' ), 'https://deliciousbrains.com/wp-sync-db/documentation/#find-and-replace' ); ?></div>
-				<div id="new-path-missing-warning" class="warning inline-message missing-replace"><?php printf( __( '<strong>New File Path Missing</strong> &mdash; Please enter the root file path of the remote website in the "New file path" field. If you are unsure of what the file path should be, please consult <a href="%s" target="_blank">our documentation</a> on find and replace fields.', 'sync-pilot' ), 'https://deliciousbrains.com/wp-sync-db/documentation/#find-and-replace' ); ?></div>
+				<div id="new-url-missing-warning" class="warning inline-message missing-replace"><?php printf( __( '<strong>New URL Missing</strong> &mdash; Please enter the protocol-relative URL of the remote website in the "New URL" field. If you are unsure of what this URL should be, please consult <a href="%s" target="_blank">our documentation</a> on find and replace fields.', self::TEXT_DOMAIN ), 'https://deliciousbrains.com/wp-sync-db/documentation/#find-and-replace' ); ?></div>
+				<div id="new-path-missing-warning" class="warning inline-message missing-replace"><?php printf( __( '<strong>New File Path Missing</strong> &mdash; Please enter the root file path of the remote website in the "New file path" field. If you are unsure of what the file path should be, please consult <a href="%s" target="_blank">our documentation</a> on find and replace fields.', self::TEXT_DOMAIN ), 'https://deliciousbrains.com/wp-sync-db/documentation/#find-and-replace' ); ?></div>
 
 			</div>
 
@@ -241,13 +241,13 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 						<li>
 							<label for="migrate-only-with-prefix">
 							<input id="migrate-only-with-prefix" class="multiselect-toggle" type="radio" value="migrate_only_with_prefix" name="table_migrate_option"<?php echo ( $loaded_profile['table_migrate_option'] == 'migrate_only_with_prefix' ? ' checked="checked"' : '' ); ?> />
-							<?php _e( 'Migrate all tables with prefix', 'sync-pilot' ); ?> "<span class="table-prefix"><?php echo $wpdb->prefix; ?></span>"
+							<?php _e( 'Migrate all tables with prefix', self::TEXT_DOMAIN ); ?> "<span class="table-prefix"><?php echo $wpdb->prefix; ?></span>"
 							</label>
 						</li>
 						<li>
 							<label for="migrate-selected">
 							<input id="migrate-selected" class="multiselect-toggle show-multiselect" type="radio" value="migrate_select" name="table_migrate_option"<?php echo ( $loaded_profile['table_migrate_option'] == 'migrate_select' ? ' checked="checked"' : '' ); ?> />
-							<?php _e( 'Migrate only selected tables below', 'sync-pilot' ); ?>
+							<?php _e( 'Migrate only selected tables below', self::TEXT_DOMAIN ); ?>
 							</label>
 						</li>
 					</ul>
@@ -265,11 +265,11 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 						endforeach; ?>
 						</select>
 						<br />
-						<a href="#" class="multiselect-select-all js-action-link"><?php _e( 'Select All', 'sync-pilot' ); ?></a>
+						<a href="#" class="multiselect-select-all js-action-link"><?php _e( 'Select All', self::TEXT_DOMAIN ); ?></a>
 						<span class="select-deselect-divider">/</span>
-						<a href="#" class="multiselect-deselect-all js-action-link"><?php _e( 'Deselect All', 'sync-pilot' ); ?></a>
+						<a href="#" class="multiselect-deselect-all js-action-link"><?php _e( 'Deselect All', self::TEXT_DOMAIN ); ?></a>
 						<span class="select-deselect-divider">/</span>
-						<a href="#" class="multiselect-invert-selection js-action-link"><?php _e( 'Invert Selection', 'sync-pilot' ); ?></a>
+						<a href="#" class="multiselect-invert-selection js-action-link"><?php _e( 'Invert Selection', self::TEXT_DOMAIN ); ?></a>
 					</div>
 				</div>
 			</div>
@@ -277,7 +277,7 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 			<div class="option-section" style="display: block;">
 				<label for="exclude-post-types" class="exclude-post-types-checkbox checkbox-label">
 				<input type="checkbox" id="exclude-post-types" value="1" autocomplete="off" name="exclude_post_types"<?php $this->maybe_checked( $loaded_profile['exclude_post_types'] ); ?> />
-				<?php _e( 'Exclude Post Types', 'sync-pilot' ); ?>
+				<?php _e( 'Exclude Post Types', self::TEXT_DOMAIN ); ?>
 				</label>
 
 				<div class="indent-wrap expandable-content post-type-select-wrap" style="display: none;">
@@ -293,11 +293,11 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 						endforeach; ?>
 						</select>
 						<br />
-						<a href="#" class="multiselect-select-all js-action-link"><?php _e( 'Select All', 'sync-pilot' ); ?></a>
+						<a href="#" class="multiselect-select-all js-action-link"><?php _e( 'Select All', self::TEXT_DOMAIN ); ?></a>
 						<span class="select-deselect-divider">/</span>
-						<a href="#" class="multiselect-deselect-all js-action-link"><?php _e( 'Deselect All', 'sync-pilot' ); ?></a>
+						<a href="#" class="multiselect-deselect-all js-action-link"><?php _e( 'Deselect All', self::TEXT_DOMAIN ); ?></a>
 						<span class="select-deselect-divider">/</span>
-						<a href="#" class="multiselect-invert-selection js-action-link"><?php _e( 'Invert Selection', 'sync-pilot' ); ?></a>
+						<a href="#" class="multiselect-invert-selection js-action-link"><?php _e( 'Invert Selection', self::TEXT_DOMAIN ); ?></a>
 					</div>
 				</div>
 			</div>
@@ -305,7 +305,7 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 			<div class="option-section">
 				<div class="header-expand-collapse clearfix">
 					<div class="expand-collapse-arrow collapsed">&#x25BC;</div>
-					<div class="option-heading tables-header"><?php _e( 'Advanced Options', 'sync-pilot' ); ?></div>
+					<div class="option-heading tables-header"><?php _e( 'Advanced Options', self::TEXT_DOMAIN ); ?></div>
 				</div>
 
 				<div class="indent-wrap expandable-content">
@@ -314,25 +314,25 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 						<li>
 							<label for="replace-guids">
 							<input id="replace-guids" type="checkbox" value="1" name="replace_guids"<?php $this->maybe_checked( $loaded_profile['replace_guids'] ); ?> />
-							<?php _e( 'Replace GUIDs', 'sync-pilot' ); ?>
+							<?php _e( 'Replace GUIDs', self::TEXT_DOMAIN ); ?>
 							</label>
 
 							<a href="#" class="general-helper replace-guid-helper js-action-link"></a>
 
 							<div class="replace-guids-info helper-message">
-								<?php printf( __( 'Although the <a href="%s" target="_blank">WordPress Codex emphasizes</a> that GUIDs should not be changed, this is limited to sites that are already live. If the site has never been live, I recommend replacing the GUIDs. For example, you may be developing a new site locally at dev.somedomain.com and want to migrate the site live to somedomain.com.', 'sync-pilot' ), 'http://codex.wordpress.org/Changing_The_Site_URL#Important_GUID_Note' ); ?>
+								<?php printf( __( 'Although the <a href="%s" target="_blank">WordPress Codex emphasizes</a> that GUIDs should not be changed, this is limited to sites that are already live. If the site has never been live, I recommend replacing the GUIDs. For example, you may be developing a new site locally at dev.somedomain.com and want to migrate the site live to somedomain.com.', self::TEXT_DOMAIN ), 'http://codex.wordpress.org/Changing_The_Site_URL#Important_GUID_Note' ); ?>
 							</div>
 						</li>
 						<li>
 							<label for="exclude-spam">
 							<input id="exclude-spam" type="checkbox" autocomplete="off" value="1" name="exclude_spam"<?php $this->maybe_checked( $loaded_profile['exclude_spam'] ); ?> />
-							<?php _e( 'Exclude spam comments', 'sync-pilot' ); ?>
+							<?php _e( 'Exclude spam comments', self::TEXT_DOMAIN ); ?>
 							</label>
 						</li>
 						<li class="keep-active-plugins">
 							<label for="keep-active-plugins">
 							<input id="keep-active-plugins" type="checkbox" value="1" autocomplete="off" name="keep_active_plugins"<?php $this->maybe_checked( $loaded_profile['keep_active_plugins'] ); ?> />
-							<?php _e( 'Do not migrate the \'active_plugins\' setting (i.e. which plugins are activated/deactivated)', 'sync-pilot' ); ?>
+							<?php _e( 'Do not migrate the \'active_plugins\' setting (i.e. which plugins are activated/deactivated)', self::TEXT_DOMAIN ); ?>
 							</label>
 						</li>
 						<li>
@@ -349,8 +349,8 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 			<div class="option-section backup-options" style="display: block;">
 				<label for="create-backup" class="backup-checkbox checkbox-label">
 					<input type="checkbox" id="create-backup" value="1" autocomplete="off" name="create_backup"<?php $this->maybe_checked( $loaded_profile['create_backup'] ); ?> />
-					<?php _e( 'Backup the <span class="directory-scope">local</span> database before replacing it', 'sync-pilot' ); ?><br />
-					<span class="option-description backup-description"><?php _e( 'An SQL file will be saved to', 'sync-pilot' ); ?> <span class="uploads-dir"><?php echo $this->get_short_uploads_dir(); ?></span></span>
+					<?php _e( 'Backup the <span class="directory-scope">local</span> database before replacing it', self::TEXT_DOMAIN ); ?><br />
+					<span class="option-description backup-description"><?php _e( 'An SQL file will be saved to', self::TEXT_DOMAIN ); ?> <span class="uploads-dir"><?php echo $this->get_short_uploads_dir(); ?></span></span>
 				</label>
 
 				<div class="indent-wrap expandable-content">
@@ -358,19 +358,19 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 						<li>
 							<label for="backup-only-with-prefix">
 							<input type="radio" id="backup-only-with-prefix" value="backup_only_with_prefix" name="backup_option"<?php echo ( $loaded_profile['backup_option'] == 'backup_only_with_prefix' ? ' checked="checked"' : '' ); ?> >
-							<?php _e( 'Backup all tables with prefix', 'sync-pilot' ); ?> "<span class="table-prefix"><?php echo $wpdb->prefix; ?></span>"
+							<?php _e( 'Backup all tables with prefix', self::TEXT_DOMAIN ); ?> "<span class="table-prefix"><?php echo $wpdb->prefix; ?></span>"
 							</label>
 						</li>
 						<li>
 							<label for="backup-selected">
 							<input type="radio" id="backup-selected" value="backup_selected" name="backup_option"<?php echo ( $loaded_profile['backup_option'] == 'backup_selected' ? ' checked="checked"' : '' ); ?> >
-							<?php _e( 'Backup only tables selected for migration', 'sync-pilot' ); ?>
+							<?php _e( 'Backup only tables selected for migration', self::TEXT_DOMAIN ); ?>
 							</label>
 						</li>
 						<li>
 							<label for="backup-manual-select">
 							<input type="radio" id="backup-manual-select" value="backup_manual_select" name="backup_option"<?php echo ( $loaded_profile['backup_option'] == 'backup_manual_select' ? ' checked="checked"' : '' ); ?> >
-							<?php _e( 'Backup only selected tables below', 'sync-pilot' ); ?>
+							<?php _e( 'Backup only selected tables below', self::TEXT_DOMAIN ); ?>
 							</label>
 						</li>
 					</ul>
@@ -388,14 +388,14 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 						endforeach; ?>
 						</select>
 						<br />
-						<a href="#" class="multiselect-select-all js-action-link"><?php _e( 'Select All', 'sync-pilot' ); ?></a>
+						<a href="#" class="multiselect-select-all js-action-link"><?php _e( 'Select All', self::TEXT_DOMAIN ); ?></a>
 						<span class="select-deselect-divider">/</span>
-						<a href="#" class="multiselect-deselect-all js-action-link"><?php _e( 'Deselect All', 'sync-pilot' ); ?></a>
+						<a href="#" class="multiselect-deselect-all js-action-link"><?php _e( 'Deselect All', self::TEXT_DOMAIN ); ?></a>
 						<span class="select-deselect-divider">/</span>
-						<a href="#" class="multiselect-invert-selection js-action-link"><?php _e( 'Invert Selection', 'sync-pilot' ); ?></a>
+						<a href="#" class="multiselect-invert-selection js-action-link"><?php _e( 'Invert Selection', self::TEXT_DOMAIN ); ?></a>
 					</div>
 				</div>
-				<p class="backup-option-disabled inline-message error-notice notification-message" style="display: none;"><?php printf( __( 'The backup option has been disabled as your <span class="directory-scope">local</span> uploads directory is currently not writeable. The following directory should have 755 permissions: <span class="upload-directory-location">%s</span></p>', 'sync-pilot' ), $this->get_upload_info( 'path' ) ); ?>
+				<p class="backup-option-disabled inline-message error-notice notification-message" style="display: none;"><?php printf( __( 'The backup option has been disabled as your <span class="directory-scope">local</span> uploads directory is currently not writeable. The following directory should have 755 permissions: <span class="upload-directory-location">%s</span></p>', self::TEXT_DOMAIN ), $this->get_upload_info( 'path' ) ); ?>
 			</div>
 
 			<?php do_action( 'syncpilot_after_advanced_options' ); ?>
@@ -403,7 +403,7 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 			<div class="option-section save-migration-profile-wrap">
 				<label for="save-migration-profile" class="save-migration-profile checkbox-label">
 				<input id="save-migration-profile" type="checkbox" value="1" name="save_migration_profile"<?php echo ( ! $is_default_profile ? ' checked="checked"' : '' ); ?> />
-				<?php _e( 'Save Migration Profile', 'sync-pilot' ); ?><span class="option-description"><?php _e( 'Save the above settings for the next time you do a similiar migration', 'sync-pilot' ); ?></span>
+				<?php _e( 'Save Migration Profile', self::TEXT_DOMAIN ); ?><span class="option-description"><?php _e( 'Save the above settings for the next time you do a similiar migration', self::TEXT_DOMAIN ); ?></span>
 				</label>
 
 				<div class="indent-wrap expandable-content">
@@ -422,7 +422,7 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 						<li>
 							<label for="create_new" class="create-new-label">
 							<input id="create_new" type="radio" value="new" name="save_migration_profile_option"<?php echo (  $is_default_profile ? ' checked="checked"' : '' ); ?> />
-							<?php _e( 'Create new profile', 'sync-pilot' ); ?>
+							<?php _e( 'Create new profile', self::TEXT_DOMAIN ); ?>
 							</label>
 							<input type="text" placeholder="e.g. Live Site" name="create_new_profile" class="create-new-profile" />
 						</li>
@@ -431,23 +431,23 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 			</div>
 
 			<div class="notification-message warning-notice prefix-notice pull">
-				<h4><?php _e( 'Warning: Different Table Prefixes', 'sync-pilot' ); ?></h4>
+				<h4><?php _e( 'Warning: Different Table Prefixes', self::TEXT_DOMAIN ); ?></h4>
 
-				<p><?php _e( 'Whoa! We\'ve detected that the database table prefix differs between installations. Clicking the Migrate DB button below will create new database tables in your local database with prefix "<span class="remote-prefix"></span>".', 'sync-pilot' ); ?></p>
+				<p><?php _e( 'Whoa! We\'ve detected that the database table prefix differs between installations. Clicking the Migrate DB button below will create new database tables in your local database with prefix "<span class="remote-prefix"></span>".', self::TEXT_DOMAIN ); ?></p>
 
-				<p><?php printf( __( 'However, your local install is configured to use table prefix "%1$s" and will ignore the migrated tables. So, <b>AFTER</b> migration is complete, you will need to edit your local install\'s wp-config.php and change the "%1$s" variable to "<span class="remote-prefix"></span>".', 'sync-pilot' ), $wpdb->prefix, $wpdb->prefix ); ?></p>
+				<p><?php printf( __( 'However, your local install is configured to use table prefix "%1$s" and will ignore the migrated tables. So, <b>AFTER</b> migration is complete, you will need to edit your local install\'s wp-config.php and change the "%1$s" variable to "<span class="remote-prefix"></span>".', self::TEXT_DOMAIN ), $wpdb->prefix, $wpdb->prefix ); ?></p>
 
-				<p><?php _e( 'This will allow your local install the use the migrated tables. Once you do this, you shouldn\'t have to do it again.', 'sync-pilot' ); ?></p>
+				<p><?php _e( 'This will allow your local install the use the migrated tables. Once you do this, you shouldn\'t have to do it again.', self::TEXT_DOMAIN ); ?></p>
 			</div>
 
 			<div class="notification-message warning-notice prefix-notice push">
-				<h4><?php _e( 'Warning: Different Table Prefixes', 'sync-pilot' ); ?></h4>
+				<h4><?php _e( 'Warning: Different Table Prefixes', self::TEXT_DOMAIN ); ?></h4>
 
-				<p><?php printf( __( 'Whoa! We\'ve detected that the database table prefix differs between installations. Clicking the Migrate DB button below will create new database tables in the remote database with prefix "%s".', 'sync-pilot' ), $wpdb->prefix ); ?></p>
+				<p><?php printf( __( 'Whoa! We\'ve detected that the database table prefix differs between installations. Clicking the Migrate DB button below will create new database tables in the remote database with prefix "%s".', self::TEXT_DOMAIN ), $wpdb->prefix ); ?></p>
 
-				<p><?php printf( __( 'However, your remote install is configured to use table prefix "<span class="remote-prefix"></span>" and will ignore the migrated tables. So, <b>AFTER</b> migration is complete, you will need to edit your remote install\'s wp-config.php and change the "<span class="remote-prefix"></span>" variable to "%s".', 'sync-pilot' ), $wpdb->prefix ); ?></p>
+				<p><?php printf( __( 'However, your remote install is configured to use table prefix "<span class="remote-prefix"></span>" and will ignore the migrated tables. So, <b>AFTER</b> migration is complete, you will need to edit your remote install\'s wp-config.php and change the "<span class="remote-prefix"></span>" variable to "%s".', self::TEXT_DOMAIN ), $wpdb->prefix ); ?></p>
 
-				<p><?php _e( 'This will allow your remote install the use the migrated tables. Once you do this, you shouldn\'t have to do it again.', 'sync-pilot' ); ?></p>
+				<p><?php _e( 'This will allow your remote install the use the migrated tables. Once you do this, you shouldn\'t have to do it again.', self::TEXT_DOMAIN ); ?></p>
 			</div>
 
 			<p class="migrate-db">
@@ -460,7 +460,7 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 
 		<?php
 		if( count( $this->settings['profiles'] ) > 0 ){ ?>
-			<a href="<?php echo $this->plugin_base; ?>" class="return-to-profile-selection clearfix bottom">&larr; <?php _e( 'Back to select a saved profile', 'sync-pilot' ); ?></a>
+			<a href="<?php echo $this->plugin_base; ?>" class="return-to-profile-selection clearfix bottom">&larr; <?php _e( 'Back to select a saved profile', self::TEXT_DOMAIN ); ?></a>
 		<?php } ?>
 
 	</form>

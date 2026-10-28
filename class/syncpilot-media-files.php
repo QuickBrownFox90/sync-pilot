@@ -182,7 +182,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 
 			if( is_wp_error( $temp_file_path ) ) {
 				$download_error = $temp_file_path->get_error_message();
-				$errors[] = __( sprintf( 'Could not download file: %1$s - %2$s', $remote_uploads_url . $file_to_download, $download_error ), 'sync-pilot' );
+				$errors[] = __( sprintf( 'Could not download file: %1$s - %2$s', $remote_uploads_url . $file_to_download, $download_error ), self::TEXT_DOMAIN );
 				continue;
 			}
 
@@ -194,16 +194,16 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 			if( false === $move_result ) {
 				$folder = dirname( $new_path );
 				if( @file_exists( $folder ) ) {
-					$errors[] =  __( sprintf( 'Error attempting to move downloaded file. Temp path: %1$s - New Path: %2$s', $temp_file_path, $new_path ), 'sync-pilot' ) . ' (#103mf)';
+					$errors[] =  __( sprintf( 'Error attempting to move downloaded file. Temp path: %1$s - New Path: %2$s', $temp_file_path, $new_path ), self::TEXT_DOMAIN ) . ' (#103mf)';
 				}
 				else{
 					if( false === @mkdir( $folder, 0755, true ) ) {
-						$errors[] =  __( sprintf( 'Error attempting to create required directory: %s', $folder ), 'sync-pilot' ) . ' (#104mf)';
+						$errors[] =  __( sprintf( 'Error attempting to create required directory: %s', $folder ), self::TEXT_DOMAIN ) . ' (#104mf)';
 					}
 					else {
 						$move_result = @rename( $temp_file_path, $new_path );
 						if( false === $move_result ) {
-							$errors[] =  __( sprintf( 'Error attempting to move downloaded file. Temp path: %1$s - New Path: %2$s', $temp_file_path, $new_path ), 'sync-pilot' ) . ' (#105mf)';
+							$errors[] =  __( sprintf( 'Error attempting to move downloaded file. Temp path: %1$s - New Path: %2$s', $temp_file_path, $new_path ), self::TEXT_DOMAIN ) . ' (#105mf)';
 						}
 					}
 				}
@@ -268,7 +268,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		if( ! isset( $_FILES['media'] ) ) {
 			$return = array(
 				'syncpilot_error' 	=> 1,
-				'body'			=> __( '$_FILES is empty, the upload appears to have failed', 'sync-pilot' ) . ' (#106mf)',
+				'body'			=> __( '$_FILES is empty, the upload appears to have failed', self::TEXT_DOMAIN ) . ' (#106mf)',
 			);
 			$result = $this->end_ajax( serialize( $return ) );
 			return $result;
@@ -285,13 +285,13 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 			$folder = dirname( $destination );
 
 			if( false === @file_exists( $folder ) && false === @mkdir( $folder, 0755, true ) ) {
-				$errors[] = __( sprintf( 'Error attempting to create required directory: %s', $folder ), 'sync-pilot' ) . ' (#108mf)';
+				$errors[] = __( sprintf( 'Error attempting to create required directory: %s', $folder ), self::TEXT_DOMAIN ) . ' (#108mf)';
 				++$i;
 				continue;
 			}
 
 			if( false === @move_uploaded_file( $file['tmp_name'], $destination ) ) {
-				$errors[] = __( sprintf( 'A problem occurred when attempting to move the temp file "%1$s" to "%2$s"', $file['tmp_name'], $destination ), 'sync-pilot' ) . ' (#107mf)';
+				$errors[] = __( sprintf( 'A problem occurred when attempting to move the temp file "%1$s" to "%2$s"', $file['tmp_name'], $destination ), self::TEXT_DOMAIN ) . ' (#107mf)';
 			}
 			++$i;
 		}
@@ -377,7 +377,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		if( false === $remote_attachments ) {
 			$return = array(
 				'syncpilot_error' 	=> 1,
-				'body'			=> __( 'Error attempting to unserialize the remote attachment data', 'sync-pilot' ) . ' (#110mf)',
+				'body'			=> __( 'Error attempting to unserialize the remote attachment data', self::TEXT_DOMAIN ) . ' (#110mf)',
 			);
 			$result = $this->end_ajax( serialize( $return ) );
 			return $result;
@@ -499,12 +499,12 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		wp_enqueue_script( 'sync-pilot-media-files', $src, array( 'jquery', 'sync-pilot-common', 'sync-pilot-hook', 'sync-pilot-script' ), $version, true );
 
 		wp_localize_script( 'sync-pilot-media-files', 'syncpilot_mf_strings', array(
-			'determining'				=> __( "Determining which media files to migrate, please wait...", 'sync-pilot' ),
-			'error_determining'			=> __( "Error while attempting to determine which media files to migrate.", 'sync-pilot' ),
-			'migration_failed'			=> __( "Migration failed", 'sync-pilot' ),
-			'problem_migrating_media'	=> __( "A problem occurred when migrating the media files.", 'sync-pilot' ),
-			'media_files'				=> __( "Media Files", 'sync-pilot' ),
-			'migrating_media_files'		=> __( "Migrating media files", 'sync-pilot' ),
+			'determining'				=> __( "Determining which media files to migrate, please wait...", self::TEXT_DOMAIN ),
+			'error_determining'			=> __( "Error while attempting to determine which media files to migrate.", self::TEXT_DOMAIN ),
+			'migration_failed'			=> __( "Migration failed", self::TEXT_DOMAIN ),
+			'problem_migrating_media'	=> __( "A problem occurred when migrating the media files.", self::TEXT_DOMAIN ),
+			'media_files'				=> __( "Media Files", self::TEXT_DOMAIN ),
+			'migrating_media_files'		=> __( "Migrating media files", self::TEXT_DOMAIN ),
 		) );
 
 	}
@@ -617,7 +617,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		if ( !isset( $profile['media_files'] ) || '1' !== $profile['media_files'] ) return $outcome;
 
 		if ( !isset( $verify_connection_response['media_files_max_file_uploads'] ) ) {
-			return $syncpilot_cli->cli_error( __( 'SyncPilot does not seems to be installed/active on the remote website.', 'sync-pilot' ) );
+			return $syncpilot_cli->cli_error( __( 'SyncPilot does not seems to be installed/active on the remote website.', self::TEXT_DOMAIN ) );
 		}
 
 		$this->set_time_limit();

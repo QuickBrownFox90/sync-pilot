@@ -17,7 +17,7 @@ jobs:
       - name: Check plugin version matches release tag
         run: |
           tag="${GITHUB_REF_NAME#v}"
-          header=$(grep -m1 -E '^Version:' sync-pilot.php | sed -E 's/^Version:[[:space:]]*//; s/[[:space:]]+$//')
+          header=$(grep -m1 -E '^[[:space:]*]*Version:' sync-pilot.php | sed -E 's/^[[:space:]*]*Version:[[:space:]]*//; s/[[:space:]]+$//')
           meta=$(grep -m1 "\['version'\]" sync-pilot.php | sed -E "s/.*= '([^']+)'.*/\1/")
           echo "tag=$tag header=$header meta=$meta"
           if [ "$tag" != "$header" ] || [ "$tag" != "$meta" ]; then

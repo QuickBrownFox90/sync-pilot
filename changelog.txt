@@ -1,5 +1,23 @@
 == Changelog ==
 
+= Version 0.0.2 =
+
+* Changed: The Help tab is reduced to a "Diagnostics" tab — only the diagnostic info and the error log with "Clear Error Log" remain; the support link and the demo videos (the original screencasts of WP Sync DB showing its old user interface) are removed together with their JavaScript and CSS; the template is now `template/diagnostics.php`, the tab hash is `#diagnostics` (was `#help`), and the error messages #105, #106, #108 and #118 point to the Diagnostics tab and the error log instead of "the Help tab for details on how to request support"
+* Changed: The text domain is no longer repeated as a string literal in every gettext call but taken from the class constant `SyncPilot_Base::TEXT_DOMAIN` (`self::TEXT_DOMAIN` in classes and templates), so it can be changed in one line; the `Text Domain:` plugin header stays a literal, as WordPress reads it without executing PHP
+* Added: German translation (`languages/sync-pilot-de_DE.po` and `.mo`, informal "du"); the source language is English
+* Removed: `languages/sync-pilot-en.pot` — it was outdated and a template is not needed at runtime; the translations are shipped as `.po` and `.mo` directly
+* Fixed: `e()` instead of `_e()` in the message "Could not delete the MySQL export file." would have ended in a fatal error "call to undefined function" if deleting the export file failed
+* Fixed: The diagnostic info used the leftover text domain `wp-app-store` for "ext/mysqli" and "WP Memory Limit"
+* Changed: The plugin header is written as a docblock with a leading ` * ` on every line and requires PHP 8.2 (was 8.1); the version is raised to 0.0.2 in the header, in `$GLOBALS['syncpilot_meta']` and in the MU compatibility plugin
+* Fixed: `backquote()` used `each()`, which was removed in PHP 8.0 and would have ended in a fatal error if the function was called with an array; it now uses `foreach`
+* Fixed: The diagnostic info called `mysql_get_server_info()` (removed in PHP 7) as a fallback when mysqli was not in use; the MySQL version now comes from `$wpdb->db_server_info()`
+* Removed: Code for PHP's `safe_mode`, which does not exist since PHP 5.4 — the "PHP Safe Mode Enabled" notice (it never showed, because `$safe_mode = ini_get(…) && …` bound wrongly), the filter `syncpilot_hide_safe_mode_warning` and the `safe_mode` check before `set_time_limit()` (now only `function_exists( 'set_time_limit' )`)
+* Removed: The "Internet Explorer Not Supported" notice and the script that showed it; the two strings are removed from the German translation
+* Fixed: The status in the README named a version "2.0.0-dev" left over from an earlier draft; it now says 0.0.2 (alpha)
+* Fixed: The release workflow read the version only from header lines that start with `Version:` and would have refused to build after the header got the leading ` * `; it now accepts both forms
+* Changed: Code style of `class/syncpilot.php` — more air between logical groups, aligned assignments, no braces around single statements; no functional change
+* Known issue: Not everything is translatable yet — the words "local" and "remote" that the JavaScript inserts into sentences (`asset/js/media-files.js`, `asset/js/script.js`) and the placeholders "New URL" and "New file path" of the find & replace fields are hard-coded English
+
 = Version 0.0.1 =
 
 * Added: First test release of SyncPilot (private, version 0.0.1; the first public release is planned as 1.0.0 once the changes of the 0.x versions have been tested on several installs) — a fork of WP Sync DB 1.5 (itself a continuation of WP Migrate DB by Delicious Brains, last maintained in 2014) merged with WP Sync DB Media Files 1.1.4b1; functionally identical to those two plugins, rebranded and merged into one

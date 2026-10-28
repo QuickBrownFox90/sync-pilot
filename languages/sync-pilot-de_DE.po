@@ -1,0 +1,1100 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: SyncPilot\n"
+"POT-Creation-Date: 2026-10-28 15:09+0100\n"
+"PO-Revision-Date: 2026-10-28 15:11+0100\n"
+"Last-Translator: Patrick Mauersberger <mauersberger@punkt191.de>\n"
+"Language-Team: Patrick Mauersberger (https://dev.patrick-mauersberger.de)\n"
+"Language: de_DE\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 3.6\n"
+"X-Poedit-Basepath: ..\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"X-Poedit-KeywordsList: "
+"__;_e;_n:1,2;_x:1,2c;_ex:1,2c;_nx:4c,1,2;esc_attr__;esc_attr_e;esc_attr_x:1,2c;esc_html__;esc_html_e;esc_html_x:1,2c;_n_noop:1,2;_nx_noop:3c,1,2;__ngettext_noop:1,2\n"
+"X-Poedit-SearchPath-0: .\n"
+
+#: class/syncpilot-base.php:42
+msgid ""
+"Invalid content verification signature, please verify the connection "
+"information on the remote site and try again."
+msgstr ""
+"Ungültige Signatur zur Inhaltsprüfung. Bitte überprüfe die "
+"Verbindungsinformationen auf der Remote-Website und versuche es erneut."
+
+#: class/syncpilot-base.php:133
+#, php-format
+msgid ""
+"The connection to the remote server has timed out, no changes have been "
+"committed. (#134 - scope: %s)"
+msgstr ""
+"Die Verbindung zum Remote-Server hat das Zeitlimit überschritten, es wurden "
+"keine Änderungen übernommen. (#134 - Bereich: %s)"
+
+#: class/syncpilot-base.php:136
+#, php-format
+msgid "We could not find: %s. Are you sure this is the correct URL?"
+msgstr ""
+"Wir konnten %s nicht finden. Bist du sicher, dass dies die richtige URL ist?"
+
+#: class/syncpilot-base.php:141
+msgid ""
+"It appears that you might be trying to pull from a local environment. This "
+"will not work if <u>this</u> website happens to be located on a remote "
+"server, it would be impossible for this server to contact your local "
+"environment."
+msgstr ""
+"Es sieht so aus, als würdest du versuchen, von einer lokalen Umgebung zu "
+"pullen. Das funktioniert nicht, wenn <u>diese</u> Website auf einem Remote-"
+"Server liegt, da dieser Server deine lokale Umgebung nicht erreichen kann."
+
+#: class/syncpilot-base.php:144
+msgid ""
+"It appears that you might be trying to push to a local environment. This "
+"will not work if <u>this</u> website happens to be located on a remote "
+"server, it would be impossible for this server to contact your local "
+"environment."
+msgstr ""
+"Es sieht so aus, als würdest du versuchen, auf eine lokale Umgebung zu "
+"pushen. Das funktioniert nicht, wenn <u>diese</u> Website auf einem Remote-"
+"Server liegt, da dieser Server deine lokale Umgebung nicht erreichen kann."
+
+#: class/syncpilot-base.php:149
+#, php-format
+msgid ""
+"The connection failed, an unexpected error occurred, please contact support. "
+"(#121 - scope: %s)"
+msgstr ""
+"Die Verbindung ist fehlgeschlagen, es ist ein unerwarteter Fehler "
+"aufgetreten. Bitte wende dich an den Support. (#121 - Bereich: %s)"
+
+#: class/syncpilot-base.php:159
+msgid ""
+"The remote site is protected with Basic Authentication. Please enter the "
+"username and password above to continue. (401 Unauthorized)"
+msgstr ""
+"Die Remote-Website ist mit Basic Authentication geschützt. Bitte gib oben "
+"Benutzername und Passwort ein, um fortzufahren. (401 Unauthorized)"
+
+#: class/syncpilot-base.php:164
+#, php-format
+msgid ""
+"Unable to connect to the remote server, please check the connection details "
+"- %1$s %2$s (#129 - scope: %3$s)"
+msgstr ""
+"Es konnte keine Verbindung zum Remote-Server hergestellt werden, bitte "
+"überprüfe die Verbindungsdaten - %1$s %2$s (#129 - Bereich: %3$s)"
+
+#: class/syncpilot-base.php:173
+msgid ""
+"There was a problem with the AJAX request, we were expecting a serialized "
+"response, instead we received:<br />"
+msgstr ""
+"Bei der AJAX-Anfrage ist ein Problem aufgetreten. Wir haben eine "
+"serialisierte Antwort erwartet, stattdessen haben wir Folgendes erhalten:"
+"<br />"
+
+#: class/syncpilot-base.php:181
+#, php-format
+msgid ""
+"SyncPilot does not seem to be installed or active on the remote site. (#131 "
+"- scope: %s)"
+msgstr ""
+"SyncPilot scheint auf der Remote-Website nicht installiert oder aktiv zu "
+"sein. (#131 - Bereich: %s)"
+
+#: class/syncpilot-base.php:385
+#, php-format
+msgid "Invalid nonce for: %s"
+msgstr "Ungültige Nonce für: %s"
+
+#: class/syncpilot-base.php:392
+#, php-format
+msgid "Access denied for: %s"
+msgstr "Zugriff verweigert für: %s"
+
+#: class/syncpilot-media-files.php:271
+msgid "$_FILES is empty, the upload appears to have failed"
+msgstr "$_FILES ist leer, der Upload scheint fehlgeschlagen zu sein"
+
+#: class/syncpilot-media-files.php:380
+msgid "Error attempting to unserialize the remote attachment data"
+msgstr "Fehler beim Deserialisieren der Anhangsdaten von der Remote-Website"
+
+#: class/syncpilot-media-files.php:502
+msgid "Determining which media files to migrate, please wait..."
+msgstr "Zu migrierende Mediendateien werden ermittelt, bitte warten..."
+
+#: class/syncpilot-media-files.php:503
+msgid "Error while attempting to determine which media files to migrate."
+msgstr "Fehler beim Ermitteln der zu migrierenden Mediendateien."
+
+#: class/syncpilot-media-files.php:504 class/syncpilot.php:2475
+msgid "Migration failed"
+msgstr "Migration fehlgeschlagen"
+
+#: class/syncpilot-media-files.php:505
+msgid "A problem occurred when migrating the media files."
+msgstr "Beim Migrieren der Mediendateien ist ein Problem aufgetreten."
+
+#: class/syncpilot-media-files.php:506 template/media-files-options.php:5
+msgid "Media Files"
+msgstr "Mediendateien"
+
+#: class/syncpilot-media-files.php:507
+msgid "Migrating media files"
+msgstr "Mediendateien werden migriert"
+
+#: class/syncpilot-media-files.php:559
+msgid "Invalid URL Provided."
+msgstr ""
+
+#: class/syncpilot-media-files.php:563
+msgid "Could not create Temporary file."
+msgstr ""
+
+#: class/syncpilot-media-files.php:620
+msgid "SyncPilot does not seems to be installed/active on the remote website."
+msgstr ""
+"SyncPilot scheint auf der Remote-Website nicht installiert/aktiv zu sein."
+
+#: class/syncpilot.php:313 class/syncpilot.php:1484
+msgid "Settings"
+msgstr "Einstellungen"
+
+#: class/syncpilot.php:374
+msgid "ext/mysqli"
+msgstr "ext/mysqli"
+
+#: class/syncpilot.php:378
+msgid "WP Memory Limit"
+msgstr "WP Memory-Limit"
+
+#: class/syncpilot.php:623
+msgid "Could not upload the SQL to the server. (#135)"
+msgstr "Das SQL konnte nicht auf den Server hochgeladen werden. (#135)"
+
+#: class/syncpilot.php:630
+msgid "Could not read the SQL file we uploaded to the server. (#136)"
+msgstr ""
+"Die auf den Server hochgeladene SQL-Datei konnte nicht gelesen werden. (#136)"
+
+#: class/syncpilot.php:652
+msgid ""
+"The connection succeeded but the remote site is configured to reject push "
+"connections. You can change this in the \"settings\" tab on the remote site. "
+"(#133)"
+msgstr ""
+"Die Verbindung war erfolgreich, aber die Remote-Website ist so konfiguriert, "
+"dass sie Push-Verbindungen ablehnt. Das kannst du im Tab „Einstellungen“ auf "
+"der Remote-Website ändern. (#133)"
+
+#: class/syncpilot.php:919
+msgid ""
+"The connection succeeded but the remote site is configured to reject pull "
+"connections. You can change this in the \"settings\" tab on the remote site. "
+"(#132)"
+msgstr ""
+"Die Verbindung war erfolgreich, aber die Remote-Website ist so konfiguriert, "
+"dass sie Pull-Verbindungen ablehnt. Das kannst du im Tab „Einstellungen“ auf "
+"der Remote-Website ändern. (#132)"
+
+#: class/syncpilot.php:1003 class/syncpilot.php:1214
+msgid ""
+"Failed attempting to unserialize the response from the remote server. Please "
+"contact support."
+msgstr ""
+"Die Antwort des Remote-Servers konnte nicht deserialisiert werden. Bitte "
+"wende dich an den Support."
+
+#: class/syncpilot.php:1064 class/syncpilot.php:1279
+msgid "pull"
+msgstr "Pull"
+
+#: class/syncpilot.php:1067 class/syncpilot.php:1282
+msgid "push"
+msgstr "Push"
+
+#: class/syncpilot.php:1069
+#, php-format
+msgid ""
+"The connection succeeded but the remote site is configured to reject %s "
+"connections. You can change this in the \"settings\" tab on the remote site. "
+"(#110)"
+msgstr ""
+"Die Verbindung war erfolgreich, aber die Remote-Website ist so konfiguriert, "
+"dass sie %s-Verbindungen ablehnt. Das kannst du im Tab „Einstellungen“ auf "
+"der Remote-Website ändern. (#110)"
+
+#: class/syncpilot.php:1265
+msgid "Try again?"
+msgstr "Erneut versuchen?"
+
+#: class/syncpilot.php:1284
+#, php-format
+msgid ""
+"The connection succeeded but the remote site is configured to reject %s "
+"connections. You can change this in the \"settings\" tab on the remote site. "
+"(#122) <a href=\"#\" class=\"try-again js-action-link\">Try again?</a>"
+msgstr ""
+"Die Verbindung war erfolgreich, aber die Remote-Website ist so konfiguriert, "
+"dass sie %s-Verbindungen ablehnt. Das kannst du im Tab „Einstellungen“ auf "
+"der Remote-Website ändern. (#122) <a href=\"#\" class=\"try-again js-action-"
+"link\">Erneut versuchen?</a>"
+
+#: class/syncpilot.php:1484
+msgid "Migrate"
+msgstr "Migrieren"
+
+#: class/syncpilot.php:1484
+msgid "Diagnostics"
+msgstr "Diagnose"
+
+#: class/syncpilot.php:1497 class/syncpilot.php:1517
+#, php-format
+msgid "Your current PHP run time limit is set to %s seconds."
+msgstr "Dein aktuelles PHP-Laufzeitlimit ist auf %s Sekunden gesetzt."
+
+#: class/syncpilot.php:1515
+msgid ""
+"<strong>PHP Function Disabled</strong> &mdash; The <code>set_time_limit()</"
+"code> function is currently disabled on your server. We use this function to "
+"ensure that the migration doesn't time out. We haven't disabled the plugin "
+"however, so you're free to cross your fingers and hope for the best. You may "
+"want to contact your web host to enable this function."
+msgstr ""
+"<strong>PHP-Funktion deaktiviert</strong> &mdash; Die Funktion "
+"<code>set_time_limit()</code> ist auf deinem Server derzeit deaktiviert. Wir "
+"verwenden sie, damit die Migration nicht in ein Timeout läuft. Wir haben das "
+"Plugin trotzdem nicht deaktiviert, du kannst also die Daumen drücken und auf "
+"das Beste hoffen. Eventuell möchtest du dich an deinen Webhoster wenden, "
+"damit die Funktion aktiviert wird."
+
+#: class/syncpilot.php:1666
+msgid ""
+"Failed to retrieve table structure, please ensure your database is online. "
+"(#125)"
+msgstr ""
+"Die Tabellenstruktur konnte nicht abgerufen werden, bitte stelle sicher, "
+"dass deine Datenbank erreichbar ist. (#125)"
+
+#: class/syncpilot.php:1686
+#, php-format
+msgid "Delete any existing table %s"
+msgstr "Vorhandene Tabelle %s löschen"
+
+#: class/syncpilot.php:1700
+#, php-format
+msgid "Table structure of table %s"
+msgstr "Tabellenstruktur der Tabelle %s"
+
+#: class/syncpilot.php:1708
+msgid ""
+"Failed to generate the create table query, please ensure your database is "
+"online. (#126)"
+msgstr ""
+"Die CREATE-TABLE-Abfrage konnte nicht erzeugt werden, bitte stelle sicher, "
+"dass deine Datenbank erreichbar ist. (#126)"
+
+#: class/syncpilot.php:1747
+#, php-format
+msgid "Data contents of table %s"
+msgstr "Dateninhalt der Tabelle %s"
+
+#: class/syncpilot.php:2082
+#, php-format
+msgid "End of data contents of table %s"
+msgstr "Ende des Dateninhalts der Tabelle %s"
+
+#: class/syncpilot.php:2230
+msgid "WordPress MySQL database migration"
+msgstr "WordPress-MySQL-Datenbankmigration"
+
+#: class/syncpilot.php:2232
+#, php-format
+msgid "Generated: %s"
+msgstr "Erzeugt: %s"
+
+#: class/syncpilot.php:2233
+#, php-format
+msgid "Hostname: %s"
+msgstr "Hostname: %s"
+
+#: class/syncpilot.php:2234
+#, php-format
+msgid "Database: %s"
+msgstr "Datenbank: %s"
+
+#: class/syncpilot.php:2277
+msgid "Failed to write the gzipped SQL data to the file. (#127)"
+msgstr ""
+"Die gzip-komprimierten SQL-Daten konnten nicht in die Datei geschrieben "
+"werden. (#127)"
+
+#: class/syncpilot.php:2284
+msgid "Failed to write the SQL data to the file. (#128)"
+msgstr "Die SQL-Daten konnten nicht in die Datei geschrieben werden. (#128)"
+
+#: class/syncpilot.php:2461
+msgid ""
+"A problem occurred when trying to change the maximum request size, please "
+"try again."
+msgstr ""
+"Beim Ändern der maximalen Anfragegröße ist ein Problem aufgetreten, bitte "
+"versuche es erneut."
+
+#: class/syncpilot.php:2462
+msgid "Establishing connection to remote server, please wait"
+msgstr "Verbindung zum Remote-Server wird hergestellt, bitte warten"
+
+#: class/syncpilot.php:2463
+msgid ""
+"A problem occurred when attempting to connect to the local server, please "
+"check the details and try again."
+msgstr ""
+"Beim Verbindungsaufbau zum lokalen Server ist ein Problem aufgetreten, bitte "
+"überprüfe die Angaben und versuche es erneut."
+
+#: class/syncpilot.php:2464
+msgid ""
+"An error occurred when trying to clear the debug log. Please contact "
+"support. (#132)"
+msgstr ""
+"Beim Leeren des Debug-Logs ist ein Fehler aufgetreten. Bitte wende dich an "
+"den Support. (#132)"
+
+#: class/syncpilot.php:2465
+msgid ""
+"An error occurred when trying to update the debug log. Please contact "
+"support. (#133)"
+msgstr ""
+"Beim Aktualisieren des Debug-Logs ist ein Fehler aufgetreten. Bitte wende "
+"dich an den Support. (#133)"
+
+#: class/syncpilot.php:2466
+msgid "Migrate DB & Save"
+msgstr "Datenbank migrieren & speichern"
+
+#: class/syncpilot.php:2467
+msgid "Migrate DB"
+msgstr "Datenbank migrieren"
+
+#: class/syncpilot.php:2468
+msgid "Please select at least one table to migrate."
+msgstr "Bitte wähle mindestens eine Tabelle zur Migration aus."
+
+#: class/syncpilot.php:2469
+msgid "Please enter a name for your migration profile."
+msgstr "Bitte gib einen Namen für dein Migrationsprofil ein."
+
+#: class/syncpilot.php:2470
+msgid ""
+"An error occurred when attempting to save the migration profile. Please see "
+"the Diagnostics tab for the error log. (#118)"
+msgstr ""
+"Beim Speichern des Migrationsprofils ist ein Fehler aufgetreten. Das "
+"Fehlerprotokoll findest du im Tab „Diagnose“. (#118)"
+
+#: class/syncpilot.php:2471
+msgid "Exporting complete"
+msgstr "Export abgeschlossen"
+
+#: class/syncpilot.php:2472
+msgid "Exporting, please wait..."
+msgstr "Export läuft, bitte warten..."
+
+#: class/syncpilot.php:2473
+msgid "please wait..."
+msgstr "bitte warten..."
+
+#: class/syncpilot.php:2474
+msgid "complete"
+msgstr "abgeschlossen"
+
+#: class/syncpilot.php:2476
+msgid "Backing up"
+msgstr "Sicherung wird erstellt"
+
+#: class/syncpilot.php:2477
+msgid "Migrating"
+msgstr "Migration läuft"
+
+#: class/syncpilot.php:2478
+msgid "Status"
+msgstr "Status"
+
+#: class/syncpilot.php:2479
+msgid "Response"
+msgstr "Antwort"
+
+#: class/syncpilot.php:2480
+msgid ""
+"A problem occurred when attempting to process the following table (#113)"
+msgstr ""
+"Beim Verarbeiten der folgenden Tabelle ist ein Problem aufgetreten (#113)"
+
+#: class/syncpilot.php:2481
+msgid ""
+"A problem occurred when processing the following table. We were expecting a "
+"response in JSON format but instead received an empty response."
+msgstr ""
+"Beim Verarbeiten der folgenden Tabelle ist ein Problem aufgetreten. Wir "
+"haben eine Antwort im JSON-Format erwartet, aber eine leere Antwort erhalten."
+
+#: class/syncpilot.php:2482
+msgid "Migration completed with some errors"
+msgstr "Migration mit einigen Fehlern abgeschlossen"
+
+#: class/syncpilot.php:2483
+msgid "Migration complete, your backup is located at:"
+msgstr "Migration abgeschlossen, deine Sicherung befindet sich unter:"
+
+#: class/syncpilot.php:2484
+msgid "A problem occurred when finalizing the backup. (#132)"
+msgstr "Beim Abschließen der Sicherung ist ein Problem aufgetreten. (#132)"
+
+#: class/syncpilot.php:2485 template/settings.php:76 template/settings.php:90
+msgid "Saved"
+msgstr "Gespeichert"
+
+#: class/syncpilot.php:2486
+msgid ""
+"Any sites setup to use the current API key will no longer be able to "
+"connect. You will need to update those sites with the newly generated API "
+"key. Do you wish to continue?"
+msgstr ""
+"Websites, die den aktuellen API-Schlüssel verwenden, können sich nicht mehr "
+"verbinden. Du musst diese Websites mit dem neu erzeugten API-Schlüssel "
+"aktualisieren. Möchtest du fortfahren?"
+
+#: class/syncpilot.php:2487
+msgid ""
+"An error occurred when trying to generate the API key. Please see the "
+"Diagnostics tab for the error log. (#105)"
+msgstr ""
+"Beim Erzeugen des API-Schlüssels ist ein Fehler aufgetreten. Das "
+"Fehlerprotokoll findest du im Tab „Diagnose“. (#105)"
+
+#: class/syncpilot.php:2488
+msgid ""
+"You are removing the following migration profile. This cannot be undone. Do "
+"you wish to continue?"
+msgstr ""
+"Du entfernst das folgende Migrationsprofil. Das kann nicht rückgängig "
+"gemacht werden. Möchtest du fortfahren?"
+
+#: class/syncpilot.php:2489
+msgid ""
+"An error occurred when trying to delete the profile. Please see the "
+"Diagnostics tab for the error log. (#106)"
+msgstr ""
+"Beim Löschen des Profils ist ein Fehler aufgetreten. Das Fehlerprotokoll "
+"findest du im Tab „Diagnose“. (#106)"
+
+#: class/syncpilot.php:2490
+msgid ""
+"The selected migration profile could not be deleted because it was not "
+"found.\n"
+"Please refresh this page to see an accurate list of the currently available "
+"migration profiles."
+msgstr ""
+"Das ausgewählte Migrationsprofil konnte nicht gelöscht werden, weil es nicht "
+"gefunden wurde.\n"
+"Bitte lade diese Seite neu, um eine aktuelle Liste der verfügbaren "
+"Migrationsprofile zu sehen."
+
+#: class/syncpilot.php:2491
+msgid ""
+"If you change the connection details, you will lose any replaces and table "
+"selections you have made below. Do you wish to continue?"
+msgstr ""
+"Wenn du die Verbindungsdaten änderst, gehen alle unten vorgenommenen "
+"Ersetzungen und Tabellenauswahlen verloren. Möchtest du fortfahren?"
+
+#: class/syncpilot.php:2492 template/migrate.php:125
+msgid "Please enter the connection information above to continue."
+msgstr "Bitte gib oben die Verbindungsinformationen ein, um fortzufahren."
+
+#: class/syncpilot.php:2493
+msgid ""
+"An error occurred when trying to save the settings. Please try again. If the "
+"problem persists, please see the Diagnostics tab for the error log. (#108)"
+msgstr ""
+"Beim Speichern der Einstellungen ist ein Fehler aufgetreten. Bitte versuche "
+"es erneut. Besteht das Problem weiterhin, findest du das Fehlerprotokoll im "
+"Tab „Diagnose“. (#108)"
+
+#: class/syncpilot.php:2494
+msgid ""
+"The connection information appears to be missing, please enter it to "
+"continue."
+msgstr ""
+"Die Verbindungsinformationen fehlen anscheinend, bitte gib sie ein, um "
+"fortzufahren."
+
+#: class/syncpilot.php:2495
+msgid ""
+"The connection information appears to be incorrect, it should consist of two "
+"lines. The first being the remote server's URL and the second being the "
+"secret key."
+msgstr ""
+"Die Verbindungsinformationen scheinen nicht korrekt zu sein, sie sollten aus "
+"zwei Zeilen bestehen: in der ersten die URL des Remote-Servers, in der "
+"zweiten der Secret Key."
+
+#: class/syncpilot.php:2496
+msgid ""
+"The URL on the first line appears to be invalid, please check it and try "
+"again."
+msgstr ""
+"Die URL in der ersten Zeile scheint ungültig zu sein, bitte überprüfe sie "
+"und versuche es erneut."
+
+#: class/syncpilot.php:2497
+msgid ""
+"The secret key on the second line appears to be invalid. It should be a 32 "
+"character string that consists of letters, numbers and special characters "
+"only."
+msgstr ""
+"Der Secret Key in der zweiten Zeile scheint ungültig zu sein. Er muss eine "
+"Zeichenfolge aus 32 Zeichen sein, die nur aus Buchstaben, Zahlen und "
+"Sonderzeichen besteht."
+
+#: class/syncpilot.php:2498
+msgid ""
+"It appears you've entered the URL for this website, you need to provide the "
+"URL of the remote website instead."
+msgstr ""
+"Du hast anscheinend die URL dieser Website eingegeben, du musst stattdessen "
+"die URL der Remote-Website angeben."
+
+#: class/syncpilot.php:2499
+msgid ""
+"It appears you've entered the secret key for this website, you need to "
+"provide the secret key for the remote website instead."
+msgstr ""
+"Du hast anscheinend den Secret Key dieser Website eingegeben, du musst "
+"stattdessen den Secret Key der Remote-Website angeben."
+
+#: class/syncpilot.php:2500 template/migrate-progress.php:8
+msgid "Time Elapsed:"
+msgstr "Verstrichene Zeit:"
+
+#: class/syncpilot.php:2501 template/migrate-progress.php:19
+msgid "Pause"
+msgstr "Pause"
+
+#: class/syncpilot.php:2502
+msgid "Migration Paused"
+msgstr "Migration pausiert"
+
+#: class/syncpilot.php:2503
+msgid "Resume"
+msgstr "Fortsetzen"
+
+#: class/syncpilot.php:2504
+msgid "Completing current request"
+msgstr "Aktuelle Anfrage wird abgeschlossen"
+
+#: class/syncpilot.php:2505
+msgid "Cancelling migration"
+msgstr "Migration wird abgebrochen"
+
+#: class/syncpilot.php:2506
+msgid "Paused"
+msgstr "Pausiert"
+
+#: class/syncpilot.php:2507
+msgid "Removing the local MySQL export file"
+msgstr "Lokale MySQL-Exportdatei wird entfernt"
+
+#: class/syncpilot.php:2508
+msgid "Removing the local backup MySQL export file"
+msgstr "Lokale MySQL-Sicherungsdatei wird entfernt"
+
+#: class/syncpilot.php:2509
+msgid "Removing the local temporary tables"
+msgstr "Lokale temporäre Tabellen werden entfernt"
+
+#: class/syncpilot.php:2510
+msgid "Removing the remote backup MySQL export file"
+msgstr "MySQL-Sicherungsdatei auf der Remote-Website wird entfernt"
+
+#: class/syncpilot.php:2511
+msgid "Removing the remote temporary tables"
+msgstr "Temporäre Tabellen auf der Remote-Website werden entfernt"
+
+#: class/syncpilot.php:2512
+msgid "Migration cancellation failed"
+msgstr "Abbruch der Migration fehlgeschlagen"
+
+#: class/syncpilot.php:2513
+msgid ""
+"A problem occurred while cancelling the migration, you may have to manually "
+"delete some temporary files / tables."
+msgstr ""
+"Beim Abbrechen der Migration ist ein Problem aufgetreten. Möglicherweise "
+"musst du einige temporäre Dateien / Tabellen manuell löschen."
+
+#: class/syncpilot.php:2514
+msgid "Migration cancelled"
+msgstr "Migration abgebrochen"
+
+#: class/syncpilot.php:2553
+msgid "Could not find the file to download:"
+msgstr "Die herunterzuladende Datei wurde nicht gefunden:"
+
+#: class/syncpilot.php:2762
+msgid "MySQL export file not found."
+msgstr "MySQL-Exportdatei nicht gefunden."
+
+#: class/syncpilot.php:2768
+msgid "Could not delete the MySQL export file."
+msgstr "Die MySQL-Exportdatei konnte nicht gelöscht werden."
+
+#: template/diagnostics.php:3
+msgid "Diagnostic Info &amp; Error Log"
+msgstr "Diagnoseinformationen &amp; Fehlerprotokoll"
+
+#: template/diagnostics.php:5
+msgid "Clear Error Log"
+msgstr "Fehlerprotokoll leeren"
+
+#: template/media-files-options.php:12
+msgid ""
+"Remove <span class=\"remove-scope-1\">local</span> media files that are not "
+"found on the <span class=\"remove-scope-2\">remote</span> site"
+msgstr ""
+"Mediendateien (<span class=\"remove-scope-1\">local</span>) entfernen, die "
+"auf der Gegenseite (<span class=\"remove-scope-2\">remote</span>) nicht "
+"vorhanden sind"
+
+#: template/media-files-options.php:18
+msgid "Media Files Unavailable"
+msgstr "Mediendateien nicht verfügbar"
+
+#: template/media-files-options.php:18
+msgid ""
+"The <strong>remote site</strong> runs a version of SyncPilot without media "
+"file support. Please install or update SyncPilot there to enable media file "
+"migration."
+msgstr ""
+"Auf der <strong>Remote-Website</strong> läuft eine SyncPilot-Version ohne "
+"Unterstützung für Mediendateien. Bitte installiere oder aktualisiere "
+"SyncPilot dort, um die Migration von Mediendateien zu ermöglichen."
+
+#: template/media-files-options.php:21 template/migrate.php:128
+msgid "Version Mismatch"
+msgstr "Versionskonflikt"
+
+#: template/migrate-progress.php:4
+msgid "Please wait while migration is running..."
+msgstr "Bitte warten, die Migration läuft..."
+
+#: template/migrate-progress.php:7
+msgid "Establishing Connection"
+msgstr "Verbindung wird hergestellt"
+
+#: template/migrate-progress.php:20
+msgid "Cancel"
+msgstr "Abbrechen"
+
+#: template/migrate.php:61 template/migrate.php:463
+msgid "Back to select a saved profile"
+msgstr "Zurück zur Auswahl eines gespeicherten Profils"
+
+#: template/migrate.php:70
+msgid "Export File"
+msgstr "Exportdatei"
+
+#: template/migrate.php:76
+msgid "Save as file to your computer"
+msgstr "Als Datei auf deinem Computer speichern"
+
+#: template/migrate.php:83
+msgid "Compress file with gzip"
+msgstr "Datei mit gzip komprimieren"
+
+#: template/migrate.php:92
+msgid "Pull"
+msgstr "Pull"
+
+#: template/migrate.php:92
+msgid "Replace this site's db with remote db"
+msgstr "Datenbank dieser Website durch die Remote-Datenbank ersetzen"
+
+#: template/migrate.php:101
+msgid "Push"
+msgstr "Push"
+
+#: template/migrate.php:101
+msgid "Replace remote db with this site's db"
+msgstr "Remote-Datenbank durch die Datenbank dieser Website ersetzen"
+
+#: template/migrate.php:110
+msgid "Connection Info - Site URL &amp; Secret Key"
+msgstr "Verbindungsinfo - Website-URL &amp; Secret Key"
+
+#: template/migrate.php:120
+msgid "SSL Disabled"
+msgstr "SSL deaktiviert"
+
+#: template/migrate.php:120
+msgid ""
+"We couldn't connect over SSL but regular http (no SSL) appears to be working "
+"so we've switched to that. If you run a push or pull, your data will be "
+"transmitted unencrypted. Most people are fine with this, but just a heads up."
+msgstr ""
+"Wir konnten keine Verbindung über SSL herstellen, aber normales HTTP (ohne "
+"SSL) scheint zu funktionieren, daher haben wir darauf umgestellt. Wenn du "
+"einen Push oder Pull ausführst, werden deine Daten unverschlüsselt "
+"übertragen. Für die meisten ist das in Ordnung, aber wir wollten dich darauf "
+"hinweisen."
+
+#: template/migrate.php:128
+#, php-format
+msgid ""
+"We've detected you have version <span class=\"remote-version\"></span> of "
+"SyncPilot at <span class=\"remote-location\"></span> but are using %1$s "
+"here. Please go to the <a href=\"%2$s\">Plugins page</a> on both installs "
+"and check for updates."
+msgstr ""
+"Wir haben festgestellt, dass unter <span class=\"remote-location\"></span> "
+"SyncPilot in Version <span class=\"remote-version\"></span> läuft, du hier "
+"aber %1$s verwendest. Bitte rufe auf beiden Installationen die <a "
+"href=\"%2$s\">Plugin-Seite</a> auf und suche nach Updates."
+
+#: template/migrate.php:132
+msgid "Cannot Access Uploads Directory"
+msgstr "Kein Zugriff auf das Uploads-Verzeichnis"
+
+#: template/migrate.php:134
+msgid ""
+"We require write permissions to the standard WordPress uploads directory. "
+"Without this permission exports are unavailable. Please grant 755 "
+"permissions on the following directory:"
+msgstr ""
+"Wir benötigen Schreibrechte für das Standard-Uploads-Verzeichnis von "
+"WordPress. Ohne diese Berechtigung sind Exporte nicht verfügbar. Bitte setze "
+"die Berechtigung 755 für das folgende Verzeichnis:"
+
+#: template/migrate.php:143
+msgid "Find"
+msgstr "Suchen"
+
+#: template/migrate.php:144
+msgid "Replace"
+msgstr "Ersetzen"
+
+#: template/migrate.php:147
+msgid ""
+"Doesn't look we have any replaces yet, <a href=\"#\" class=\"js-action-link "
+"add-replace\">add one?</a>"
+msgstr ""
+"Es sind noch keine Ersetzungen vorhanden, <a href=\"#\" class=\"js-action-"
+"link add-replace\">eine hinzufügen?</a>"
+
+#: template/migrate.php:226
+#, php-format
+msgid ""
+"<strong>New URL Missing</strong> &mdash; Please enter the protocol-relative "
+"URL of the remote website in the \"New URL\" field. If you are unsure of "
+"what this URL should be, please consult <a href=\"%s\" target=\"_blank\">our "
+"documentation</a> on find and replace fields."
+msgstr ""
+"<strong>Neue URL fehlt</strong> &mdash; Bitte gib im Feld „New URL“ die "
+"protokollrelative URL der Remote-Website ein. Wenn du dir nicht sicher bist, "
+"wie diese URL lauten soll, lies <a href=\"%s\" target=\"_blank\">unsere "
+"Dokumentation</a> zu den Suchen-und-Ersetzen-Feldern."
+
+#: template/migrate.php:227
+#, php-format
+msgid ""
+"<strong>New File Path Missing</strong> &mdash; Please enter the root file "
+"path of the remote website in the \"New file path\" field. If you are unsure "
+"of what the file path should be, please consult <a href=\"%s\" "
+"target=\"_blank\">our documentation</a> on find and replace fields."
+msgstr ""
+"<strong>Neuer Dateipfad fehlt</strong> &mdash; Bitte gib im Feld „New file "
+"path“ den Stammdateipfad der Remote-Website ein. Wenn du dir nicht sicher "
+"bist, wie der Dateipfad lauten soll, lies <a href=\"%s\" "
+"target=\"_blank\">unsere Dokumentation</a> zu den Suchen-und-Ersetzen-"
+"Feldern."
+
+#: template/migrate.php:244
+msgid "Migrate all tables with prefix"
+msgstr "Alle Tabellen mit Präfix migrieren"
+
+#: template/migrate.php:250
+msgid "Migrate only selected tables below"
+msgstr "Nur unten ausgewählte Tabellen migrieren"
+
+#: template/migrate.php:268 template/migrate.php:296 template/migrate.php:391
+#: template/settings.php:68
+msgid "Select All"
+msgstr "Alle auswählen"
+
+#: template/migrate.php:270 template/migrate.php:298 template/migrate.php:393
+#: template/settings.php:70
+msgid "Deselect All"
+msgstr "Alle abwählen"
+
+#: template/migrate.php:272 template/migrate.php:300 template/migrate.php:395
+#: template/settings.php:72
+msgid "Invert Selection"
+msgstr "Auswahl umkehren"
+
+#: template/migrate.php:280
+msgid "Exclude Post Types"
+msgstr "Beitragstypen ausschließen"
+
+#: template/migrate.php:308
+msgid "Advanced Options"
+msgstr "Erweiterte Optionen"
+
+#: template/migrate.php:317
+msgid "Replace GUIDs"
+msgstr "GUIDs ersetzen"
+
+#: template/migrate.php:323
+#, php-format
+msgid ""
+"Although the <a href=\"%s\" target=\"_blank\">WordPress Codex emphasizes</a> "
+"that GUIDs should not be changed, this is limited to sites that are already "
+"live. If the site has never been live, I recommend replacing the GUIDs. For "
+"example, you may be developing a new site locally at dev.somedomain.com and "
+"want to migrate the site live to somedomain.com."
+msgstr ""
+"Obwohl der <a href=\"%s\" target=\"_blank\">WordPress Codex betont</a>, dass "
+"GUIDs nicht geändert werden sollten, gilt das nur für Websites, die bereits "
+"live sind. Wenn die Website noch nie live war, empfehle ich, die GUIDs zu "
+"ersetzen. Du entwickelst zum Beispiel lokal eine neue Website unter "
+"dev.somedomain.com und möchtest sie auf somedomain.com live migrieren."
+
+#: template/migrate.php:329
+msgid "Exclude spam comments"
+msgstr "Spam-Kommentare ausschließen"
+
+#: template/migrate.php:335
+msgid ""
+"Do not migrate the 'active_plugins' setting (i.e. which plugins are "
+"activated/deactivated)"
+msgstr ""
+"Die Einstellung „active_plugins“ nicht migrieren (d. h. welche Plugins "
+"aktiviert/deaktiviert sind)"
+
+#: template/migrate.php:352
+msgid ""
+"Backup the <span class=\"directory-scope\">local</span> database before "
+"replacing it"
+msgstr ""
+"Datenbank vor dem Ersetzen sichern (<span class=\"directory-scope\">local</"
+"span>)"
+
+#: template/migrate.php:353
+msgid "An SQL file will be saved to"
+msgstr "Eine SQL-Datei wird gespeichert unter"
+
+#: template/migrate.php:361
+msgid "Backup all tables with prefix"
+msgstr "Alle Tabellen mit Präfix sichern"
+
+#: template/migrate.php:367
+msgid "Backup only tables selected for migration"
+msgstr "Nur die für die Migration ausgewählten Tabellen sichern"
+
+#: template/migrate.php:373
+msgid "Backup only selected tables below"
+msgstr "Nur unten ausgewählte Tabellen sichern"
+
+#: template/migrate.php:398
+#, php-format
+msgid ""
+"The backup option has been disabled as your <span class=\"directory-"
+"scope\">local</span> uploads directory is currently not writeable. The "
+"following directory should have 755 permissions: <span class=\"upload-"
+"directory-location\">%s</span></p>"
+msgstr ""
+"Die Sicherungsoption wurde deaktiviert, weil das Uploads-Verzeichnis (<span "
+"class=\"directory-scope\">local</span>) derzeit nicht beschreibbar ist. Das "
+"folgende Verzeichnis sollte die Berechtigung 755 haben: <span class=\"upload-"
+"directory-location\">%s</span></p>"
+
+#: template/migrate.php:406
+msgid "Save Migration Profile"
+msgstr "Migrationsprofil speichern"
+
+#: template/migrate.php:406
+msgid "Save the above settings for the next time you do a similiar migration"
+msgstr "Die obigen Einstellungen für die nächste ähnliche Migration speichern"
+
+#: template/migrate.php:425
+msgid "Create new profile"
+msgstr "Neues Profil erstellen"
+
+#: template/migrate.php:434 template/migrate.php:444
+msgid "Warning: Different Table Prefixes"
+msgstr "Warnung: Unterschiedliche Tabellenpräfixe"
+
+#: template/migrate.php:436
+msgid ""
+"Whoa! We've detected that the database table prefix differs between "
+"installations. Clicking the Migrate DB button below will create new database "
+"tables in your local database with prefix \"<span class=\"remote-prefix\"></"
+"span>\"."
+msgstr ""
+"Achtung! Wir haben festgestellt, dass sich das Tabellenpräfix der Datenbank "
+"zwischen den Installationen unterscheidet. Ein Klick auf die Schaltfläche "
+"„Datenbank migrieren“ unten erstellt neue Datenbanktabellen in deiner "
+"lokalen Datenbank mit dem Präfix „<span class=\"remote-prefix\"></span>“."
+
+#: template/migrate.php:438
+#, php-format
+msgid ""
+"However, your local install is configured to use table prefix \"%1$s\" and "
+"will ignore the migrated tables. So, <b>AFTER</b> migration is complete, you "
+"will need to edit your local install's wp-config.php and change the \"%1$s\" "
+"variable to \"<span class=\"remote-prefix\"></span>\"."
+msgstr ""
+"Deine lokale Installation ist jedoch auf das Tabellenpräfix „%1$s“ "
+"konfiguriert und ignoriert die migrierten Tabellen. Du musst daher <b>NACH</"
+"b> Abschluss der Migration die wp-config.php deiner lokalen Installation "
+"bearbeiten und die Variable „%1$s“ auf „<span class=\"remote-prefix\"></"
+"span>“ ändern."
+
+#: template/migrate.php:440
+msgid ""
+"This will allow your local install the use the migrated tables. Once you do "
+"this, you shouldn't have to do it again."
+msgstr ""
+"Damit kann deine lokale Installation die migrierten Tabellen verwenden. Wenn "
+"du das einmal gemacht hast, musst du es nicht erneut tun."
+
+#: template/migrate.php:446
+#, php-format
+msgid ""
+"Whoa! We've detected that the database table prefix differs between "
+"installations. Clicking the Migrate DB button below will create new database "
+"tables in the remote database with prefix \"%s\"."
+msgstr ""
+"Achtung! Wir haben festgestellt, dass sich das Tabellenpräfix der Datenbank "
+"zwischen den Installationen unterscheidet. Ein Klick auf die Schaltfläche "
+"„Datenbank migrieren“ unten erstellt neue Datenbanktabellen in der Remote-"
+"Datenbank mit dem Präfix „%s“."
+
+#: template/migrate.php:448
+#, php-format
+msgid ""
+"However, your remote install is configured to use table prefix \"<span "
+"class=\"remote-prefix\"></span>\" and will ignore the migrated tables. So, "
+"<b>AFTER</b> migration is complete, you will need to edit your remote "
+"install's wp-config.php and change the \"<span class=\"remote-prefix\"></"
+"span>\" variable to \"%s\"."
+msgstr ""
+"Deine Remote-Installation ist jedoch auf das Tabellenpräfix „<span "
+"class=\"remote-prefix\"></span>“ konfiguriert und ignoriert die migrierten "
+"Tabellen. Du musst daher <b>NACH</b> Abschluss der Migration die wp-"
+"config.php deiner Remote-Installation bearbeiten und die Variable „<span "
+"class=\"remote-prefix\"></span>“ auf „%s“ ändern."
+
+#: template/migrate.php:450
+msgid ""
+"This will allow your remote install the use the migrated tables. Once you do "
+"this, you shouldn't have to do it again."
+msgstr ""
+"Damit kann deine Remote-Installation die migrierten Tabellen verwenden. Wenn "
+"du das einmal gemacht hast, musst du es nicht erneut tun."
+
+#: template/profile.php:2
+msgid "Would you like to use a saved migration profile?"
+msgstr "Möchtest du ein gespeichertes Migrationsprofil verwenden?"
+
+#: template/profile.php:7
+msgid "Nope, let's start fresh..."
+msgstr "Nein, neu anfangen..."
+
+#: template/settings.php:18
+msgid ""
+"Accept <b>pull</b> requests allow this database to be exported and downloaded"
+msgstr ""
+"<b>Pull</b>-Anfragen akzeptieren (erlaubt den Export und Download dieser "
+"Datenbank)"
+
+#: template/settings.php:24
+msgid "Accept <b>push</b> requests allow this database to be overwritten"
+msgstr ""
+"<b>Push</b>-Anfragen akzeptieren (erlaubt das Überschreiben dieser Datenbank)"
+
+#: template/settings.php:30
+msgid "Enable SSL verification"
+msgstr "SSL-Verifizierung aktivieren"
+
+#: template/settings.php:34
+msgid ""
+"We disable SSL verification by default because a lot of people's "
+"environments are not setup for it to work. For example, with XAMPP, you have "
+"to manually enable OpenSSL by editing the php.ini. Without SSL verification, "
+"an HTTPS connection is vulnerable to a man-in-the-middle attack, so we do "
+"recommend you configure your environment and enable this."
+msgstr ""
+"Wir deaktivieren die SSL-Verifizierung standardmäßig, weil die Umgebung bei "
+"vielen dafür nicht eingerichtet ist. Mit XAMPP musst du zum Beispiel OpenSSL "
+"manuell in der php.ini aktivieren. Ohne SSL-Verifizierung ist eine HTTPS-"
+"Verbindung anfällig für Man-in-the-Middle-Angriffe. Wir empfehlen daher, "
+"deine Umgebung entsprechend zu konfigurieren und diese Option zu aktivieren."
+
+#: template/settings.php:41
+msgid "Connection Info"
+msgstr "Verbindungsinfo"
+
+#: template/settings.php:43
+msgid "Reset API Key"
+msgstr "API-Schlüssel zurücksetzen"
+
+#: template/settings.php:49
+msgid ""
+"Improve performance and reliability by not loading the following plugins for "
+"migration requests"
+msgstr ""
+"Performance und Zuverlässigkeit verbessern, indem die folgenden Plugins bei "
+"Migrationsanfragen nicht geladen werden"
+
+#: template/settings.php:53
+msgid ""
+"Some plugins add a lot of overhead to each request, requiring extra memory "
+"and CPU. And some plugins even interfere with migrations and cause them to "
+"fail. We recommend only loading plugins that affect migration requests, for "
+"example a plugin that hooks into SyncPilot."
+msgstr ""
+"Manche Plugins erzeugen bei jeder Anfrage erheblichen Mehraufwand und "
+"benötigen zusätzlichen Arbeitsspeicher und CPU. Einige Plugins stören sogar "
+"Migrationen und lassen sie fehlschlagen. Wir empfehlen, nur Plugins zu "
+"laden, die Migrationsanfragen betreffen, zum Beispiel ein Plugin, das sich "
+"in SyncPilot einklinkt."
+
+#: template/settings.php:75
+msgid "Save Changes"
+msgstr "Änderungen speichern"
+
+#: template/settings.php:83
+msgid "Maximum Request Size"
+msgstr "Maximale Anfragegröße"
+
+#: template/settings.php:86
+#, php-format
+msgid ""
+"We've detected that your server supports requests up to %s, but it's "
+"possible that your server has limitations that we could not detect. To be on "
+"the safe side, we set the default to 1 MB, but you can try throttling it up "
+"to get better performance. If you're getting a 413 error or having trouble "
+"with time outs, try throttling this setting down."
+msgstr ""
+"Wir haben festgestellt, dass dein Server Anfragen bis zu %s unterstützt, es "
+"ist aber möglich, dass dein Server Einschränkungen hat, die wir nicht "
+"erkennen konnten. Um auf Nummer sicher zu gehen, haben wir den Standardwert "
+"auf 1 MB gesetzt. Du kannst ihn aber hochsetzen, um eine bessere Performance "
+"zu erreichen. Wenn du einen 413-Fehler erhältst oder Probleme mit Timeouts "
+"hast, setze diesen Wert wieder herunter."

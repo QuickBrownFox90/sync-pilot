@@ -1,5 +1,7 @@
 <?php
 class SyncPilot_Base {
+	const TEXT_DOMAIN = 'sync-pilot';
+
 	protected $settings;
 	protected $plugin_file_path;
 	protected $plugin_dir_path;
@@ -37,7 +39,7 @@ class SyncPilot_Base {
 	function __construct( $plugin_file_path ) {
 		$this->settings = get_option( 'syncpilot_settings' );
 
-		$this->invalid_content_verification_error = __( 'Invalid content verification signature, please verify the connection information on the remote site and try again.', 'sync-pilot' );
+		$this->invalid_content_verification_error = __( 'Invalid content verification signature, please verify the connection information on the remote site and try again.', self::TEXT_DOMAIN );
 
 		$this->transient_timeout = 60 * 60 * 12;
 		$this->transient_retry_timeout = 60 * 60 * 2;
@@ -74,9 +76,8 @@ class SyncPilot_Base {
 	}
 
 	function set_time_limit() {
-		if ( !function_exists( 'ini_get' ) || !ini_get( 'safe_mode' ) ) {
+		if ( function_exists( 'set_time_limit' ) )
 			@set_time_limit( 0 );
-		}
 	}
 
 	function remote_post( $url, $data, $scope, $args = array(), $expecting_serial = false ) {
@@ -128,23 +129,23 @@ class SyncPilot_Base {
 				return $this->retry_remote_post( $url, $data, $scope, $args, $expecting_serial );
 			}
 			else if( isset( $response->errors['http_request_failed'][0] ) && strstr( $response->errors['http_request_failed'][0], 'timed out' ) ) {
-				$this->error = sprintf( __( 'The connection to the remote server has timed out, no changes have been committed. (#134 - scope: %s)', 'sync-pilot' ), $scope );
+				$this->error = sprintf( __( 'The connection to the remote server has timed out, no changes have been committed. (#134 - scope: %s)', self::TEXT_DOMAIN ), $scope );
 			}
 			else if ( isset( $response->errors['http_request_failed'][0] ) && ( strstr( $response->errors['http_request_failed'][0], 'Could not resolve host' ) || strstr( $response->errors['http_request_failed'][0], 'couldn\'t connect to host' ) ) ) {
-				$this->error = sprintf( __( 'We could not find: %s. Are you sure this is the correct URL?', 'sync-pilot' ), $_POST['url'] );
+				$this->error = sprintf( __( 'We could not find: %s. Are you sure this is the correct URL?', self::TEXT_DOMAIN ), $_POST['url'] );
 				$url_bits = parse_url( $_POST['url'] );
 				if( strstr( $_POST['url'], 'dev.' ) || strstr( $_POST['url'], '.dev' ) || ! strstr( $url_bits['host'], '.' ) ) {
 					$this->error .= '<br />';
 					if( $_POST['intent'] == 'pull' ) {
-						$this->error .= __( 'It appears that you might be trying to pull from a local environment. This will not work if <u>this</u> website happens to be located on a remote server, it would be impossible for this server to contact your local environment.', 'sync-pilot' );
+						$this->error .= __( 'It appears that you might be trying to pull from a local environment. This will not work if <u>this</u> website happens to be located on a remote server, it would be impossible for this server to contact your local environment.', self::TEXT_DOMAIN );
 					}
 					else {
-						$this->error .= __( 'It appears that you might be trying to push to a local environment. This will not work if <u>this</u> website happens to be located on a remote server, it would be impossible for this server to contact your local environment.', 'sync-pilot' );
+						$this->error .= __( 'It appears that you might be trying to push to a local environment. This will not work if <u>this</u> website happens to be located on a remote server, it would be impossible for this server to contact your local environment.', self::TEXT_DOMAIN );
 					}
 				}
 			}
 			else {
-				$this->error = sprintf( __( 'The connection failed, an unexpected error occurred, please contact support. (#121 - scope: %s)', 'sync-pilot' ), $scope );
+				$this->error = sprintf( __( 'The connection failed, an unexpected error occurred, please contact support. (#121 - scope: %s)', self::TEXT_DOMAIN ), $scope );
 			}
 			$this->log_error( $this->error, $response );
 			return false;
@@ -154,12 +155,12 @@ class SyncPilot_Base {
 				return $this->retry_remote_post( $url, $data, $scope, $args, $expecting_serial );
 			}
 			else if( $response['response']['code'] == '401' ) {
-				$this->error = __( 'The remote site is protected with Basic Authentication. Please enter the username and password above to continue. (401 Unauthorized)', 'sync-pilot' );
+				$this->error = __( 'The remote site is protected with Basic Authentication. Please enter the username and password above to continue. (401 Unauthorized)', self::TEXT_DOMAIN );
 				$this->log_error( $this->error, $response );
 				return false;
 			}
 			else {
-				$this->error = sprintf( __( 'Unable to connect to the remote server, please check the connection details - %1$s %2$s (#129 - scope: %3$s)', 'sync-pilot' ), $response['response']['code'], $response['response']['message'], $scope );
+				$this->error = sprintf( __( 'Unable to connect to the remote server, please check the connection details - %1$s %2$s (#129 - scope: %3$s)', self::TEXT_DOMAIN ), $response['response']['code'], $response['response']['message'], $scope );
 				$this->log_error( $this->error, $response );
 				return false;
 			}
@@ -168,7 +169,7 @@ class SyncPilot_Base {
 			if( strpos( $url, 'https://' ) === 0 && $scope == 'ajax_verify_connection_to_remote_site' ) {
 				return $this->retry_remote_post( $url, $data, $scope, $args, $expecting_serial );
 			}
-			$this->error = __( 'There was a problem with the AJAX request, we were expecting a serialized response, instead we received:<br />', 'sync-pilot' ) . htmlentities( $response['body'] );
+			$this->error = __( 'There was a problem with the AJAX request, we were expecting a serialized response, instead we received:<br />', self::TEXT_DOMAIN ) . htmlentities( $response['body'] );
 			$this->log_error( $this->error, $response );
 			return false;
 		}
@@ -176,7 +177,7 @@ class SyncPilot_Base {
 			if( strpos( $url, 'https://' ) === 0 && $scope == 'ajax_verify_connection_to_remote_site' ) {
 				return $this->retry_remote_post( $url, $data, $scope, $args, $expecting_serial );
 			}
-			$this->error = sprintf( __( 'SyncPilot does not seem to be installed or active on the remote site. (#131 - scope: %s)', 'sync-pilot' ), $scope );
+			$this->error = sprintf( __( 'SyncPilot does not seem to be installed or active on the remote site. (#131 - scope: %s)', self::TEXT_DOMAIN ), $scope );
 			$this->log_error( $this->error, $response );
 			return false;
 		}
@@ -380,14 +381,14 @@ class SyncPilot_Base {
 		if ( defined( 'DOING_SYNCPILOT_TESTS' ) || $this->doing_cli_migration ) return;
 		$result = check_ajax_referer( $action, 'nonce', false );
 		if ( false === $result ) {
-			$return = array( 'syncpilot_error' => 1, 'body' => sprintf( __( 'Invalid nonce for: %s', 'sync-pilot' ), $action ) );
+			$return = array( 'syncpilot_error' => 1, 'body' => sprintf( __( 'Invalid nonce for: %s', self::TEXT_DOMAIN ), $action ) );
 			$this->end_ajax( json_encode( $return ) );
 		}
 
 		$cap = ( is_multisite() ) ? 'manage_network_options' : 'export';
 		$cap = apply_filters( 'syncpilot_ajax_cap', $cap );
 		if ( !current_user_can( $cap ) ) {
-			$return = array( 'syncpilot_error' => 1, 'body' => sprintf( __( 'Access denied for: %s', 'sync-pilot' ), $action ) );
+			$return = array( 'syncpilot_error' => 1, 'body' => sprintf( __( 'Access denied for: %s', self::TEXT_DOMAIN ), $action ) );
 			$this->end_ajax( json_encode( $return ) );
 		}
 	}

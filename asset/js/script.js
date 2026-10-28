@@ -243,11 +243,6 @@ var execute_next_step;
       $('.plugin-compatibility-wrap').show();
     }
 
-    if (navigator.userAgent.indexOf('MSIE') > 0 || navigator.userAgent.indexOf(
-      'Trident') > 0) {
-      $('.ie-warning').show();
-    }
-
     $('.slider').slider({
       range: 'min',
       value: syncpilot_max_request / 1024,
@@ -299,21 +294,6 @@ var execute_next_step;
     var pull_post_type_select = $('#select-post-types').clone();
     var push_select_backup = $('#select-backup').clone();
     var pull_select_backup = $('#select-backup').clone();
-
-    $('.help-tab .video').each(function() {
-      var $container = $(this),
-        $viewer = $('.video-viewer');
-
-      $('a', this).click(function(e) {
-        e.preventDefault();
-
-        $viewer.attr('src', '//www.youtube.com/embed/' + $container.data(
-          'video-id') + '?autoplay=1');
-        $viewer.show();
-        var offset = $viewer.offset();
-        $(window).scrollTop(offset.top - 50);
-      });
-    });
 
     $('.backup-options').show();
     $('.keep-active-plugins').show();
@@ -560,7 +540,7 @@ var execute_next_step;
       });
     });
 
-    // updates the debug log when the user switches to the help tab
+    // updates the debug log when the user switches to the diagnostics tab
     function refresh_debug_log() {
       $.ajax({
         url: ajaxurl,
@@ -1612,7 +1592,7 @@ var execute_next_step;
       e.stopPropagation();
     });
 
-    // migrate / settings tabs
+    // migrate / settings / diagnostics tabs
     $('.nav-tab').click(function() {
       $('.nav-tab').removeClass('nav-tab-active');
       $(this).addClass('nav-tab-active');
@@ -1623,7 +1603,7 @@ var execute_next_step;
       hash = hash.replace('-tab', '');
       window.location.hash = hash;
 
-      if ($(this).hasClass('help')) {
+      if ($(this).hasClass('diagnostics')) {
         refresh_debug_log();
       }
     });
@@ -1697,7 +1677,7 @@ var execute_next_step;
       $('.content-tab').hide();
       $('.' + hash + '-tab').show();
 
-      if (hash == 'help') {
+      if (hash == 'diagnostics') {
         refresh_debug_log();
       }
     }

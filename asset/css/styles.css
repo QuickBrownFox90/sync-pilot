@@ -26,7 +26,7 @@
      Settings Tab
      ========================================================================== */
   /* =============================================================================
-     Help Tab
+     Diagnostics Tab
      ========================================================================== */
   /* =============================================================================
      Addons Tab
@@ -703,115 +703,30 @@
   font-weight: bold;
   display: none;
 }
-.syncpilot .help-tab {
+.syncpilot .diagnostics-tab {
   display: none;
 }
-.syncpilot .help-tab h3 {
+.syncpilot .diagnostics-tab h3 {
   font-size: 18px;
   font-weight: normal;
 }
-.syncpilot .help-tab .support {
-  border-bottom: 1px solid #ccc;
-  margin-bottom: 25px;
-  padding-bottom: 18px;
-}
-.syncpilot .help-tab .support p {
-  width: 640px;
-}
-.syncpilot .help-tab .support .email a {
-  font-size: 12px;
-}
-.syncpilot .help-tab .support .ajax-spinner {
-  top: 2px;
-}
-.syncpilot .help-tab .video-viewer {
-  margin-bottom: 30px;
-}
-.syncpilot .help-tab .videos {
-  width: 640px;
-}
-.syncpilot .help-tab .videos ul > li {
-  margin-bottom: 30px;
-  overflow: hidden;
-  position: relative;
-}
-.syncpilot .help-tab .videos ul > li a {
-  overflow: hidden;
-  display: block;
-  width: 320px;
-  height: 180px;
-  float: left;
-  margin-right: 15px;
-  position: relative;
-  z-index: 1;
-}
-.syncpilot .help-tab .videos ul > li a:before, .syncpilot .help-tab .videos ul > li a:after {
-  position: absolute;
-  content: " ";
-  margin: auto;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
-}
-.syncpilot .help-tab .videos ul > li a:before {
-  width: 64px;
-  height: 64px;
-  -webkit-border-radius: 64px;
-  -moz-border-radius: 64px;
-  -ms-border-radius: 64px;
-  -o-border-radius: 64px;
-  border-radius: 64px;
-  filter: progid:DXImageTransform.Microsoft.Alpha(Opacity=80);
-  opacity: 0.8;
-  border: 1px solid #ddd;
-  background-color: #fff;
-  z-index: 2;
-}
-.syncpilot .help-tab .videos ul > li a:after {
-  filter: progid:DXImageTransform.Microsoft.Alpha(Opacity=80);
-  opacity: 0.8;
-  border: 21.33333px solid transparent;
-  border-top-width: 12.8px;
-  border-bottom-width: 12.8px;
-  border-left-color: #333;
-  background: transparent;
-  display: block;
-  left: 25px;
-  width: 0px;
-  height: 0px;
-  z-index: 3;
-}
-.syncpilot .help-tab .videos .video:last-child {
-  margin-bottom: 0px;
-}
-.syncpilot .help-tab .videos img {
-  width: 320px;
-  height: 240px;
-  position: relative;
-  top: 50%;
-  margin-top: -120px;
-}
-.syncpilot .help-tab .debug {
+.syncpilot .diagnostics-tab .debug {
   width: 640px;
   border-bottom: 1px solid #CCCCCC;
   margin-bottom: 25px;
   padding-bottom: 28px;
 }
-.syncpilot .help-tab .debug textarea {
+.syncpilot .diagnostics-tab .debug textarea {
   width: 100%;
   min-height: 200px;
   font-family: Consolas, Monaco, monospace;
   margin-bottom: 5px;
 }
-.syncpilot .help-tab h4 {
+.syncpilot .diagnostics-tab h4 {
   margin: 0 0 0.2em 0;
 }
-.syncpilot .help-tab p {
+.syncpilot .diagnostics-tab p {
   margin: 0 0 0.5em 0;
-}
-.syncpilot .help-tab iframe {
-  display: none;
 }
 
 /* Progress Information */
@@ -1059,7 +974,7 @@ body.mp6 .syncpilot h2.nav-tab-wrapper {
   margin-bottom: 0;
   width: 722px;
 }
-body.mp6 .syncpilot .help-tab h3 {
+body.mp6 .syncpilot .diagnostics-tab h3 {
   margin-top: 0;
 }
 body.mp6 .syncpilot .temp-disabled {
@@ -1191,15 +1106,6 @@ body.mp6 .syncpilot .delete-profile:after {
 body.mp6 .syncpilot .replace-remove-row:hover:after,
 body.mp6 .syncpilot .delete-profile:hover:after {
   color: #666;
-}
-body.mp6 .syncpilot .help-tab .support p, body.mp6 .syncpilot .help-tab .support .email a {
-  font-size: 14px;
-}
-body.mp6 .syncpilot .help-tab div.warning p {
-  font-size: 13px;
-}
-body.mp6 .syncpilot .help-tab .videos h4, body.mp6 .syncpilot .help-tab .videos p {
-  font-size: 14px;
 }
 body.mp6 .syncpilot .inline-message, body.mp6 .syncpilot .notification-message {
   border-radius: 0;
