@@ -31,7 +31,7 @@
 					</label>
 					<a href="#" class="general-helper replace-guid-helper js-action-link"></a>
 					<div class="ssl-verify-message helper-message">
-					<?php _e( 'We disable SSL verification by default because a lot of people\'s environments are not setup for it to work. For example, with XAMPP, you have to manually enable OpenSSL by editing the php.ini. Without SSL verification, an HTTPS connection is vulnerable to a man-in-the-middle attack, so we do recommend you configure your environment and enable this.', self::TEXT_DOMAIN ); ?>
+					<?php _e( 'Check the TLS certificate of the other site and never fall back from https to http. Switch this off only if a site cannot offer a valid certificate, for example a local site with a self-signed certificate: without the check an https connection is vulnerable to a man-in-the-middle attack. With XAMPP you may have to enable OpenSSL in the php.ini first.', self::TEXT_DOMAIN ); ?>
 					</div>
 				</li>
 			</ul>

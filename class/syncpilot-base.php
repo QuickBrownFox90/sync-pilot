@@ -2,6 +2,9 @@
 class SyncPilot_Base {
 	const TEXT_DOMAIN = 'sync-pilot';
 
+	// the tables that are replaced are renamed to <this prefix><name> first and dropped when the migration has worked
+	const OLD_TABLE_PREFIX = '_old_';
+
 	protected $settings;
 	protected $plugin_file_path;
 	protected $plugin_dir_path;
@@ -83,11 +86,28 @@ class SyncPilot_Base {
 			@set_time_limit( 0 );
 	}
 
+	// "Enable SSL verification" in the settings: check the TLS certificate of the other site
+	function verify_ssl() {
+		return ! empty( $this->settings['verify_ssl'] );
+	}
+
+	// The connection test may fall back from https to http only if the certificate is not verified anyway,
+	// otherwise a network attacker could force the downgrade and read everything that follows
+	function may_retry_over_http( $url, $scope ) {
+		return 0 === strpos( $url, 'https://' ) && 'ajax_verify_connection_to_remote_site' === $scope && ! $this->verify_ssl();
+	}
+
+	// unserialize() for data from another site, a request or the database: no object is created, so no
+	// __wakeup() or __destruct() of any class can run
+	function safe_unserialize( $data ) {
+		return @unserialize( $data, array( 'allowed_classes' => false ) );
+	}
+
 	function remote_post( $url, $data, $scope, $args = array(), $expecting_serial = false ) {
 
 		$this->set_time_limit();
 
-		if ( function_exists( 'fsockopen' ) && strpos( $url, 'https://' ) === 0 && $scope == 'ajax_verify_connection_to_remote_site' ) {
+		if ( function_exists( 'fsockopen' ) && $this->may_retry_over_http( $url, $scope ) ) {
 
 			$url_parts = parse_url( $url );
 			$host      = $url_parts['host'];
@@ -104,7 +124,7 @@ class SyncPilot_Base {
 		$args = wp_parse_args( $args, array(
 			'timeout'   => $default_remote_post_timeout,
 			'blocking'  => true,
-			'sslverify'	=> false,
+			'sslverify'	=> $this->verify_ssl(),
 		) );
 
 		$args['method'] = 'POST';
@@ -124,7 +144,7 @@ class SyncPilot_Base {
 
 		if ( is_wp_error( $response ) ) {
 
-			if ( strpos( $url, 'https://' ) === 0 && $scope == 'ajax_verify_connection_to_remote_site' ) {
+			if ( $this->may_retry_over_http( $url, $scope ) ) {
 				return $this->retry_remote_post( $url, $data, $scope, $args, $expecting_serial );
 			}
 
@@ -146,6 +166,10 @@ class SyncPilot_Base {
 				}
 			}
 
+			else if ( isset( $response->errors['http_request_failed'][0] ) && preg_match( '/ssl|certificate|tls/i', $response->errors['http_request_failed'][0] ) ) {
+				$this->error = sprintf( __( 'The TLS certificate of the remote site could not be verified. Install a valid certificate there or switch off "Enable SSL verification" in the settings. (#139 - scope: %s)', self::TEXT_DOMAIN ), $scope );
+			}
+
 			else {
 				$this->error = sprintf( __( 'The connection failed, an unexpected error occurred, please contact support. (#121 - scope: %s)', self::TEXT_DOMAIN ), $scope );
 			}
@@ -157,7 +181,7 @@ class SyncPilot_Base {
 
 		elseif ( (int) $response['response']['code'] < 200 || (int) $response['response']['code'] > 399 ) {
 
-			if ( strpos( $url, 'https://' ) === 0 && $scope == 'ajax_verify_connection_to_remote_site' ) {
+			if ( $this->may_retry_over_http( $url, $scope ) ) {
 				return $this->retry_remote_post( $url, $data, $scope, $args, $expecting_serial );
 			}
 
@@ -178,7 +202,7 @@ class SyncPilot_Base {
 		}
 
 		elseif ( $expecting_serial && is_serialized( $response['body'] ) == false ) {
-			if ( strpos( $url, 'https://' ) === 0 && $scope == 'ajax_verify_connection_to_remote_site' )
+			if ( $this->may_retry_over_http( $url, $scope ) )
 				return $this->retry_remote_post( $url, $data, $scope, $args, $expecting_serial );
 
 			$this->error = __( 'There was a problem with the AJAX request, we were expecting a serialized response, instead we received:<br />', self::TEXT_DOMAIN ) . htmlentities( $response['body'] );
@@ -189,7 +213,7 @@ class SyncPilot_Base {
 		}
 
 		elseif ( $response['body'] === '0' ) {
-			if( strpos( $url, 'https://' ) === 0 && $scope == 'ajax_verify_connection_to_remote_site' )
+			if( $this->may_retry_over_http( $url, $scope ) )
 				return $this->retry_remote_post( $url, $data, $scope, $args, $expecting_serial );
 
 
@@ -202,9 +226,9 @@ class SyncPilot_Base {
 
 		elseif ( $expecting_serial && is_serialized( $response['body'] ) == true && $scope == 'ajax_verify_connection_to_remote_site' ) {
 
-			$unserialized_response = unserialize( $response['body'] );
+			$unserialized_response = $this->safe_unserialize( $response['body'] );
 
-			if ( isset( $unserialized_response['error'] ) && '1' == $unserialized_response['error'] && strpos( $url, 'https://' ) === 0 )
+			if ( isset( $unserialized_response['error'] ) && '1' == $unserialized_response['error'] && $this->may_retry_over_http( $url, $scope ) )
 				return $this->retry_remote_post( $url, $data, $scope, $args, $expecting_serial );
 		}
 
@@ -212,6 +236,9 @@ class SyncPilot_Base {
 	}
 
 	function retry_remote_post( $url, $data, $scope, $args = array(), $expecting_serial = false ) {
+
+		if ( ! $this->may_retry_over_http( $url, $scope ) )
+			return false;
 
 		$url = substr_replace( $url, 'http', 0, 5 );
 
@@ -319,28 +346,56 @@ class SyncPilot_Base {
 		return array_intersect_key( $post_array, array_flip( $accepted_elements ) );
 	}
 
+	// The signature is "<timestamp>.<base64 HMAC-SHA256>". The HMAC covers the timestamp and every field with its name
+	// and with the length of name and value, so values cannot be moved from one field to another, and a request that
+	// was recorded can only be replayed for a few minutes
 	function create_signature( $data, $key ) {
 
 		if ( isset( $data['sig'] ) )
 			unset( $data['sig'] );
 
-		$flat_data = implode( '', $data );
+		$timestamp = time();
 
-		return base64_encode( hash_hmac( 'sha1', $flat_data, $key, true ) );
+		return $timestamp . '.' . base64_encode( hash_hmac( 'sha256', $this->signature_payload( $data, $timestamp ), $key, true ) );
+	}
+
+	function signature_payload( $data, $timestamp ) {
+
+		$payload = $timestamp . '|';
+
+		foreach ( $data as $name => $value ) {
+
+			$value    = is_scalar( $value ) ? (string) $value : json_encode( $value );
+			$payload .= strlen( $name ) . ':' . $name . strlen( $value ) . ':' . $value . ';';
+		}
+
+		return $payload;
 	}
 
 	function verify_signature( $data, $key ) {
 
-		if ( empty( $data['sig'] ) )
+		if ( empty( $data['sig'] ) || ! is_string( $data['sig'] ) )
 			return false;
 
 		if ( isset( $data['nonce'] ) )
 			unset( $data['nonce'] );
 
-		$temp               = $data;
-		$computed_signature = $this->create_signature( $temp, $key );
+		$parts = explode( '.', $data['sig'], 2 );
 
-		return $computed_signature === $data['sig'];
+		if ( 2 !== count( $parts ) || ! ctype_digit( $parts[0] ) )
+			return false;
+
+		$timestamp = (int) $parts[0];
+		$window    = (int) apply_filters( 'syncpilot_signature_window', 10 * MINUTE_IN_SECONDS );
+
+		if ( abs( time() - $timestamp ) > $window )
+			return false;
+
+		unset( $data['sig'] );
+
+		$computed_signature = base64_encode( hash_hmac( 'sha256', $this->signature_payload( $data, $timestamp ), $key, true ) );
+
+		return hash_equals( $computed_signature, $parts[1] );
 	}
 
 	function diverse_array( $vector ) {

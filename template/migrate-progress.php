@@ -26,7 +26,7 @@
 	<div class="clearfix"></div>
 	<div class="progress-bar-wrapper">
 		<div class="progress-tables-hover-boxes"></div>
-		<div class="progress-label"><?php echo $wpdb->get_prefix(); ?>options</div>
+		<div class="progress-label"><?php echo esc_html( $GLOBALS['wpdb']->prefix ); ?>options</div>
 		<div class="progress-bar"></div>
 		<div class="progress-tables"></div>
 	</div>

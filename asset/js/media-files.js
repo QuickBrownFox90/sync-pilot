@@ -52,8 +52,8 @@ var media_successfully_determined;
             if (typeof remote_connection_data != 'undefined' &&
                 syncpilot_media_files_version != remote_connection_data.media_files_version
             ) {
-                $('.media-files-remote-location').html(remote_connection_data.url);
-                $('.media-file-remote-version').html(remote_connection_data.media_files_version);
+                $('.media-files-remote-location').text(remote_connection_data.url);
+                $('.media-file-remote-version').text(remote_connection_data.media_files_version);
                 $('.media-files-different-plugin-version-notice').show();
                 disable_media_files_option();
                 return;
@@ -151,7 +151,7 @@ var media_successfully_determined;
 
         function migration_failed(data) {
             $('.progress-title').html(syncpilot_mf_strings.migration_failed);
-            $('.progress-text').html(data);
+            $('.progress-text').html(syncpilot_sanitize_html(data));
             $('.progress-text').addClass('migration-error');
             migration_error = true;
             migration_complete_events();

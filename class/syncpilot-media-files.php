@@ -127,7 +127,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 
 		if ( ! empty( $attachment['metadata'] ) ) {
 
-			$attachment['metadata'] = @unserialize( $attachment['metadata'] );
+			$attachment['metadata'] = $this->safe_unserialize( $attachment['metadata'] );
 
 			if ( ! empty( $attachment['metadata']['sizes'] ) && is_array( $attachment['metadata']['sizes'] ) ) {
 
@@ -323,7 +323,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 
 		$upload_dir = $this->uploads_dir();
 		$files      = $this->diverse_array( $_FILES['media'] );
-		$file_paths = unserialize( $filtered_post['files'] );
+		$file_paths = $this->safe_unserialize( $filtered_post['files'] );
 		$i          = 0;
 		$errors     = array();
 
@@ -434,7 +434,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 			return $result;
 		}
 
-		$remote_attachments = @unserialize( $filtered_post['remote_attachments'] );
+		$remote_attachments = $this->safe_unserialize( $filtered_post['remote_attachments'] );
 
 		if( false === $remote_attachments ) {
 			$return = array(
@@ -701,7 +701,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 			return $result;
 		}
 
-		$response = unserialize( trim( $response ) );
+		$response = $this->safe_unserialize( trim( $response ) );
 
 		if ( isset( $response['syncpilot_error'] ) ) {
 			$result = $this->end_ajax( json_encode( $response ) );

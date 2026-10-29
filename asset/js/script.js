@@ -136,8 +136,8 @@ var execute_next_step;
         if (typeof plugin_version != 'undefined' && plugin_version !=
             syncpilot_plugin_version) {
             $('.different-plugin-version-notice').show();
-            $('.remote-version').html(plugin_version);
-            $('.remote-location').html(url);
+            $('.remote-version').text(plugin_version);
+            $('.remote-location').text(url);
             $('.step-two').hide();
             show_version_notice = true;
         }
@@ -145,7 +145,7 @@ var execute_next_step;
 
     function maybe_show_prefix_notice(prefix) {
         if (prefix != syncpilot_this_prefix) {
-            $('.remote-prefix').html(prefix);
+            $('.remote-prefix').text(prefix);
             show_prefix_notice = true;
             if ($('#pull').is(':checked')) {
                 $('.prefix-notice.pull').show();
@@ -379,7 +379,7 @@ var execute_next_step;
 
                     if (typeof data.syncpilot_error != 'undefined' && data.syncpilot_error ==
                         1) {
-                        $('.connection-status').html(data.body);
+                        $('.connection-status').html(syncpilot_sanitize_html(data.body));
                         $('.connection-status').addClass(
                             'notification-message error-notice migration-error');
 
@@ -502,7 +502,7 @@ var execute_next_step;
                         $('.select-post-types-wrap').prepend(pull_post_type_select);
                         $('#select-backup').remove();
                         $('.backup-tables-wrap').prepend(pull_select_backup);
-                        $('.table-prefix').html(data.prefix);
+                        $('.table-prefix').text(data.prefix);
                         $('.uploads-dir').html(syncpilot_this_uploads_dir);
                     } else {
                         $('#select-backup').remove();
@@ -967,7 +967,7 @@ var execute_next_step;
                         migration_complete_events();
                         $('.progress-title').html(syncpilot_i10n.migration_failed);
                         $('.progress-text').addClass('migration-error');
-                        $('.progress-text').html(data.body);
+                        $('.progress-text').html(syncpilot_sanitize_html(data.body));
                         return;
                     }
 
@@ -1116,7 +1116,7 @@ var execute_next_step;
                                         $('.progress-text').html(syncpilot_i10n.table_process_problem_empty_response +
                                             ' ' + tables_to_migrate[i]);
                                     } else {
-                                        $('.progress-text').html(data);
+                                        $('.progress-text').html(syncpilot_sanitize_html(data));
                                     }
                                     $('.progress-text').addClass('migration-error');
                                     migration_error = true;
@@ -1128,7 +1128,7 @@ var execute_next_step;
                                     row_information.syncpilot_error == 1) {
                                     $('.progress-title').html('Migration failed');
                                     $('.progress-text').addClass('migration-error');
-                                    $('.progress-text').html(row_information.body);
+                                    $('.progress-text').html(syncpilot_sanitize_html(row_information.body));
                                     migration_error = true;
                                     migration_complete_events();
                                     return;
@@ -1183,7 +1183,7 @@ var execute_next_step;
                     $('.progress-title').html(completed_msg).append(
                         '<div class="dashicons dashicons-yes"></div>');
                 } else {
-                    $('.progress-text').html(non_fatal_errors);
+                    $('.progress-text').html(syncpilot_sanitize_html(non_fatal_errors));
                     $('.progress-text').addClass('migration-error');
                     $('.progress-title').html(syncpilot_i10n.completed_with_some_errors);
                 }
@@ -1263,7 +1263,7 @@ var execute_next_step;
                     success: function (data) {
                         if ($.trim(data) != '') {
                             $('.progress-title').html(syncpilot_i10n.migration_failed);
-                            $('.progress-text').html(data);
+                            $('.progress-text').html(syncpilot_sanitize_html(data));
                             $('.progress-text').addClass('migration-error');
                             migration_error = true;
                             migration_complete_events();
@@ -1441,7 +1441,7 @@ var execute_next_step;
                 if (connection_established) {
                     $('.connection-status').hide();
                     $('.step-two').show();
-                    $('.table-prefix').html(connection_data.prefix);
+                    $('.table-prefix').text(connection_data.prefix);
                     $('.uploads-dir').html(syncpilot_this_uploads_dir);
                     if (profile_name_edited == false) {
                         var profile_name = get_domain_name(connection_info[0]);
@@ -1476,7 +1476,7 @@ var execute_next_step;
                     $('.connection-status').hide();
                     $('.step-two').show();
                     $('.table-prefix').html(syncpilot_this_prefix);
-                    $('.uploads-dir').html(connection_data.uploads_dir);
+                    $('.uploads-dir').text(connection_data.uploads_dir);
                     if (profile_name_edited == false) {
                         var profile_name = get_domain_name(connection_info[0]);
                         $('.create-new-profile').val(profile_name);
@@ -1497,7 +1497,7 @@ var execute_next_step;
                         $('#create-backup').attr('disabled', 'disabled');
                         $('#create-backup-label').addClass('disabled');
                         $('.backup-option-disabled').show();
-                        $('.upload-directory-location').html(connection_data.upload_dir_long);
+                        $('.upload-directory-location').text(connection_data.upload_dir_long);
                     }
                 } else {
                     $('.connection-status').show();
@@ -2080,7 +2080,7 @@ var execute_next_step;
 
                     if (typeof data.syncpilot_error != 'undefined' && data.syncpilot_error ==
                         1) {
-                        $('.connection-status').html(data.body);
+                        $('.connection-status').html(syncpilot_sanitize_html(data.body));
                         $('.connection-status').addClass(
                             'notification-message error-notice migration-error');
 
@@ -2158,7 +2158,7 @@ var execute_next_step;
                         $('.select-tables-wrap').prepend(pull_select);
                         $('#select-post-types').remove();
                         $('.select-post-types-wrap').prepend(pull_post_type_select);
-                        $('.table-prefix').html(data.prefix);
+                        $('.table-prefix').text(data.prefix);
                         $('.uploads-dir').html(syncpilot_this_uploads_dir);
                     } else {
                         $('#select-backup').remove();
@@ -2278,7 +2278,7 @@ var execute_next_step;
                         data = $.trim(data);
                         if (data != '') {
                             $('.progress-title').html(syncpilot_i10n.migration_cancellation_failed);
-                            $('.progress-text').html(data);
+                            $('.progress-text').html(syncpilot_sanitize_html(data));
                             $('.progress-text').addClass('migration-error');
                             migration_error = true;
                             migration_complete_events();

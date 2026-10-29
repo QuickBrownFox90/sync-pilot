@@ -33,7 +33,7 @@ class SyncPilot extends SyncPilot_Base {
 			'allow_pull' => false,
 			'allow_push' => false,
 			'profiles'  => array(),
-			'verify_ssl'	=> false,
+			'verify_ssl'	=> true,
 			'blacklist_plugins' => array(),
 		);
 
@@ -305,7 +305,34 @@ class SyncPilot extends SyncPilot_Base {
 		$upload_info['path'] .= DS . $upload_dir_name;
 		$upload_info['url'] .= '/' . $upload_dir_name;
 
+		$this->protect_dump_directory( $upload_info['path'] );
+
 		return $upload_info[$type];
+	}
+
+	// Exports (…-migrate-…) are only handed out by download_file(), so the web server must not serve them directly.
+	// Backups (…-backup-…) stay reachable, the page links to them after a migration; they have a long random name.
+	// Also done for folders that already exist, so installs of older versions get the rule too.
+	function protect_dump_directory( $path ) {
+
+		if ( ! is_dir( $path ) || ! is_writable( $path ) )
+			return;
+
+		$htaccess = $path . DS . '.htaccess';
+		$rules    = "# SyncPilot: exports are handed out by the plugin only\n"
+			. "Options -Indexes\n"
+			. "<FilesMatch \"-migrate-[0-9]{14}-[a-z0-9]+\\.sql(\\.gz)?\$\">\n"
+			. "\t<IfModule mod_authz_core.c>\n\t\tRequire all denied\n\t</IfModule>\n"
+			. "\t<IfModule !mod_authz_core.c>\n\t\tOrder allow,deny\n\t\tDeny from all\n\t</IfModule>\n"
+			. "</FilesMatch>\n";
+
+		if ( ! file_exists( $htaccess ) || $rules !== @file_get_contents( $htaccess ) )
+			@file_put_contents( $htaccess, $rules );
+
+		$webconfig = $path . DS . 'web.config';
+
+		if ( ! file_exists( $webconfig ) )
+			@file_put_contents( $webconfig, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration><system.webServer><security><requestFiltering><denyUrlSequences><add sequence=\"-migrate-\" /></denyUrlSequences></requestFiltering></security></system.webServer></configuration>\n" );
 	}
 
 	function ajax_update_max_request_size() {
@@ -334,7 +361,7 @@ class SyncPilot extends SyncPilot_Base {
 	function get_sql_dump_info( $migration_type, $info_type ) {
 
 		if ( empty( $this->session_salt ) )
-			$this->session_salt = strtolower( wp_generate_password( 5, false, false ) );
+			$this->session_salt = bin2hex( random_bytes( 16 ) );
 
 		$datetime = date('YmdHis');
 		$ds       = ( $info_type == 'path' ? DS : '/' );
@@ -629,14 +656,62 @@ class SyncPilot extends SyncPilot_Base {
 		global $wpdb;
 
 		$tables      = explode( ',', $_POST['tables'] );
-		$temp_tables = array();
+		$temp_prefix = stripslashes( $_POST['temp_prefix'] );
+		$old_prefix  = self::OLD_TABLE_PREFIX;
+		$existing    = $wpdb->get_col( 'SHOW TABLES' );
+		$missing     = array();
+		$renames     = array();
+		$old_tables  = array();
+		$stale       = array();
 
-		foreach( $tables as $table ) {
-			$temp_prefix   = stripslashes( $_POST['temp_prefix'] );
-			$temp_tables[] = $temp_prefix . $table;
+		// the names end up in SQL: a backtick would end the quoting
+		foreach ( array_merge( $tables, array( $temp_prefix, $_POST['prefix'] ) ) as $name ) {
+
+			if ( false !== strpos( $name, '`' ) ) {
+				$result = $this->end_ajax( __( 'The migration could not be completed: a table name is not valid. No table was replaced. (#141)', self::TEXT_DOMAIN ) );
+
+				return $result;
+			}
+		}
+
+		// 1. every temporary table must exist, otherwise nothing is touched
+		foreach ( $tables as $table ) {
+
+			if ( ! in_array( $temp_prefix . $table, $existing, true ) )
+				$missing[] = $temp_prefix . $table;
+		}
+
+		if ( ! empty( $missing ) ) {
+
+			$shown = implode( ', ', array_slice( $missing, 0, 10 ) ) . ( count( $missing ) > 10 ? ', …' : '' );
+			$result = $this->end_ajax( sprintf( __( 'The migration could not be completed: these temporary tables do not exist: %s. No table was replaced, the data of this site is unchanged. (#140)', self::TEXT_DOMAIN ), esc_html( $shown ) ) );
+
+			return $result;
+		}
+
+		// 2. one RENAME TABLE for all tables: the old table is renamed, the new one takes its name, and either all
+		//    renames work or none of them. Nothing is dropped before everything else has worked.
+		foreach ( $tables as $table ) {
+
+			$old = $old_prefix . $table;
+
+			if ( in_array( $old, $existing, true ) )
+				$stale[] = $old; // left over from an earlier migration that failed after the renaming
+
+			if ( in_array( $table, $existing, true ) ) {
+				$renames[]    = $this->backquote( $table ) . ' TO ' . $this->backquote( $old );
+				$old_tables[] = $old;
+			}
+
+			$renames[] = $this->backquote( $temp_prefix . $table ) . ' TO ' . $this->backquote( $table );
 		}
 
 		$sql = "SET FOREIGN_KEY_CHECKS=0;\n";
+
+		foreach ( $stale as $table )
+			$sql .= 'DROP TABLE IF EXISTS ' . $this->backquote( $table ) . ";\n";
+
+		$sql .= 'RENAME TABLE ' . implode( ', ', $renames ) . ";\n";
 
 		$preserved_options = array( 'syncpilot_settings', 'syncpilot_error_log' );
 
@@ -648,13 +723,7 @@ class SyncPilot extends SyncPilot_Base {
 
 		$preserved_options = apply_filters( 'syncpilot_preserved_options', $preserved_options );
 
-		foreach ( $temp_tables as $table ) {
-			$sql .= 'DROP TABLE IF EXISTS ' . $this->backquote( substr( $table, strlen( $temp_prefix ) ) ) . ';';
-			$sql .= "\n";
-			$sql .= 'RENAME TABLE ' . $this->backquote( $table )  . ' TO ' . $this->backquote( substr( $table, strlen( $temp_prefix ) ) ) . ';';
-			$sql .= "\n";
-		}
-
+		// read before the renaming: this is still the options table of this site
 		$preserved_options_data = $wpdb->get_results( sprintf( "SELECT * FROM %soptions WHERE `option_name` IN ('%s')", $wpdb->prefix, implode( "','", $preserved_options ) ), ARRAY_A );
 
 		foreach( $preserved_options_data as $option ) {
@@ -662,9 +731,22 @@ class SyncPilot extends SyncPilot_Base {
 			$sql .= $wpdb->prepare( "INSERT INTO `{$_POST['prefix']}options` ( `option_id`, `option_name`, `option_value`, `autoload` ) VALUES ( NULL , %s, %s, %s );\n", $option['option_name'], $option['option_value'], $option['autoload'] );
 		}
 
-		$alter_table_name = $this->get_alter_table_name();
 		$sql .= $this->get_alter_queries();
-		$sql .= "DROP TABLE IF EXISTS " . $this->backquote( $alter_table_name ) . ";\n";
+
+		$process_chunk_result = $this->process_chunk( $sql );
+
+		if ( true !== $process_chunk_result ) {
+			$result = $this->end_ajax( $process_chunk_result );
+			return $result;
+		}
+
+		// 3. everything has worked: the replaced tables are not needed any more
+		$sql = "SET FOREIGN_KEY_CHECKS=0;\n";
+
+		foreach ( $old_tables as $table )
+			$sql .= 'DROP TABLE IF EXISTS ' . $this->backquote( $table ) . ";\n";
+
+		$sql .= 'DROP TABLE IF EXISTS ' . $this->backquote( $this->get_alter_table_name() ) . ";\n";
 
 		$process_chunk_result = $this->process_chunk( $sql );
 
@@ -1097,7 +1179,7 @@ class SyncPilot extends SyncPilot_Base {
 				return $result;
 			}
 
-			$return = @unserialize( trim( $response ) );
+			$return = $this->safe_unserialize( trim( $response ) );
 
 			if ( false === $return ) {
 
@@ -1309,7 +1391,7 @@ class SyncPilot extends SyncPilot_Base {
 			return $result;
 		}
 
-		$response = unserialize( trim( $response ) );
+		$response = $this->safe_unserialize( trim( $response ) );
 
 		if ( false === $response ) {
 			$error_msg = __( 'Failed attempting to unserialize the response from the remote server. Please contact support.', self::TEXT_DOMAIN );
@@ -1422,11 +1504,11 @@ class SyncPilot extends SyncPilot_Base {
 	// Generates our secret key
 	function generate_key() {
 
-		$keyset = 'abcdefghijklmnopqrstuvqxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/';
+		$keyset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/';
 		$key    = '';
 
 		for ( $i = 0; $i < 32; $i++ ) {
-			$key .= substr( $keyset, rand( 0, strlen( $keyset ) -1 ), 1 );
+			$key .= $keyset[ random_int( 0, strlen( $keyset ) - 1 ) ];
 		}
 
 		return $key;
@@ -1914,7 +1996,7 @@ class SyncPilot extends SyncPilot_Base {
 			$_POST['primary_keys'] = trim( $_POST['primary_keys'] );
 
 			if( ! empty( $_POST['primary_keys'] ) && is_serialized( $_POST['primary_keys'] ) ) {
-				$this->primary_keys = unserialize( stripslashes( $_POST['primary_keys'] ) );
+				$this->primary_keys = $this->safe_unserialize( stripslashes( $_POST['primary_keys'] ) );
 				$first_select       = false;
 			}
 		}
@@ -2262,12 +2344,17 @@ class SyncPilot extends SyncPilot_Base {
 		if ( ! $serialized && is_string( $data ) && ! $this->contains_search_term( $data ) )
 			return $data;
 
+		// objects in the old Serializable format ("C:5:"Class":…") hold their data in a string that only the class can
+		// read, without the class they would lose it
+		if ( is_string( $data ) && preg_match( '/(^|[;{}])C:\d+:"/', $data ) )
+			return $data;
+
 		$is_json = false;
 
 		// some unseriliased data cannot be re-serialized eg. SimpleXMLElements
 		try {
 
-			if ( is_string( $data ) && ( $unserialized = @unserialize( $data ) ) !== false ) {
+			if ( is_string( $data ) && ( $unserialized = $this->safe_unserialize( $data ) ) !== false ) {
 
 				// PHP currently has a bug that doesn't allow you to clone the DateInterval / DatePeriod classes.
 				// We skip them here as they probably won't need data to be replaced anyway
@@ -2301,7 +2388,7 @@ class SyncPilot extends SyncPilot_Base {
 					$_tmp[ $key ] = $this->recursive_unserialize_replace( $value, false, $parent_serialized );
 
 				// the serialized array "a:N:{…}" becomes the object "O:len:"Class":N:{…}" again
-				$data = unserialize( 'O:' . strlen( $class ) . ':"' . $class . '"' . substr( serialize( $_tmp ), 1 ) );
+				$data = $this->safe_unserialize( 'O:' . strlen( $class ) . ':"' . $class . '"' . substr( serialize( $_tmp ), 1 ) );
 				unset( $_tmp );
 			}
 
@@ -2670,9 +2757,7 @@ class SyncPilot extends SyncPilot_Base {
 
 		$diskfile         = $this->get_upload_info( 'path' ) . DS . $dump_name;
 		$filename         = basename( $diskfile );
-		$last_dash        = strrpos( $filename, '-' );
-		$salt             = substr( $filename, $last_dash, 6 );
-		$filename_no_salt = str_replace( $salt, '', $filename );
+		$filename_no_salt = preg_replace( '/-[a-z0-9]{5,64}(\.sql(\.gz)?)$/', '$1', $filename ); // without the random part
 
 		if ( file_exists( $diskfile ) ) {
 			header( 'Content-Description: File Transfer' );
