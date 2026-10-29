@@ -158,12 +158,11 @@ class SyncPilot extends SyncPilot_Base {
 			'exclude_post_types' =>'0'
 		);
 
-		if ( is_multisite() ) {
+		if ( is_multisite() )
 			add_action( 'network_admin_menu', array( $this, 'network_admin_menu' ) );
-		}
-		else {
+
+		else
 			add_action( 'admin_menu', array( $this, 'admin_menu' ) );
-		}
 
 		add_filter( 'admin_body_class', array( $this, 'admin_body_class' ) );
 
@@ -174,6 +173,7 @@ class SyncPilot extends SyncPilot_Base {
 			add_action( 'network_admin_menu', array( $this, 'network_admin_menu' ) );
 			$this->plugin_base = 'settings.php?page=sync-pilot';
 		}
+
 		else {
 			add_action( 'admin_menu', array( $this, 'admin_menu' ) );
 			$this->plugin_base = 'tools.php?page=sync-pilot';
@@ -181,27 +181,45 @@ class SyncPilot extends SyncPilot_Base {
 	}
 
 	function ajax_blacklist_plugins() {
-		$this->settings['blacklist_plugins'] = $_POST['blacklist_plugins'];
+
+		$this->check_ajax_referer( 'blacklist-plugins' );
+
+		// nothing selected: jQuery sends no field at all
+		$blacklist = isset( $_POST['blacklist_plugins'] ) ? (array) wp_unslash( $_POST['blacklist_plugins'] ) : array();
+
+		$this->settings['blacklist_plugins'] = array_values( array_filter( $blacklist, 'is_string' ) );
 		update_option( 'syncpilot_settings', $this->settings );
+
 		exit;
 	}
 
 	function ajax_plugin_compatibility() {
-		$mu_dir = ( defined( 'WPMU_PLUGIN_DIR' ) && defined( 'WPMU_PLUGIN_URL' ) ) ? WPMU_PLUGIN_DIR : trailingslashit( WP_CONTENT_DIR ) . 'mu-plugins';
-		$source = trailingslashit( $this->plugin_dir_path ) . 'compatibility/sync-pilot-compatibility.php';
-    $destination = trailingslashit( $mu_dir ) . 'sync-pilot-compatibility.php';
+
+		$this->check_ajax_referer( 'plugin-compatibility' );
+
+		$mu_dir     = ( defined( 'WPMU_PLUGIN_DIR' ) && defined( 'WPMU_PLUGIN_URL' ) ) ? WPMU_PLUGIN_DIR : trailingslashit( WP_CONTENT_DIR ) . 'mu-plugins';
+		$source      = trailingslashit( $this->plugin_dir_path ) . 'compatibility/sync-pilot-compatibility.php';
+		$destination = trailingslashit( $mu_dir ) . 'sync-pilot-compatibility.php';
+
 		if ( '1' === trim( $_POST['install'] ) ) { // install MU plugin
-			if ( !wp_mkdir_p( $mu_dir ) ) {
+
+			if ( ! wp_mkdir_p( $mu_dir ) ) {
 				_e( sprintf( 'The following directory could not be created: %s', $mu_dir ), self::TEXT_DOMAIN );
+
 				exit;
 			}
+
 			if ( !copy( $source, $destination ) ) {
 				_e( sprintf( 'Could not copy the compatibility plugin from %1$s to %2$s', $source, $destination ), self::TEXT_DOMAIN );
+
 				exit;
 			}
-		} else { // uninstall MU plugin
+		}
+
+		else { // uninstall MU plugin
 			if ( file_exists( $destination ) && !unlink( $destination ) ) {
 				_e( sprintf( 'Could not remove the compatibility plugin from %s', $destination ), self::TEXT_DOMAIN );
+
 				exit;
 			}
 		}
@@ -209,47 +227,61 @@ class SyncPilot extends SyncPilot_Base {
 	}
 
 	function check_again_clear_transients( $current_screen ) {
-		if( ! isset( $current_screen->id ) || strpos( $current_screen->id, 'update-core' ) === false || ! isset( $_GET['force-check'] ) ) return;
+		if (
+			! isset( $current_screen->id ) ||
+			strpos( $current_screen->id, 'update-core' ) === false ||
+			! isset( $_GET['force-check'] )
+		)
+			return;
+
 		delete_site_transient( 'syncpilot_upgrade_data' );
 		delete_site_transient( 'update_plugins' );
 	}
 
 	function get_alter_table_name() {
-		if ( ! is_null( $this->alter_table_name ) ) {
+
+		if ( ! is_null( $this->alter_table_name ) )
 			return $this->alter_table_name;
-		}
+
 		global $wpdb;
+
 		$this->alter_table_name = apply_filters( 'syncpilot_alter_table_name', $wpdb->prefix . 'syncpilot_alter_statements' );
+
 		return $this->alter_table_name;
 	}
 
 	function get_create_alter_table_query() {
-		if ( ! is_null( $this->create_alter_table_query ) ) {
+
+		if ( ! is_null( $this->create_alter_table_query ) )
 			return $this->create_alter_table_query;
-		}
-		$alter_table_name = $this->get_alter_table_name();
-		$this->create_alter_table_query = sprintf( "DROP TABLE IF EXISTS `%s`;\n", $alter_table_name );
+
+		$alter_table_name                = $this->get_alter_table_name();
+		$this->create_alter_table_query  = sprintf( "DROP TABLE IF EXISTS `%s`;\n", $alter_table_name );
 		$this->create_alter_table_query .= sprintf( "CREATE TABLE `%s` ( `query` longtext NOT NULL );\n", $alter_table_name );
-		$this->create_alter_table_query = apply_filters( 'syncpilot_create_alter_table_query', $this->create_alter_table_query );
+		$this->create_alter_table_query  = apply_filters( 'syncpilot_create_alter_table_query', $this->create_alter_table_query );
+
 		return $this->create_alter_table_query;
 	}
 
 	function get_short_uploads_dir() {
 		$short_path = str_replace( $this->absolute_root_file_path, '', $this->get_upload_info( 'path' ) );
+
 		return trailingslashit( substr( str_replace( '\\', '/', $short_path ), 1 ) );
 	}
 
 	function get_upload_info( $type = 'path' ) {
+
 		// Let developers define their own path to for export files
 		// Note: We require a very specific data set here, it should be similiar to the following
 		// array(
 		//			'path' 	=> '/path/to/custom/uploads/directory', <- note missing end trailing slash
 		//			'url'	=> 'http://yourwebsite.com/custom/uploads/directory' <- note missing end trailing slash
 		// );
+
 		$upload_info = apply_filters( 'syncpilot_upload_info', array() );
-		if ( !empty( $upload_info ) ) {
-			return $upload_info[$type];
-		}
+
+		if ( ! empty( $upload_info ) )
+			return $upload_info[ $type ];
 
 		$upload_dir = wp_upload_dir();
 
@@ -258,17 +290,16 @@ class SyncPilot extends SyncPilot_Base {
 
 		$upload_dir_name = apply_filters( 'syncpilot_upload_dir_name', self::TEXT_DOMAIN );
 
-		if( ! file_exists( $upload_dir['basedir'] . DS . $upload_dir_name ) ) {
+		if ( ! file_exists( $upload_dir['basedir'] . DS . $upload_dir_name ) ) {
 			$url = wp_nonce_url( $this->plugin_base, 'sync-pilot-nonce' );
 
-			if( false === @mkdir( $upload_dir['basedir'] . DS . $upload_dir_name, 0755 ) ) {
+			if ( false === @mkdir( $upload_dir['basedir'] . DS . $upload_dir_name, 0755 ) )
 				return $upload_info[$type];
-			}
 
 			$filename = $upload_dir['basedir'] . DS . $upload_dir_name . DS . 'index.php';
-			if( false === @file_put_contents( $filename, "<?php\r\n// Silence is golden\r\n?>" ) ) {
-				return $upload_info[$type];
-			}
+
+			if ( false === @file_put_contents( $filename, "<?php\r\n// Silence is golden\r\n?>" ) )
+				return $upload_info[ $type ];
 		}
 
 		$upload_info['path'] .= DS . $upload_dir_name;
@@ -278,65 +309,89 @@ class SyncPilot extends SyncPilot_Base {
 	}
 
 	function ajax_update_max_request_size() {
+
 		$this->check_ajax_referer( 'update-max-request-size' );
+
 		$this->settings['max_request'] = (int) $_POST['max_request_size'] * 1024;
+
 		update_option( 'syncpilot_settings', $this->settings );
+
 		$result = $this->end_ajax();
+
 		return $result;
 	}
 
 	function is_json( $string, $strict = false ) {
+
 		$json = @json_decode( $string, true );
-		if( $strict == true && ! is_array( $json ) ) return false;
+
+		if( $strict == true && ! is_array( $json ) )
+			return false;
+
 		return ! ( $json == NULL || $json == false );
 	}
 
 	function get_sql_dump_info( $migration_type, $info_type ) {
-		if( empty( $this->session_salt ) ) {
+
+		if ( empty( $this->session_salt ) )
 			$this->session_salt = strtolower( wp_generate_password( 5, false, false ) );
-		}
+
 		$datetime = date('YmdHis');
-		$ds = ( $info_type == 'path' ? DS : '/' );
+		$ds       = ( $info_type == 'path' ? DS : '/' );
+
 		return sprintf( '%s%s%s-%s-%s-%s.sql', $this->get_upload_info( $info_type ), $ds, sanitize_title_with_dashes( DB_NAME ), $migration_type, $datetime, $this->session_salt );
 	}
 
 	function parse_migration_form_data( $data ) {
+
 		parse_str( $data, $form_data );
+
 		$this->accepted_fields = apply_filters( 'syncpilot_accepted_profile_fields', $this->accepted_fields );
-		$form_data = array_intersect_key( $form_data, array_flip( $this->accepted_fields ) );
+		$form_data             = array_intersect_key( $form_data, array_flip( $this->accepted_fields ) );
+
 		unset( $form_data['replace_old'][0] );
 		unset( $form_data['replace_new'][0] );
+
 		return $form_data;
 	}
 
 	function plugin_action_links( $links ) {
 		$link = sprintf( '<a href="%s">%s</a>', network_admin_url( $this->plugin_base ), __( 'Settings', self::TEXT_DOMAIN ) );
+
 		array_unshift( $links, $link );
+
 		return $links;
 	}
 
 	function ajax_clear_log() {
 		$this->check_ajax_referer( 'clear-log' );
+
 		delete_option( 'syncpilot_error_log' );
+
 		$result = $this->end_ajax();
+
 		return $result;
 	}
 
 	function ajax_get_log() {
 		$this->check_ajax_referer( 'get-log' );
+
 		ob_start();
+
 		$this->output_diagnostic_info();
 		$this->output_log_file();
+
 		$return = ob_get_clean();
 		$result = $this->end_ajax( $return );
+
 		return $result;
 	}
 
 	function output_log_file() {
 		$log = get_option( 'syncpilot_error_log' );
-		if( $log ) {
+
+		if ( $log )
 			echo $log;
-		}
 	}
 
 	function output_diagnostic_info() {
@@ -356,7 +411,10 @@ class SyncPilot extends SyncPilot_Base {
 		echo "\r\n";
 
 		echo 'WordPress: ';
-		if ( is_multisite() ) echo 'WPMU'; else echo 'WP'; echo bloginfo('version');
+		if ( is_multisite() )
+			echo 'WPMU';
+		else
+			echo 'WP'; echo bloginfo('version');
 		echo "\r\n";
 
 		echo 'Web Server: ';
@@ -364,7 +422,8 @@ class SyncPilot extends SyncPilot_Base {
 		echo "\r\n";
 
 		echo 'PHP: ';
-		if ( function_exists( 'phpversion' ) ) echo esc_html( phpversion() );
+		if ( function_exists( 'phpversion' ) )
+			echo esc_html( phpversion() );
 		echo "\r\n";
 
 		echo 'MySQL: ';
@@ -396,7 +455,10 @@ class SyncPilot extends SyncPilot_Base {
 		}
 
 		echo 'Debug Mode: ';
-		if ( defined('WP_DEBUG') && WP_DEBUG ) { echo 'Yes'; } else { echo 'No'; }
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG )
+			echo 'Yes';
+		else
+			echo 'No';
 		echo "\r\n";
 
 		echo 'WP Max Upload Size: ';
@@ -408,36 +470,34 @@ class SyncPilot extends SyncPilot_Base {
 		echo "\r\n";
 
 		echo 'PHP Time Limit: ';
-		if ( function_exists( 'ini_get' ) ) echo ini_get('max_execution_time');
+		if ( function_exists( 'ini_get' ) )
+			echo ini_get('max_execution_time');
 		echo "\r\n";
 
 		echo 'PHP Error Log: ';
-		if ( function_exists( 'ini_get' ) ) echo ini_get('error_log');
+		if ( function_exists( 'ini_get' ) )
+			echo ini_get('error_log');
 		echo "\r\n";
 
 		echo 'fsockopen: ';
-		if ( function_exists( 'fsockopen' ) ) {
+		if ( function_exists( 'fsockopen' ) )
 			echo 'Enabled';
-		} else {
+		else
 			echo 'Disabled';
-		}
 		echo "\r\n";
 
 		echo 'OpenSSL: ';
-		if ( $this->open_ssl_enabled() ) {
+		if ( $this->open_ssl_enabled() )
 			echo OPENSSL_VERSION_TEXT;
-
-		} else {
+		else
 			echo 'Disabled';
-		}
 		echo "\r\n";
 
 		echo 'cURL: ';
-		if ( function_exists( 'curl_init' ) ) {
+		if ( function_exists( 'curl_init' ) )
 			echo 'Enabled';
-		} else {
+		else
 			echo 'Disabled';
-		}
 		echo "\r\n";
 		echo "\r\n";
 
@@ -461,88 +521,118 @@ class SyncPilot extends SyncPilot_Base {
 
 	function remove_wp_plugin_dir( $name ) {
 		$plugin = str_replace( WP_PLUGIN_DIR, '', $name );
+
 		return substr( $plugin, 1 );
 	}
 
 	function fire_migration_complete() {
+
 		$filtered_post = $this->filter_post_elements( $_POST, array( 'action', 'url' ) );
+
 		if ( ! $this->verify_signature( $filtered_post, $this->settings['key'] ) ) {
+
 			$error_msg = $this->invalid_content_verification_error . ' (#138)';
+
 			$this->log_error( $error_msg, $filtered_post );
+
 			$result = $this->end_ajax( $error_msg );
+
 			return $result;
 		}
 
 		do_action( 'syncpilot_migration_complete', 'pull', $_POST['url'] );
 		$result = $this->end_ajax();
+
 		return $result;
 	}
 
 	function get_alter_queries() {
 		global $wpdb;
+
 		$alter_table_name = $this->get_alter_table_name();
 		$sql = '';
 		$alter_queries = $wpdb->get_results( "SELECT * FROM `{$alter_table_name}`", ARRAY_A );
-		if( ! empty( $alter_queries ) ) {
-			foreach( $alter_queries as $alter_query ) {
+
+		if ( ! empty( $alter_queries ) ) {
+			foreach( $alter_queries as $alter_query )
 				$sql .= $alter_query['query'];
-			}
 		}
+
 		return $sql;
 	}
 
 	// After table migration, delete old tables and rename new tables removing the temporarily prefix
 	function ajax_finalize_migration() {
+
 		$this->check_ajax_referer( 'finalize-migration' );
+
 		global $wpdb;
+
 		$return = '';
+
 		if ( $_POST['intent'] == 'pull' ) {
 			$return = $this->finalize_migration();
 		}
+
 		else {
 			do_action( 'syncpilot_migration_complete', 'push', $_POST['url'] );
+
 			$data = $this->get_post_data_filtered();
-			if ( isset( $data['nonce'] ) ) {
+
+			if ( isset( $data['nonce'] ) )
 				unset( $data['nonce'] );
-			}
-			$data['action'] = 'syncpilot_remote_finalize_migration';
-			$data['intent'] = 'pull';
-			$data['prefix'] = $wpdb->prefix;
-			$data['type'] = 'push';
-			$data['location'] = home_url();
+
+			$data['action']      = 'syncpilot_remote_finalize_migration';
+			$data['intent']      = 'pull';
+			$data['prefix']      = $wpdb->prefix;
+			$data['type']        = 'push';
+			$data['location']    = home_url();
 			$data['temp_prefix'] = $this->temp_prefix;
-			$data['sig'] = $this->create_signature( $data, $data['key'] );
-			$ajax_url = trailingslashit( $_POST['url'] ) . 'wp-admin/admin-ajax.php';
-			$response = $this->remote_post( $ajax_url, $data, __FUNCTION__ );
+			$data['sig']         = $this->create_signature( $data, $data['key'] );
+			$ajax_url            = trailingslashit( $_POST['url'] ) . 'wp-admin/admin-ajax.php';
+			$response            = $this->remote_post( $ajax_url, $data, __FUNCTION__ );
+
 			ob_start();
+
 			echo $response;
+
 			$this->display_errors();
+
 			$return = ob_get_clean();
 		}
+
 		$result = $this->end_ajax( $return );
+
 		return $result;
 	}
 
 	function respond_to_remote_finalize_migration() {
+
 		$filtered_post = $this->filter_post_elements( $_POST, array( 'action', 'intent', 'url', 'key', 'form_data', 'prefix', 'type', 'location', 'tables', 'temp_prefix' ) );
+
 		if ( ! $this->verify_signature( $filtered_post, $this->settings['key'] ) ) {
 			$error_msg = $this->invalid_content_verification_error . ' (#123)';
 			$this->log_error( $error_msg, $filtered_post );
+
 			$result = $this->end_ajax( $error_msg );
+
 			return $result;
 		}
+
 		$return = $this->finalize_migration();
 		$result = $this->end_ajax( $return );
+
 		return $result;
 	}
 
 	function finalize_migration() {
 		global $wpdb;
 
-		$tables = explode( ',', $_POST['tables'] );
+		$tables      = explode( ',', $_POST['tables'] );
 		$temp_tables = array();
+
 		foreach( $tables as $table ) {
-			$temp_prefix = stripslashes( $_POST['temp_prefix'] );
+			$temp_prefix   = stripslashes( $_POST['temp_prefix'] );
 			$temp_tables[] = $temp_prefix . $table;
 		}
 
@@ -551,7 +641,8 @@ class SyncPilot extends SyncPilot_Base {
 		$preserved_options = array( 'syncpilot_settings', 'syncpilot_error_log' );
 
 		$this->form_data = $this->parse_migration_form_data( $_POST['form_data'] );
-		if( isset( $this->form_data['keep_active_plugins'] ) ) {
+
+		if ( isset( $this->form_data['keep_active_plugins'] ) ) {
 			$preserved_options[] = 'active_plugins';
 		}
 
@@ -576,7 +667,8 @@ class SyncPilot extends SyncPilot_Base {
 		$sql .= "DROP TABLE IF EXISTS " . $this->backquote( $alter_table_name ) . ";\n";
 
 		$process_chunk_result = $this->process_chunk( $sql );
-		if( true !== $process_chunk_result ) {
+
+		if ( true !== $process_chunk_result ) {
 			$result = $this->end_ajax( $process_chunk_result );
 			return $result;
 		}
@@ -584,19 +676,26 @@ class SyncPilot extends SyncPilot_Base {
 		$type = ( isset( $_POST['type'] ) ? 'push' : 'pull' );
 		$location = ( isset( $_POST['location'] ) ? $_POST['location'] : $_POST['url'] );
 
-		if( ! isset( $_POST['location'] ) ) {
-			$data = array();
+		if ( ! isset( $_POST['location'] ) ) {
+
+			$data           = array();
 			$data['action'] = 'syncpilot_fire_migration_complete';
-			$data['url'] = home_url();
-			$data['sig'] = $this->create_signature( $data, $_POST['key'] );
-			$ajax_url = trailingslashit( $_POST['url'] ) . 'wp-admin/admin-ajax.php';
-			$response = $this->remote_post( $ajax_url, $data, __FUNCTION__ );
+			$data['url']    = home_url();
+			$data['sig']    = $this->create_signature( $data, $_POST['key'] );
+			$ajax_url       = trailingslashit( $_POST['url'] ) . 'wp-admin/admin-ajax.php';
+			$response       = $this->remote_post( $ajax_url, $data, __FUNCTION__ );
+
 			ob_start();
+
 			echo $response;
+
 			$this->display_errors();
+
 			$maybe_errors = trim( ob_get_clean() );
-			if( false === empty( $maybe_errors ) ) {
+
+			if ( false === empty( $maybe_errors ) ) {
 				$result = $this->end_ajax( $maybe_errors );
+
 				return $result;
 			}
 		}
@@ -613,7 +712,7 @@ class SyncPilot extends SyncPilot_Base {
 		$gzip          = ( isset( $_POST['chunk_gzipped'] ) && $_POST['chunk_gzipped'] );
 		$tmp_file_name = 'chunk.txt';
 
-		if( $gzip )
+		if ( $gzip )
 			$tmp_file_name .= '.gz';
 
 		$tmp_file_path = wp_tempnam( $tmp_file_name );
@@ -666,6 +765,7 @@ class SyncPilot extends SyncPilot_Base {
 	function process_chunk( $chunk ) {
 		// prepare db
 		global $wpdb;
+
 		$this->set_time_limit();
 
 		$queries = array_filter( explode( ";\n", $chunk ) );
@@ -674,7 +774,7 @@ class SyncPilot extends SyncPilot_Base {
 		ob_start();
 		$wpdb->show_errors();
 
-		if( empty( $wpdb->charset ) ) {
+		if ( empty( $wpdb->charset ) ) {
 			$charset = ( defined( 'DB_CHARSET' ) ? DB_CHARSET : 'utf8' );
 			$wpdb->charset = $charset;
 			$wpdb->set_charset( $wpdb->dbh, $wpdb->charset );
@@ -754,7 +854,8 @@ class SyncPilot extends SyncPilot_Base {
 
 			$result = $this->export_table( $_POST['table'] );
 
-			if ( $_POST['intent'] == 'savefile' )
+			// transfer_chunk() has already closed the file when end_ajax() did not exit (WP-CLI, tests)
+			if ( $_POST['intent'] == 'savefile' && isset( $this->fp ) )
 				$this->close( $this->fp );
 
 			ob_start();
@@ -1479,7 +1580,7 @@ class SyncPilot extends SyncPilot_Base {
 
 		<div class="wrap syncpilot">
 
-			<div id="icon-tools" class="icon32"><br /></div><h2>Migrate DB</h2>
+			<div id="icon-tools" class="icon32"><br /></div><h2>SyncPilot</h2>
 
 			<h2 class="nav-tab-wrapper"><a href="#" class="nav-tab nav-tab-active js-action-link migrate" data-div-name="migrate-tab"><?php _e( 'Migrate', self::TEXT_DOMAIN ); ?></a><a href="#" class="nav-tab js-action-link settings" data-div-name="settings-tab"><?php _e( 'Settings', self::TEXT_DOMAIN ); ?></a><a href="#" class="nav-tab js-action-link diagnostics" data-div-name="diagnostics-tab"><?php _e( 'Diagnostics', self::TEXT_DOMAIN ); ?></a></h2>
 
@@ -1521,8 +1622,8 @@ class SyncPilot extends SyncPilot_Base {
 	}
 
 	function apply_replaces( $subject, $is_serialized = false ) {
-		$search  = $this->form_data['replace_old'];
-		$replace = $this->form_data['replace_new'];
+		$search  = $this->form_data['replace_old'] ?? array();
+		$replace = $this->form_data['replace_new'] ?? array();
 		$new     = str_ireplace( $search, $replace, $subject, $count );
 
 		/*
@@ -1539,6 +1640,28 @@ class SyncPilot extends SyncPilot_Base {
 		}
 
 		return $new;
+	}
+
+	// Does the value contain one of the strings that apply_replaces() would replace?
+	function contains_search_term( $subject ) {
+
+		$terms = $this->form_data['replace_old'] ?? array();
+
+		// subdomain based multisite installs also replace //site.<domain> in apply_replaces()
+		if ( is_multisite() && defined( 'SUBDOMAIN_INSTALL' ) && SUBDOMAIN_INSTALL && ! empty( $_POST['domain_current_site'] ) )
+			$terms[] = $this->get_domain_current_site();
+
+		foreach ( $terms as $term ) {
+
+			if ( '' === (string) $term )
+				continue;
+
+			// JSON stores the slashes of URLs and paths as \/
+			if ( false !== stripos( $subject, $term ) || false !== stripos( $subject, str_replace( '/', '\/', $term ) ) )
+				return true;
+		}
+
+		return false;
 	}
 
 	function process_sql_constraint( $create_query, $table, &$alter_table_query ) {
@@ -2134,6 +2257,11 @@ class SyncPilot extends SyncPilot_Base {
 	 */
 	function recursive_unserialize_replace( $data, $serialized = false, $parent_serialized = false ) {
 
+		// a value without any search string stays byte-identical: unserializing and serializing it again
+		// (or decoding and encoding JSON) would change it without anything being replaced
+		if ( ! $serialized && is_string( $data ) && ! $this->contains_search_term( $data ) )
+			return $data;
+
 		$is_json = false;
 
 		// some unseriliased data cannot be re-serialized eg. SimpleXMLElements
@@ -2160,6 +2288,23 @@ class SyncPilot extends SyncPilot_Base {
 				unset( $_tmp );
 			}
 
+			// the class of the object is not loaded: a foreach would add public copies of its private and protected
+			// properties, the (array) cast keeps their real names ("\0Class\0name", "\0*\0name")
+			elseif ( $data instanceof __PHP_Incomplete_Class ) {
+
+				$_tmp  = (array) $data;
+				$class = $_tmp['__PHP_Incomplete_Class_Name'];
+
+				unset( $_tmp['__PHP_Incomplete_Class_Name'] );
+
+				foreach ( $_tmp as $key => $value )
+					$_tmp[ $key ] = $this->recursive_unserialize_replace( $value, false, $parent_serialized );
+
+				// the serialized array "a:N:{…}" becomes the object "O:len:"Class":N:{…}" again
+				$data = unserialize( 'O:' . strlen( $class ) . ':"' . $class . '"' . substr( serialize( $_tmp ), 1 ) );
+				unset( $_tmp );
+			}
+
 			// Submitted by Tina Matter
 			elseif ( is_object( $data ) ) {
 
@@ -2174,6 +2319,15 @@ class SyncPilot extends SyncPilot_Base {
 			}
 
 			elseif ( $this->is_json( $data, true ) ) {
+
+				// json_encode() escapes slashes and unicode by default, keep the escaping the original text used
+				$json_flags = 0;
+
+				if ( false === strpos( $data, '\/' ) )
+					$json_flags |= JSON_UNESCAPED_SLASHES;
+
+				if ( false === strpos( $data, '\u' ) )
+					$json_flags |= JSON_UNESCAPED_UNICODE;
 
 				$_tmp = array( );
 				$data = json_decode( $data, true );
@@ -2194,7 +2348,7 @@ class SyncPilot extends SyncPilot_Base {
 				return serialize( $data );
 
 			if ( $is_json )
-				return json_encode( $data );
+				return json_encode( $data, $json_flags );
 
 		}
 
@@ -2236,11 +2390,16 @@ class SyncPilot extends SyncPilot_Base {
 	}
 
 	function close( $fp ) {
-		if ( $this->gzip() && isset( $this->form_data['gzip_file'] ) )
-			gzclose( $fp );
 
-		else
-			fclose( $fp );
+		// open() returns false when the file could not be opened, and PHP 8 throws a TypeError for fclose( false )
+		if ( is_resource( $fp ) ) {
+
+			if ( $this->gzip() && isset( $this->form_data['gzip_file'] ) )
+				gzclose( $fp );
+
+			else
+				fclose( $fp );
+		}
 
 		unset( $this->fp );
 	}
@@ -2253,14 +2412,14 @@ class SyncPilot extends SyncPilot_Base {
 
 			if ( $this->gzip() && isset( $this->form_data['gzip_file'] ) ) {
 
-				if ( ! @gzwrite( $this->fp, $query_line ) ) {
+				if ( empty( $this->fp ) || ! @gzwrite( $this->fp, $query_line ) ) {
 					$this->error = __( 'Failed to write the gzipped SQL data to the file. (#127)', self::TEXT_DOMAIN );
 					return false;
 				}
 			}
 
 			else {
-				if ( false === @fwrite( $this->fp, $query_line ) ) {
+				if ( empty( $this->fp ) || false === @fwrite( $this->fp, $query_line ) ) {
 					$this->error = __( 'Failed to write the SQL data to the file. (#128)', self::TEXT_DOMAIN );
 
 					return false;
@@ -2379,13 +2538,13 @@ class SyncPilot extends SyncPilot_Base {
 	}
 
 	function network_admin_menu() {
-		$hook_suffix = add_submenu_page( 'settings.php', 'Migrate DB', 'Migrate DB', 'manage_network_options', 'sync-pilot', array( $this, 'options_page' ) );
+		$hook_suffix = add_submenu_page( 'settings.php', 'SyncPilot', 'SyncPilot', 'manage_network_options', 'sync-pilot', array( $this, 'options_page' ) );
 
 		$this->after_admin_menu( $hook_suffix );
 	}
 
 	function admin_menu() {
-		$hook_suffix = add_management_page( 'Migrate DB', 'Migrate DB', 'export', 'sync-pilot', array( $this, 'options_page' ) );
+		$hook_suffix = add_management_page( 'SyncPilot', 'SyncPilot', 'export', 'sync-pilot', array( $this, 'options_page' ) );
 
 		$this->after_admin_menu( $hook_suffix );
 	}
@@ -2547,6 +2706,9 @@ class SyncPilot extends SyncPilot_Base {
 			'reset_api_key'						=> wp_create_nonce( 'reset-api-key' ),
 			'delete_migration_profile'			=> wp_create_nonce( 'delete-migration-profile' ),
 			'save_setting'						=> wp_create_nonce( 'save-setting' ),
+			'cancel_migration'					=> wp_create_nonce( 'cancel-migration' ),
+			'blacklist_plugins'					=> wp_create_nonce( 'blacklist-plugins' ),
+			'plugin_compatibility'				=> wp_create_nonce( 'plugin-compatibility' ),
 		);
 
 		$nonces = apply_filters( 'syncpilot_nonces', $nonces );
@@ -2672,6 +2834,8 @@ class SyncPilot extends SyncPilot_Base {
 
 	function ajax_cancel_migration() {
 
+		$this->check_ajax_referer( 'cancel-migration' );
+
 		$this->form_data = $this->parse_migration_form_data( $_POST['form_data'] );
 
 		switch( $_POST['intent'] ) {
@@ -2751,6 +2915,14 @@ class SyncPilot extends SyncPilot_Base {
 	}
 
 	function delete_temporary_tables( $prefix ) {
+
+		global $wpdb;
+
+		// temporary tables are named <temp prefix><table prefix><name>, e.g. _mig_wp_posts: a prefix that is empty,
+		// that the real tables start with (wp, wp_) or that starts with the table prefix (wp_posts) would drop real tables
+		foreach ( array_unique( array( $wpdb->base_prefix, $wpdb->prefix ) ) as $table_prefix )
+			if ( '' === (string) $prefix || 0 === strpos( $table_prefix, $prefix ) || 0 === strpos( $prefix, $table_prefix ) )
+				return;
 
 		$tables         = $this->get_tables();
 		$delete_queries = '';

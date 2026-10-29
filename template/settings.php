@@ -1,12 +1,12 @@
-<div class="settings-tab content-tab">
+<?php
+	$connection_info              = sprintf( "%s\r%s", site_url( '', 'https' ), $this->settings['key'] );
+	$pull_checked                 = ( $this->settings['allow_pull'] ? ' checked="checked"' : '' );
+	$push_checked                 = ( $this->settings['allow_push'] ? ' checked="checked"' : '' );
+	$verify_ssl_checked           = ( $this->settings['verify_ssl'] ? ' checked="checked"' : '' );
+	$plugin_compatibility_checked = ( isset( $GLOBALS['syncpilot_compatibility'] ) ? ' checked="checked"' : '' );
+?>
 
-	<?php
-		$connection_info = sprintf( "%s\r%s", site_url( '', 'https' ), $this->settings['key'] );
-		$pull_checked = ( $this->settings['allow_pull'] ? ' checked="checked"' : '' );
-		$push_checked = ( $this->settings['allow_push'] ? ' checked="checked"' : '' );
-		$verify_ssl_checked = ( $this->settings['verify_ssl'] ? ' checked="checked"' : '' );
-		$plugin_compatibility_checked = ( isset( $GLOBALS['syncpilot_compatibility'] ) ? ' checked="checked"' : '' );
-	?>
+<div class="settings-tab content-tab">
 
 	<form method="post" id="settings-form" action="#settings" autocomplete="off">
 
@@ -57,9 +57,13 @@
 				<select autocomplete="off" class="multiselect" id="selected-plugins" name="selected_plugins[]" multiple="multiple">
 				<?php
 					$blacklist = array_flip( $this->settings['blacklist_plugins'] );
+
 					foreach ( get_plugins() as $key => $plugin ) {
-						if( 0 === strpos( $plugin['Name'], 'SyncPilot' ) ) continue;
+						if ( 0 === strpos( $plugin['Name'], 'SyncPilot' ) )
+							continue;
+
 						$selected = ( isset( $blacklist[$key] ) ) ? ' selected' : '';
+
 						printf( '<option value="%s"%s>%s</option>', $key, $selected, $plugin['Name'] );
 					}
 				?>

@@ -1,16 +1,32 @@
+<?php
+	/**
+	 * Show migration progress template part
+	 * @since   0.0.1
+	 * @author  Patrick Mauersberger, Sean Lang and contributors
+	 */
+
+	global $wpdb;
+?>
+
 <div class="progress-content">
 	<span class="close-progress-content close-progress-content-button">&times;</span>
 	<div>
-		<h2 class="progress-title"><?php _e( 'Please wait while migration is running...', self::TEXT_DOMAIN ); ?></h2>
+		<h2 class="progress-title">
+			<?php _e( 'Please wait while migration is running...', self::TEXT_DOMAIN ); ?>
+		</h2>
 	</div>
 	<div class="progress-info-wrapper clearfix">
-		<div class="progress-text"><?php _e( 'Establishing Connection', self::TEXT_DOMAIN ); ?></div>
-		<span class="timer"><?php echo __( 'Time Elapsed:', self::TEXT_DOMAIN ) . ' 00:00:00'; ?></span>
+		<div class="progress-text">
+			<?php _e( 'Establishing Connection', self::TEXT_DOMAIN ); ?>
+		</div>
+		<span class="timer">
+			<?php echo __( 'Time Elapsed:', self::TEXT_DOMAIN ) . ' 00:00:00'; ?>
+		</span>
 	</div>
 	<div class="clearfix"></div>
 	<div class="progress-bar-wrapper">
 		<div class="progress-tables-hover-boxes"></div>
-		<div class="progress-label">wp_options</div>
+		<div class="progress-label"><?php echo $wpdb->get_prefix(); ?>options</div>
 		<div class="progress-bar"></div>
 		<div class="progress-tables"></div>
 	</div>
@@ -19,5 +35,4 @@
 		<span class="pause-resume button"><?php _e( 'Pause', self::TEXT_DOMAIN ); ?></span>
 		<span class="cancel button"><?php _e( 'Cancel', self::TEXT_DOMAIN ); ?></span>
 	</div>
-
 </div> <!-- end .progress-content -->

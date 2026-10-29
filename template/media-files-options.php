@@ -1,4 +1,13 @@
-<?php global $loaded_profile; ?>
+<?php
+	/**
+	 * Media files options template part
+	 * @since   0.0.1
+	 * @author  Patrick Mauersberger, Sean Lang and contributors
+	 */
+
+	global $loaded_profile;
+?>
+
 <div class="option-section media-files-options">
 	<label class="media-files checkbox-label" for="media-files">
 		<input type="checkbox" name="media_files" value="1" data-available="1" id="media-files"<?php echo ( isset( $loaded_profile['media_files'] ) ? ' checked="checked"' : '' ); ?> />

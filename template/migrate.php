@@ -1,43 +1,52 @@
 <?php
-global $wpdb;
-global $loaded_profile;
+	/**
+	 * General migration page template
+	 * @since   0.0.1
+	 * @author  Patrick Mauersberger, Sean Lang and contributors
+	 */
 
-if( isset( $_GET['syncpilot-profile'] ) ){
-	$loaded_profile = $this->get_profile( $_GET['syncpilot-profile'] );
-}
-else{
-	$loaded_profile = $this->default_profile;
-}
+	global $wpdb;
+	global $loaded_profile;
 
-$is_default_profile = isset( $loaded_profile['default_profile'] );
+	if ( isset( $_GET['syncpilot-profile'] ) )
+		$loaded_profile = $this->get_profile( $_GET['syncpilot-profile'] );
 
-$convert_exclude_revisions = false;
-$convert_post_type_selection = false;
-if( ! $is_default_profile ) {
-	if( isset( $loaded_profile['exclude_revisions'] ) ) {
-		$convert_exclude_revisions = true;
+	else
+		$loaded_profile = $this->default_profile;
+
+
+	$is_default_profile = isset( $loaded_profile['default_profile'] );
+
+	$convert_exclude_revisions   = false;
+	$convert_post_type_selection = false;
+
+	if ( ! $is_default_profile ) {
+		if ( isset( $loaded_profile['exclude_revisions'] ) )
+			$convert_exclude_revisions = true;
+
+		/* We used to provide users the option of selecting which post types they'd like to migrate.
+		* We found that our wording for this funtionality was a little confusing so we switched it to instead read "Exclude Post Types"
+		* Once we made the switch we needed a way of inverting their saved post type selection to instead exclude the select post types.
+		* This was required to make their select compatible with the new "exclude" wording.
+		* This is easy enough for "push" and "export" saved profile as we know which post types exist on the local system and
+		* can easily invert the selection. Pull saved profiles is a little tricker.
+		* $this->maybe_update_profile() is used to update deprecated profile options to their new values.
+		* At the time of page request $this->maybe_update_profile() cannot be used to update a pull profile as we don't know which
+		* post types exist on the remote machine. As such we invert this selection later using the $convert_post_type_selection flag below.
+		*/
+
+		if ( isset( $loaded_profile['post_type_migrate_option'] ) && 'migrate_select_post_types' == $loaded_profile['post_type_migrate_option'] && 'pull' == $loaded_profile['action'] )
+			$convert_post_type_selection = true;
+
+		$loaded_profile = $this->maybe_update_profile( $loaded_profile, $_GET['syncpilot-profile'] );
 	}
-	/* We used to provide users the option of selecting which post types they'd like to migrate.
-	 * We found that our wording for this funtionality was a little confusing so we switched it to instead read "Exclude Post Types"
-	 * Once we made the switch we needed a way of inverting their saved post type selection to instead exclude the select post types.
-	 * This was required to make their select compatible with the new "exclude" wording.
-	 * This is easy enough for "push" and "export" saved profile as we know which post types exist on the local system and
-	 * can easily invert the selection. Pull saved profiles is a little tricker.
-	 * $this->maybe_update_profile() is used to update deprecated profile options to their new values.
-	 * At the time of page request $this->maybe_update_profile() cannot be used to update a pull profile as we don't know which
-	 * post types exist on the remote machine. As such we invert this selection later using the $convert_post_type_selection flag below.
-	*/
-	if ( isset( $loaded_profile['post_type_migrate_option'] ) && 'migrate_select_post_types' == $loaded_profile['post_type_migrate_option'] && 'pull' == $loaded_profile['action'] ) {
-		$convert_post_type_selection = true;
-	}
-	$loaded_profile = $this->maybe_update_profile( $loaded_profile, $_GET['syncpilot-profile'] );
-}
 
-if( false == $is_default_profile ) {
-	$loaded_profile = wp_parse_args( $loaded_profile, $this->default_profile );
-}
-$loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
+	if ( false == $is_default_profile )
+		$loaded_profile = wp_parse_args( $loaded_profile, $this->default_profile );
+
+	$loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 ?>
+
 <script type='text/javascript'>
 	var syncpilot_default_profile = <?php echo ( $is_default_profile ? 'true' : 'false' ); ?>;
 	<?php if( isset( $loaded_profile['select_tables'] ) && ! empty( $loaded_profile['select_tables'] ) ) : ?>
@@ -57,12 +66,11 @@ $loaded_profile = wp_parse_args( $loaded_profile, $this->checkbox_options );
 
 	<form method="post" id="migrate-form" action="#migrate" enctype="multipart/form-data">
 
-		<?php if( count( $this->settings['profiles'] ) > 0 ){ ?>
+		<?php if ( count( $this->settings['profiles'] ) > 0 ) : ?>
 			<a href="<?php echo $this->plugin_base; ?>" class="return-to-profile-selection clearfix">&larr; <?php _e( 'Back to select a saved profile', self::TEXT_DOMAIN ); ?></a>
-		<?php } ?>
+		<?php endif; ?>
 
 		<div class="option-section">
-
 			<ul class="option-group migrate-selection">
 				<li>
 					<label for="savefile">
