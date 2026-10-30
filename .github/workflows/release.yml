@@ -35,9 +35,9 @@ jobs:
         run: |
           npm ci
           npm run build
-          if [ -n "$(git status --porcelain -- asset/css)" ]; then
-            echo "::error::asset/css is not up to date, run 'npm run build' and commit the result"
-            git status --porcelain -- asset/css
+          if [ -n "$(git status --porcelain -- asset/css asset/js)" ]; then
+            echo "::error::asset/css or asset/js is not up to date, run 'npm run build' and commit the result"
+            git status --porcelain -- asset/css asset/js
             exit 1
           fi
 

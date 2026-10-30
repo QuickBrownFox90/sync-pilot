@@ -1231,3 +1231,19 @@ msgstr "Verbinden"
 #: template/migrate.php:464
 msgid "Save Profile"
 msgstr "Profil speichern"
+
+#: class/syncpilot.php:2703
+msgid "Pushing to %s"
+msgstr "Push zu %s"
+
+#: class/syncpilot.php:2703
+msgid "Pulling from %s"
+msgstr "Pull von %s"
+
+#: class/syncpilot.php:2703
+msgid "Finalizing migration"
+msgstr "Migration wird abgeschlossen"
+
+#: class/syncpilot.php:2703
+msgid "Migration complete"
+msgstr "Migration abgeschlossen"

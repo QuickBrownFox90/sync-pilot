@@ -753,7 +753,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 	function load_assets() {
 
 		$plugins_url = trailingslashit( plugins_url() ) . trailingslashit( $this->plugin_folder_name );
-		$src         = $plugins_url . 'asset/js/media-files.js';
+		$suffix      = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : '.min';
+		$src         = $plugins_url . 'asset/js/media-files' . $suffix . '.js';
 		$version     = defined('SCRIPT_DEBUG') && SCRIPT_DEBUG ? time() : $this->plugin_version;
 
 		wp_enqueue_script( 'sync-pilot-media-files', $src, array( 'jquery', 'sync-pilot-common', 'sync-pilot-hook', 'sync-pilot-script' ), $version, true );

@@ -247,7 +247,7 @@ var media_successfully_determined;
                     nonce: syncpilot_nonces.migrate_media,
                 },
                 error: function (jqXHR, textStatus, errorThrown) {
-                    $('.progress-title').html('Migration failed');
+                    $('.progress-title').html(syncpilot_mf_strings.migration_failed);
                     $('.progress-text').html(syncpilot_mf_strings.problem_migrating_media +
                         ' (#102mf)');
                     $('.progress-text').addClass('migration-error');

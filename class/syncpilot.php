@@ -2686,24 +2686,29 @@ class SyncPilot extends SyncPilot_Base {
 		$plugins_url = trailingslashit( plugins_url( '', $this->plugin_file_path ) );
 		$version     = defined('SCRIPT_DEBUG') && SCRIPT_DEBUG ? time() : $this->plugin_version;
 
-		// asset/css is built from asset/src (npm run build): styles.css is readable, styles.min.css is what runs normally
+		// asset/css and asset/js are built from asset/src (npm run build): the readable files are for SCRIPT_DEBUG, the
+		// .min files are what runs normally
 		$suffix = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : '.min';
 
 		$src = $plugins_url . 'asset/css/styles' . $suffix . '.css';
 		wp_enqueue_style( 'sync-pilot-styles', $src, array(), $version );
 
-		$src = $plugins_url . 'asset/js/common.js';
+		$src = $plugins_url . 'asset/js/common' . $suffix . '.js';
 		wp_enqueue_script( 'sync-pilot-common', $src, NULL, $version, true );
 
-		$src = $plugins_url . 'asset/js/hook.js';
+		$src = $plugins_url . 'asset/js/hook' . $suffix . '.js';
 		wp_enqueue_script( 'sync-pilot-hook', $src, NULL, $version, true );
 
 		do_action( 'syncpilot_load_assets' );
 
-		$src = $plugins_url . 'asset/js/script.js';
+		$src = $plugins_url . 'asset/js/script' . $suffix . '.js';
 		wp_enqueue_script( 'sync-pilot-script', $src, array( 'jquery' ), $version, true );
 
 		wp_localize_script( 'sync-pilot-script', 'syncpilot_i10n', array(
+			'pushing_to'							=> __( "Pushing to %s", self::TEXT_DOMAIN ),
+			'pulling_from'							=> __( "Pulling from %s", self::TEXT_DOMAIN ),
+			'finalizing_migration'					=> __( "Finalizing migration", self::TEXT_DOMAIN ),
+			'migration_complete'					=> __( "Migration complete", self::TEXT_DOMAIN ),
 			'dialog_ok'								=> __( "OK", self::TEXT_DOMAIN ),
 			'dialog_cancel'							=> __( "Cancel", self::TEXT_DOMAIN ),
 			'plugin_compatibility_confirm'			=> __( "If confirmed we will install an additional WordPress \"Must Use\" plugin. This plugin will allow us to control which plugins are loaded during SyncPilot specific operations. Do you wish to continue?", self::TEXT_DOMAIN ),

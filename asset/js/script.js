@@ -164,6 +164,12 @@ var execute_next_step;
 
     function get_default_profile_name(url, intent, ing_suffix) {
         var domain = get_domain_name(url);
+
+        // title of the progress box: "Pushing to example.com" / "Pulling from example.com" (translatable as a whole)
+        if (ing_suffix) {
+            return (intent == 'pull' ? syncpilot_i10n.pulling_from : syncpilot_i10n.pushing_to).replace('%s', domain);
+        }
+
         var action = intent;
         action = action.charAt(0).toUpperCase() + action.slice(1);
         if (ing_suffix) {
@@ -882,6 +888,11 @@ var execute_next_step;
                     last_element = value;
                 });
 
+                // the box is hidden until it slides in (below); in a hidden box every width is 0, every table counts as
+                // "narrower than 1px" and is added to the last one, and the bar stays at 0% until the end. So it is laid
+                // out, but not visible, while the chunks are measured
+                $('.progress-content').css({ display: 'block', visibility: 'hidden' });
+
                 $('.progress-chunk').each(function (index) {
                     if ($(this).width() < 1 && tables_to_migrate[index] !=
                         last_element) {
@@ -904,6 +915,8 @@ var execute_next_step;
                         }
                     }
                 });
+
+                $('.progress-content').css({ display: '', visibility: '' });
 
                 percent_rounded = 0;
                 if (table_rows[last_element] != 0) {
@@ -952,7 +965,7 @@ var execute_next_step;
                     nonce: syncpilot_nonces.initiate_migration,
                 },
                 error: function (jqXHR, textStatus, errorThrown) {
-                    $('.progress-title').html('Migration failed');
+                    $('.progress-title').html(syncpilot_i10n.migration_failed);
                     $('.progress-text').html(syncpilot_i10n.connection_local_server_problem +
                         ' (#112)');
                     $('.progress-text').append('<br /><br />Status: ' + jqXHR.status +
@@ -1095,7 +1108,7 @@ var execute_next_step;
                             timeout: 0,
                             data: request_data,
                             error: function (jqXHR, textStatus, errorThrown) {
-                                $('.progress-title').html('Migration failed');
+                                $('.progress-title').html(syncpilot_i10n.migration_failed);
                                 $('.progress-text').html(syncpilot_i10n.table_process_problem +
                                     ' ' + tables_to_migrate[i]);
                                 $('.progress-text').append('<br /><br />' +
@@ -1117,7 +1130,7 @@ var execute_next_step;
                                 try {
                                     row_information = JSON.parse(data);
                                 } catch (variable) {
-                                    $('.progress-title').html('Migration failed');
+                                    $('.progress-title').html(syncpilot_i10n.migration_failed);
                                     if ('' == data || null == data) {
                                         $('.progress-text').html(syncpilot_i10n.table_process_problem_empty_response +
                                             ' ' + tables_to_migrate[i]);
@@ -1132,7 +1145,7 @@ var execute_next_step;
 
                                 if (typeof row_information.syncpilot_error != 'undefined' &&
                                     row_information.syncpilot_error == 1) {
-                                    $('.progress-title').html('Migration failed');
+                                    $('.progress-title').html(syncpilot_i10n.migration_failed);
                                     $('.progress-text').addClass('migration-error');
                                     $('.progress-text').html(syncpilot_sanitize_html(row_information.body));
                                     migration_error = true;
@@ -1220,7 +1233,7 @@ var execute_next_step;
             $('.migration-controls').fadeOut();
             if (migration_intent == 'savefile') {
                 currently_migrating = false;
-                var migrate_complete_text = 'Migration complete';
+                var migrate_complete_text = syncpilot_i10n.migration_complete;
                 if ($('#save_computer').is(':checked')) {
                     var url = syncpilot_this_download_url + encodeURIComponent(
                         dump_filename);
@@ -1240,7 +1253,7 @@ var execute_next_step;
                 }
 
             } else { // rename temp tables, delete old tables
-                $('.progress-text').html('Finalizing migration');
+                $('.progress-text').html(syncpilot_i10n.finalizing_migration);
                 $.ajax({
                     url: ajaxurl,
                     type: 'POST',
