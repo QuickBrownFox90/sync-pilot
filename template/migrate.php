@@ -211,13 +211,13 @@
 									<span class="sort-handle"></span>
 								</td>
 								<td class="old-replace-col">
-									<input type="text" size="40" name="replace_old[]" class="code" placeholder="Old value" value="<?php echo $replace_old; ?>" autocomplete="off" />
+									<input type="text" size="40" name="replace_old[]" class="code" placeholder="Old value" value="<?php echo esc_attr( $replace_old ); ?>" autocomplete="off" />
 								</td>
 								<td class="arrow-col">
 									<span class="right-arrow">&rarr;</span>
 								</td>
 								<td class="replace-right-col">
-									<input type="text" size="40" name="replace_new[]" class="code" placeholder="New value" value="<?php echo ( isset( $loaded_profile['replace_new'][$i] ) ? $loaded_profile['replace_new'][$i] : '' ); ?>" autocomplete="off" />
+									<input type="text" size="40" name="replace_new[]" class="code" placeholder="New value" value="<?php echo esc_attr( isset( $loaded_profile['replace_new'][$i] ) ? $loaded_profile['replace_new'][$i] : '' ); ?>" autocomplete="off" />
 									<span style="display: none;" class="replace-remove-row" data-profile-id="0"></span>
 								</td>
 							</tr>
@@ -422,7 +422,7 @@
 									<span class="delete-profile" data-profile-id="<?php echo $profile_id; ?>"></span>
 									<label for="profile-<?php echo $profile_id; ?>">
 									<input id="profile-<?php echo $profile_id; ?>" type="radio" value="<?php echo --$profile_id; ?>" name="save_migration_profile_option"<?php echo ( $loaded_profile['name'] == $profile['name'] ) ? ' checked="checked"' : ''; ?> />
-									<?php echo $profile['name']; ?>
+									<?php echo esc_html( $profile['name'] ); ?>
 									</label>
 								</li>
 							<?php }

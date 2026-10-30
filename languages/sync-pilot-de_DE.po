@@ -1128,3 +1128,14 @@ msgid ""
 msgstr ""
 "Die Migration konnte nicht abgeschlossen werden: Ein Tabellenname ist "
 "ungültig. Es wurde keine Tabelle ersetzt. (#141)"
+
+#, php-format
+msgid "The path of the media file is not valid: %s"
+msgstr "Der Pfad der Mediendatei ist ungültig: %s"
+
+msgid "The list of media files does not match the uploaded files."
+msgstr "Die Liste der Mediendateien passt nicht zu den hochgeladenen Dateien."
+
+#, php-format
+msgid "The media file would end up outside the uploads folder: %s"
+msgstr "Die Mediendatei würde außerhalb des Upload-Ordners landen: %s"

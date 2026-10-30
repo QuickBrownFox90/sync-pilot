@@ -146,6 +146,69 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		return $attachment;
 	}
 
+	/**
+	 * Check a media file path that comes from the other site or from a request: relative to the uploads folder,
+	 * no "." or ".." segments, no hidden files, only file types WordPress allows for uploads and no script
+	 * extension inside a double extension (image.php.jpg)
+	 * @since   0.1.2
+	 * @param   string $path Path relative to the uploads folder
+	 * @return  bool
+	 */
+	function is_safe_media_path( $path ) {
+
+		if ( ! is_string( $path ) || '' === $path || false !== strpos( $path, "\0" ) )
+			return false;
+
+		$path = str_replace( '\\', '/', $path );
+
+		if ( '/' === $path[0] || 1 === preg_match( '#^[A-Za-z]:#', $path ) || 1 === preg_match( '#(^|/)\.\.?(/|$)#', $path ) )
+			return false;
+
+		$name = basename( $path );
+
+		if ( '.' === $name[0] || 1 === preg_match( '/\.(php[0-9]?|phtml|pht|phps|phar|shtml|cgi|asp|aspx|jsp|htaccess|htpasswd)(\.|$)/i', $name ) )
+			return false;
+
+		$filetype = wp_check_filetype( $name );
+
+		return ! empty( $filetype['type'] );
+	}
+
+	/**
+	 * Check that a destination is inside the uploads folder, symbolic links included; the folder does not have to exist yet
+	 * @since   0.1.2
+	 * @param   string $destination Absolute path of the file to write
+	 * @return  bool
+	 */
+	function is_inside_uploads( $destination ) {
+
+		$base = realpath( $this->uploads_dir() );
+		$dir  = dirname( $destination );
+
+		if ( false === $base )
+			return false;
+
+		while ( ! file_exists( $dir ) && dirname( $dir ) !== $dir )
+			$dir = dirname( $dir );
+
+		$real = realpath( $dir );
+
+		return false !== $real && ( $real === $base || 0 === strpos( $real . DS, $base . DS ) );
+	}
+
+	/**
+	 * Check the "Accept pull / push requests" setting for the endpoints the other site calls
+	 * @since   0.1.2
+	 * @param   string $intent What the other site does: "pull" or "push"
+	 * @return  bool
+	 */
+	function media_request_allowed( $intent ) {
+
+		$setting = ( 'pull' === $intent ) ? 'allow_pull' : 'allow_push';
+
+		return ! empty( $this->settings[ $setting ] );
+	}
+
 	function uploads_dir() {
 
 		if ( defined( 'UPLOADBLOGSDIR' ) ) {
@@ -196,7 +259,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 
 	function process_pull_request() {
 
-		$files_to_download  = $_POST['file_chunk'];
+		$files_to_download  = ( isset( $_POST['file_chunk'] ) && is_array( $_POST['file_chunk'] ) ) ? $_POST['file_chunk'] : array();
 		$remote_uploads_url = trailingslashit( $_POST['remote_uploads_url'] );
 		$parsed             = parse_url( $_POST['url'] );
 
@@ -210,6 +273,13 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 
 		foreach( $files_to_download as $file_to_download ) {
 
+			// the name comes from the other site: it must not leave the uploads folder or be a script
+			if ( ! $this->is_safe_media_path( $file_to_download ) ) {
+				$errors[] = sprintf( __( 'The path of the media file is not valid: %s', self::TEXT_DOMAIN ), esc_html( (string) $file_to_download ) ) . ' (#111mf)';
+
+				continue;
+			}
+
 			$temp_file_path = $this->download_url( $remote_uploads_url . $file_to_download );
 
 			if ( is_wp_error( $temp_file_path ) ) {
@@ -219,8 +289,17 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 				continue;
 			}
 
-			$date        = str_replace( basename( $file_to_download ), '', $file_to_download );
-			$new_path    = $upload_dir . $date . basename( $file_to_download  );
+			$date     = str_replace( basename( $file_to_download ), '', $file_to_download );
+			$new_path = $upload_dir . $date . basename( $file_to_download  );
+
+			if ( ! $this->is_inside_uploads( $new_path ) ) {
+				@unlink( $temp_file_path );
+
+				$errors[] = sprintf( __( 'The media file would end up outside the uploads folder: %s', self::TEXT_DOMAIN ), esc_html( $file_to_download ) ) . ' (#113mf)';
+
+				continue;
+			}
+
 			$move_result = @rename( $temp_file_path, $new_path );
 
 			if ( false === $move_result ) {
@@ -267,13 +346,26 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 
 	function process_push_request() {
 
-		$files_to_migrate = $_POST['file_chunk'];
+		$files_to_migrate = ( isset( $_POST['file_chunk'] ) && is_array( $_POST['file_chunk'] ) ) ? array_values( $_POST['file_chunk'] ) : array();
 		$upload_dir       = $this->uploads_dir();
 
 		$body = '';
 
-		foreach( $files_to_migrate as $file_to_migrate )
+		foreach( $files_to_migrate as $file_to_migrate ) {
+
+			if ( ! $this->is_safe_media_path( $file_to_migrate ) || ! $this->is_inside_uploads( $upload_dir . $file_to_migrate ) ) {
+				$return = array(
+					'syncpilot_error' => 1,
+					'body'            => sprintf( __( 'The path of the media file is not valid: %s', self::TEXT_DOMAIN ), esc_html( (string) $file_to_migrate ) ) . ' (#111mf)',
+				);
+
+				$result = $this->end_ajax( json_encode( $return ) );
+
+				return $result;
+			}
+
 			$body .= $this->file_to_multipart( $upload_dir . $file_to_migrate );
+		}
 
 		$post_args = array(
 			'action'	=> 'syncpilot_mf_push_request',
@@ -309,6 +401,18 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 			return $result;
 		}
 
+		if ( ! $this->media_request_allowed( 'push' ) ) {
+
+			$return = array(
+				'syncpilot_error' => 1,
+				'body'            => sprintf( __( 'The connection succeeded but the remote site is configured to reject %s connections. You can change this in the "settings" tab on the remote site. (#110)', self::TEXT_DOMAIN ), __( 'push', self::TEXT_DOMAIN ) ),
+			);
+
+			$result = $this->end_ajax( serialize( $return ) );
+
+			return $result;
+		}
+
 		if( ! isset( $_FILES['media'] ) ) {
 
 			$return = array(
@@ -327,10 +431,47 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		$i          = 0;
 		$errors     = array();
 
+		// every uploaded file needs exactly one path, and every path has to be safe: nothing is written otherwise
+		if ( ! is_array( $file_paths ) || count( $file_paths ) !== count( $files ) ) {
+
+			$return = array(
+				'syncpilot_error' => 1,
+				'body'            => __( 'The list of media files does not match the uploaded files.', self::TEXT_DOMAIN ) . ' (#112mf)',
+			);
+
+			$result = $this->end_ajax( serialize( $return ) );
+
+			return $result;
+		}
+
+		$file_paths = array_values( $file_paths );
+
+		foreach ( $file_paths as $file_path ) {
+
+			if ( ! $this->is_safe_media_path( $file_path ) ) {
+
+				$return = array(
+					'syncpilot_error' => 1,
+					'body'            => sprintf( __( 'The path of the media file is not valid: %s', self::TEXT_DOMAIN ), esc_html( (string) $file_path ) ) . ' (#111mf)',
+				);
+
+				$result = $this->end_ajax( serialize( $return ) );
+
+				return $result;
+			}
+		}
+
 		foreach( $files as &$file ) {
 
 			$destination = $upload_dir . $file_paths[$i];
-			$folder = dirname( $destination );
+			$folder      = dirname( $destination );
+
+			if ( ! $this->is_inside_uploads( $destination ) ) {
+				$errors[] = sprintf( __( 'The media file would end up outside the uploads folder: %s', self::TEXT_DOMAIN ), esc_html( $file_paths[$i] ) ) . ' (#113mf)';
+				++$i;
+
+				continue;
+			}
 
 			if ( false === @file_exists( $folder ) && false === @mkdir( $folder, 0755, true ) ) {
 				$errors[] = __( sprintf( 'Error attempting to create required directory: %s', $folder ), self::TEXT_DOMAIN ) . ' (#108mf)';
@@ -427,6 +568,18 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 			$return = array(
 				'syncpilot_error' 	=> 1,
 				'body'			=> $this->invalid_content_verification_error . ' (#109mf)',
+			);
+
+			$result = $this->end_ajax( serialize( $return ) );
+
+			return $result;
+		}
+
+		if ( ! $this->media_request_allowed( 'push' ) ) {
+
+			$return = array(
+				'syncpilot_error' => 1,
+				'body'            => sprintf( __( 'The connection succeeded but the remote site is configured to reject %s connections. You can change this in the "settings" tab on the remote site. (#110)', self::TEXT_DOMAIN ), __( 'push', self::TEXT_DOMAIN ) ),
 			);
 
 			$result = $this->end_ajax( serialize( $return ) );
@@ -546,6 +699,18 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 			$return = array(
 				'syncpilot_error' => 1,
 				'body'			  => $this->invalid_content_verification_error . ' (#100mf)',
+			);
+
+			$result = $this->end_ajax( serialize( $return ) );
+
+			return $result;
+		}
+
+		if ( ! $this->media_request_allowed( $filtered_post['intent'] ?? '' ) ) {
+
+			$return = array(
+				'syncpilot_error' => 1,
+				'body'            => sprintf( __( 'The connection succeeded but the remote site is configured to reject %s connections. You can change this in the "settings" tab on the remote site. (#110)', self::TEXT_DOMAIN ), 'pull' === ( $filtered_post['intent'] ?? '' ) ? __( 'pull', self::TEXT_DOMAIN ) : __( 'push', self::TEXT_DOMAIN ) ),
 			);
 
 			$result = $this->end_ajax( serialize( $return ) );

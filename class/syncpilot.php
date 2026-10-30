@@ -201,7 +201,7 @@ class SyncPilot extends SyncPilot_Base {
 		$source      = trailingslashit( $this->plugin_dir_path ) . 'compatibility/sync-pilot-compatibility.php';
 		$destination = trailingslashit( $mu_dir ) . 'sync-pilot-compatibility.php';
 
-		if ( '1' === trim( $_POST['install'] ) ) { // install MU plugin
+		if ( isset( $_POST['install'] ) && '1' === trim( $_POST['install'] ) ) { // install MU plugin
 
 			if ( ! wp_mkdir_p( $mu_dir ) ) {
 				_e( sprintf( 'The following directory could not be created: %s', $mu_dir ), self::TEXT_DOMAIN );
@@ -792,28 +792,22 @@ class SyncPilot extends SyncPilot_Base {
 
 		$filtered_post = $this->filter_post_elements( $_POST, array( 'action', 'table', 'chunk_gzipped' ) );
 		$gzip          = ( isset( $_POST['chunk_gzipped'] ) && $_POST['chunk_gzipped'] );
-		$tmp_file_name = 'chunk.txt';
 
-		if ( $gzip )
-			$tmp_file_name .= '.gz';
-
-		$tmp_file_path = wp_tempnam( $tmp_file_name );
-
-		if ( !isset( $_FILES['chunk']['tmp_name'] ) || !move_uploaded_file( $_FILES['chunk']['tmp_name'], $tmp_file_path ) ) {
+		// Read the upload in place: PHP removes it at the end of the request, so nothing is left behind in the temp folder
+		// when the request turns out to be unsigned
+		if ( !isset( $_FILES['chunk']['tmp_name'] ) || !is_string( $_FILES['chunk']['tmp_name'] ) || !is_uploaded_file( $_FILES['chunk']['tmp_name'] ) ) {
 
 			$result = $this->end_ajax( __( 'Could not upload the SQL to the server. (#135)', self::TEXT_DOMAIN ) );
 
 			return $result;
 		}
 
-		if ( false === ( $chunk = file_get_contents( $tmp_file_path ) ) ) {
+		if ( false === ( $chunk = file_get_contents( $_FILES['chunk']['tmp_name'] ) ) ) {
 
 			$result = $this->end_ajax( __( 'Could not read the SQL file we uploaded to the server. (#136)', self::TEXT_DOMAIN ) );
 
 			return $result;
 		}
-
-		@unlink( $tmp_file_path );
 
 		$filtered_post['chunk'] = $chunk;
 
@@ -835,8 +829,17 @@ class SyncPilot extends SyncPilot_Base {
 			return $result;
 		}
 
-		if( $gzip )
-			$filtered_post['chunk'] = gzuncompress( $filtered_post['chunk'] );
+		if ( $gzip ) {
+
+			$filtered_post['chunk'] = @gzuncompress( $filtered_post['chunk'] );
+
+			if ( false === $filtered_post['chunk'] ) {
+
+				$result = $this->end_ajax( __( 'Could not read the SQL file we uploaded to the server. (#136)', self::TEXT_DOMAIN ) );
+
+				return $result;
+			}
+		}
 
 		$process_chunk_result = $this->process_chunk( $filtered_post['chunk'] );
 		$result               = $this->end_ajax( $process_chunk_result );
@@ -1553,8 +1556,14 @@ class SyncPilot extends SyncPilot_Base {
 	}
 
 	// Retrieves the specified profile, if -1, returns the default profile
+	/**
+	 * Get a saved profile by its (1 based) number from the URL; anything that is not a saved profile gives the default profile
+	 * @since   0.1.2
+	 * @param   mixed $profile_id Value of the URL parameter syncpilot-profile
+	 * @return  array
+	 */
 	function get_profile( $profile_id ) {
-		--$profile_id;
+		$profile_id = (int) $profile_id - 1;
 
 		if ( $profile_id == '-1' || ! isset( $this->settings['profiles'][$profile_id] ) )
 			return $this->default_profile;
@@ -2019,33 +2028,42 @@ class SyncPilot extends SyncPilot_Base {
 				}
 
 				elseif ( $this->table_is( 'commentmeta', $table ) ) {
-					extract( $this->get_ms_compat_table_names( array( 'commentmeta', 'comments' ), $table ) );
+					$ms_tables         = $this->get_ms_compat_table_names( array( 'commentmeta', 'comments' ), $table );
+					$commentmeta_table = $ms_tables['commentmeta_table'];
+					$comments_table    = $ms_tables['comments_table'];
 					$join[] = sprintf( 'INNER JOIN %1$s ON %1$s.comment_ID = %2$s.comment_id', $this->backquote( $comments_table ), $this->backquote( $commentmeta_table ) );
 					$where .= sprintf( ' AND %1$s.comment_approved != \'spam\'', $this->backquote( $comments_table ) );
 				}
 			}
 
 			if ( 'backup' != $_POST['stage'] && isset( $this->form_data['exclude_post_types'] ) && ! empty( $this->form_data['select_post_types'] ) ) {
-				$post_types = '\'' . implode( '\', \'', $this->form_data['select_post_types'] ) . '\'';
+				$post_types = '\'' . implode( '\', \'', array_map( 'esc_sql', (array) $this->form_data['select_post_types'] ) ) . '\'';
 
 				if( $this->table_is( 'posts', $table ) ) {
 					$where .= ' AND `post_type` NOT IN ( ' . $post_types . ' )';
 				}
 
 				elseif( $this->table_is( 'postmeta', $table ) ) {
-					extract( $this->get_ms_compat_table_names( array( 'postmeta', 'posts' ), $table ) );
+					$ms_tables      = $this->get_ms_compat_table_names( array( 'postmeta', 'posts' ), $table );
+					$postmeta_table = $ms_tables['postmeta_table'];
+					$posts_table    = $ms_tables['posts_table'];
 					$join[] = sprintf( 'INNER JOIN %1$s ON %1$s.ID = %2$s.post_id', $this->backquote( $posts_table ), $this->backquote( $postmeta_table ) );
 					$where .= sprintf( ' AND %1$s.post_type NOT IN ( ' . $post_types . ' )', $this->backquote( $posts_table ) );
 				}
 
 				elseif ( $this->table_is( 'comments', $table ) ) {
-					extract( $this->get_ms_compat_table_names( array( 'comments', 'posts' ), $table ) );
+					$ms_tables      = $this->get_ms_compat_table_names( array( 'comments', 'posts' ), $table );
+					$comments_table = $ms_tables['comments_table'];
+					$posts_table    = $ms_tables['posts_table'];
 					$join[] = sprintf( 'INNER JOIN %1$s ON %1$s.ID = %2$s.comment_post_ID', $this->backquote( $posts_table ), $this->backquote( $comments_table ) );
 					$where .= sprintf( ' AND %1$s.post_type NOT IN ( ' . $post_types . ' )', $this->backquote( $posts_table ) );
 				}
 
 				elseif( $this->table_is( 'commentmeta', $table ) ) {
-					extract( $this->get_ms_compat_table_names( array( 'commentmeta', 'posts', 'comments' ), $table ) );
+					$ms_tables         = $this->get_ms_compat_table_names( array( 'commentmeta', 'posts', 'comments' ), $table );
+					$commentmeta_table = $ms_tables['commentmeta_table'];
+					$posts_table       = $ms_tables['posts_table'];
+					$comments_table    = $ms_tables['comments_table'];
 					$join[] = sprintf( 'INNER JOIN %1$s ON %1$s.comment_ID = %2$s.comment_id', $this->backquote( $comments_table ), $this->backquote( $commentmeta_table ) );
 					$join[] = sprintf( 'INNER JOIN %2$s ON %2$s.ID = %1$s.comment_post_ID', $this->backquote( $comments_table ), $this->backquote( $posts_table ) );
 					$where .= sprintf( ' AND %1$s.post_type NOT IN ( ' . $post_types . ' )', $this->backquote( $posts_table ) );
@@ -2594,13 +2612,13 @@ class SyncPilot extends SyncPilot_Base {
 				$result = array();
 
 				foreach ( $a_name as $key => $val )
-					$result[$key] = '`' . $val . '`';
+					$result[$key] = '`' . str_replace( '`', '``', $val ) . '`';
 
 				return $result;
 			}
 
 			else {
-				return '`' . $a_name . '`';
+				return '`' . str_replace( '`', '``', $a_name ) . '`';
 			}
 
 		}
@@ -2821,7 +2839,7 @@ class SyncPilot extends SyncPilot_Base {
 			var syncpilot_this_uploads_dir     = '<?php echo addslashes( $this->get_short_uploads_dir() ); ?>';
 			var syncpilot_write_permission     = <?php echo ( is_writeable( $this->get_upload_info( 'path' ) ) ? 'true' : 'false' ); ?>;
 			var syncpilot_nonces               = <?php echo json_encode( $nonces ); ?>;
-			var syncpilot_profile              = '<?php echo ( isset( $_GET['syncpilot-profile'] ) ? $_GET['syncpilot-profile'] : '-1' ); ?>';
+			var syncpilot_profile              = '<?php echo ( isset( $_GET['syncpilot-profile'] ) ? (int) $_GET['syncpilot-profile'] : -1 ); ?>';
 
 			<?php do_action( 'syncpilot_js_variables' ); ?>
 		</script>
