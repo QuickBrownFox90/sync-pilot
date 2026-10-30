@@ -1,0 +1,195 @@
+#syncpilot-main {
+    width: 742px;
+}
+
+#overlay {
+    background-color: rgba(255, 255, 255, 0.9);
+}
+
+.syncpilot {
+    /* =============================================================================
+     Common & Global
+     ========================================================================== */
+    /* =============================================================================
+     Migrate Tab
+     ========================================================================== */
+    /* Misc */
+    /* Tabs */
+    /* Saved migration profile selection */
+    /* Output Selection */
+    /* Find and Replace */
+    /* Select Tables */
+    /* Advanced Options */
+    /* Save migration profile */
+    /* Action buttons */
+    /* =============================================================================
+     Settings Tab
+     ========================================================================== */
+    /* =============================================================================
+     Diagnostics Tab
+     ========================================================================== */
+    /* =============================================================================
+     Addons Tab
+     ========================================================================== */
+}
+
+.syncpilot .updated {
+    clear: both;
+}
+
+.syncpilot div.updated.warning {
+    max-width: 742px;
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+    margin: 10px 0;
+}
+
+.syncpilot div.updated.warning p {
+    font-size: 13px;
+    margin: 0.5em 0;
+}
+
+.syncpilot a {
+    text-decoration: none;
+}
+
+.syncpilot li {
+    margin-bottom: 5px;
+    position: relative;
+}
+
+.syncpilot ul {
+    margin: 0;
+}
+
+.syncpilot input[type=checkbox],
+.syncpilot input[type=radio] {
+    margin-right: 5px;
+    vertical-align: baseline;
+    margin-top: 0;
+}
+
+.syncpilot input[type=text],
+.syncpilot input[type=password] {
+    padding: 5px;
+}
+
+.syncpilot input[disabled=disabled] {
+    cursor: default;
+}
+
+.syncpilot label.disabled {
+    color: #888;
+    cursor: default;
+}
+
+.syncpilot .option-section {
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+}
+
+.syncpilot .option-section h3 {
+    font-size: 18px;
+    font-weight: normal;
+}
+
+.syncpilot p.migrate-db {
+    overflow: hidden;
+}
+
+.syncpilot p.migrate-db input {
+    float: left;
+}
+
+.syncpilot p.migrate-db img {
+    float: left;
+    margin: 3px 0 0 5px;
+}
+
+.syncpilot p.migrate-db .save-settings-button {
+    margin-left: 10px;
+    display: none;
+}
+
+.syncpilot .indent-wrap {
+    margin-left: 24px;
+}
+
+.syncpilot .expandable-content {
+    display: none;
+    margin-top: 10px;
+}
+
+.syncpilot .expandable-content li:last-child {
+    margin-bottom: 0px;
+}
+
+.syncpilot .header-wrapper {
+    margin-bottom: 10px;
+}
+
+.syncpilot .header-expand-collapse {
+    cursor: pointer;
+    display: inline-block;
+}
+
+.syncpilot .option-description {
+    font-size: 12px;
+    color: #999;
+    margin-left: 8px;
+    font-weight: normal;
+}
+
+.syncpilot .option-group li:last-child {
+    margin-bottom: 0;
+}
+
+.syncpilot .connection-status {
+    display: none;
+    overflow: auto;
+}
+
+.syncpilot .connection-status.error {
+    color: #9D1818;
+}
+
+.syncpilot .ajax-spinner {
+    left: 6px;
+    position: relative;
+    top: 3px;
+}
+
+.syncpilot div.message {
+    margin: 15px 0 0;
+}
+
+.syncpilot .return-to-profile-selection {
+    margin-bottom: 15px;
+    display: inline-block;
+}
+
+.syncpilot .return-to-profile-selection.bottom {
+    margin-top: 10px;
+}
+
+.syncpilot h2.nav-tab-wrapper {
+    margin-top: 10px;
+    margin-bottom: 20px;
+    padding-left: 5px;
+}
+
+.syncpilot h2.nav-tab-wrapper a {
+    margin-right: 4px;
+}
+
+.syncpilot h2.nav-tab-wrapper a.nav-tab-active {
+    color: #464646;
+    cursor: default;
+}
+
+.syncpilot label {
+    display: inline-block;
+    clear: both;
+}

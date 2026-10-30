@@ -1,0 +1,33 @@
+.syncpilot .migration-profile-options li {
+    position: relative;
+    width: 520px;
+}
+
+.syncpilot .migration-profile-options li a {
+    padding: 5px 10px;
+    width: 500px;
+    border: 1px solid #ddd;
+    margin: 0px 0px 7px;
+    display: block;
+    font-size: 14px;
+    color: #333;
+}
+
+.syncpilot .migration-profile-options li a:hover {
+    border-color: #bbb;
+}
+
+.syncpilot .main-list-delete-profile-link {
+    color: #999999;
+    font-family: "Times New Roman", serif;
+    font-size: 26px;
+    font-weight: 200;
+    position: absolute;
+    right: 7px;
+    top: 6px;
+    cursor: pointer;
+}
+
+.syncpilot .main-list-delete-profile-link:hover {
+    color: #444;
+}

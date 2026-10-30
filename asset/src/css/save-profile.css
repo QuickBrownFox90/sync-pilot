@@ -1,0 +1,79 @@
+.syncpilot .save-migration-profile-wrap li label {
+    font-size: 12px;
+    font-weight: normal;
+}
+
+.syncpilot .save-migration-profile-wrap li {
+    margin-bottom: 5px;
+    padding-left: 25px;
+}
+
+.syncpilot .save-migration-profile-wrap .indent-wrap {
+    margin-left: 0px;
+}
+
+.syncpilot .create-new-label {
+    margin-right: 8px;
+}
+
+.syncpilot .create-new-profile {
+    position: absolute;
+    top: -5px;
+}
+
+.syncpilot .replace-remove-row,
+.syncpilot .delete-profile {
+    background-color: #eee;
+    border: 1px solid #ccc;
+    border-radius: 50% 50% 50% 50%;
+    cursor: pointer;
+    height: 11px;
+    left: 5px;
+    margin-left: 2px;
+    position: absolute;
+    margin-top: -6px;
+    top: 50%;
+    width: 11px;
+    display: none;
+    background-position: 50% 50%;
+    background-size: 6px 6px;
+    background-repeat: no-repeat;
+}
+
+.syncpilot .replace-remove-row:after,
+.syncpilot .delete-profile:after {
+    content: "\00d7";
+    left: 2px;
+    position: absolute;
+    top: -3px;
+    color: #aaa;
+    font-size: 12px;
+}
+
+.syncpilot .replace-remove-row:after {
+    position: relative;
+}
+
+.syncpilot .replace-remove-row:hover,
+.syncpilot .delete-profile:hover {
+    border-color: #aaa;
+}
+
+.syncpilot .migrate-db .ajax-success-msg {
+    font-weight: bold;
+    margin: 3px 0 0 9px;
+    display: inline-block;
+}
+
+.syncpilot p img.save-profile-ajax-spinner {
+    margin-left: 10px;
+}
+
+.syncpilot .backup-description {
+    left: 20px;
+    position: relative;
+}
+
+.syncpilot .backup-option-disabled {
+    margin-bottom: 0px !important;
+}

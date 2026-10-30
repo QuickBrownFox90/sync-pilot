@@ -1,0 +1,87 @@
+.syncpilot .find-heading,
+.syncpilot .replace-heading {
+    float: left;
+}
+
+.syncpilot .find-heading {
+    width: 400px;
+}
+
+.syncpilot .replace-fields {
+    border-collapse: collapse;
+    border-spacing: 0px;
+}
+
+.syncpilot .replace-fields input {
+    width: 295px;
+}
+
+.syncpilot .replace-fields tr td {
+    padding-bottom: 7px;
+}
+
+.syncpilot .replace-fields tr:last-child td {
+    padding-bottom: 0px;
+}
+
+.syncpilot .arrow-col {
+    width: 93px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.syncpilot .right-arrow {
+    font-size: 36px;
+    color: #aaa;
+    font-family: arial, sans-serif;
+}
+
+.syncpilot .replace-right-col span {
+    border-radius: 50%;
+    border: 1px solid #ccc;
+    background-color: #eee;
+    width: 16px;
+    height: 16px;
+    display: inline-block;
+    position: relative;
+    top: 4px;
+    cursor: pointer;
+}
+
+.syncpilot .replace-right-col span:hover {
+    border-color: #aaa;
+}
+
+.syncpilot .sort-handle-col {
+    width: 20px;
+    cursor: -webkit-grab;
+    cursor: -moz-grab;
+}
+
+.syncpilot .sort-handle:before {
+    content: "\f214";
+    display: inline-block;
+    -webkit-font-smoothing: antialiased;
+    font: normal 16px/1 'dashicons';
+    vertical-align: top;
+    color: #aaa;
+    background-color: transparent !important;
+}
+
+.syncpilot .original-repeatable-field {
+    display: none;
+}
+
+.syncpilot .no-replaces-message {
+    display: none;
+    margin-bottom: 0px;
+}
+
+.syncpilot .inline-message.missing-replace {
+    margin-top: 15px;
+    display: none;
+}
+
+.syncpilot #new-path-missing-warning {
+    margin-top: 5px;
+}

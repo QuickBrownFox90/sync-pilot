@@ -1,0 +1,27 @@
+/* Replacement for alert() / confirm(), see syncpilot_dialog() in common.js */
+.syncpilot-dialog {
+    max-width: 480px;
+    width: calc(100% - 40px);
+    padding: 20px 24px;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    background: #fff;
+    color: #1d2327;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3);
+}
+
+.syncpilot-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.syncpilot-dialog .syncpilot-dialog-message {
+    margin: 0 0 20px;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.syncpilot-dialog .syncpilot-dialog-buttons {
+    text-align: right;
+}

@@ -1,0 +1,30 @@
+.syncpilot .diagnostics-tab {
+    display: none;
+}
+
+.syncpilot .diagnostics-tab h3 {
+    font-size: 18px;
+    font-weight: normal;
+}
+
+.syncpilot .diagnostics-tab .debug {
+    width: 640px;
+    border-bottom: 1px solid #CCCCCC;
+    margin-bottom: 25px;
+    padding-bottom: 28px;
+}
+
+.syncpilot .diagnostics-tab .debug textarea {
+    width: 100%;
+    min-height: 200px;
+    font-family: Consolas, Monaco, monospace;
+    margin-bottom: 5px;
+}
+
+.syncpilot .diagnostics-tab h4 {
+    margin: 0 0 0.2em 0;
+}
+
+.syncpilot .diagnostics-tab p {
+    margin: 0 0 0.5em 0;
+}

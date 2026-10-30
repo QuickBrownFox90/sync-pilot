@@ -45,7 +45,11 @@ On the first load SyncPilot copies the settings of WP Sync DB (API key, pull/pus
 
 ## Status
 
-Version 0.2.0 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged, with fixes for PHP 8.2+ and the first security fixes (see [changelog.txt](changelog.txt)). Pull, push and export were tested on PHP 8.4; Media Files, multisite and WP-CLI are not verified yet. Further hardening is planned, so use it only between sites you control and only on a trusted connection.
+Version 0.2.1 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged, with fixes for PHP 8.2+ and the first security fixes (see [changelog.txt](changelog.txt)). Pull, push and export were tested on PHP 8.4; Media Files, multisite and WP-CLI are not verified yet. Further hardening is planned, so use it only between sites you control and only on a trusted connection.
+
+## Development
+
+The admin styles are written as modules in `asset/src/css/` and built into `asset/css/` (`styles.css` readable, `styles.min.css` minified; the plugin loads the minified file unless `SCRIPT_DEBUG` is on). After a change run `npm install` once and then `npm run build`, and commit the result; the release workflow stops if `asset/css` is not up to date. The ZIP of a release does not contain `asset/src`, `package.json` or `package-lock.json`.
 
 ## License
 

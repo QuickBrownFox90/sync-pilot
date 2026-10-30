@@ -1,0 +1,15 @@
+/* SyncPilot admin styles; the order of the imports is the order of the cascade */
+@import "./base.css";
+@import "./profiles.css";
+@import "./migrate.css";
+@import "./search-replace.css";
+@import "./tables.css";
+@import "./helpers.css";
+@import "./notices.css";
+@import "./save-profile.css";
+@import "./settings.css";
+@import "./diagnostics.css";
+@import "./utilities.css";
+@import "./progress.css";
+@import "./wp-admin.css";
+@import "./dialog.css";

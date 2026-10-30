@@ -1,0 +1,203 @@
+.progress-content {
+    display: none;
+    position: relative;
+    margin: 0 auto;
+    background-color: #fff;
+    padding: 50px;
+    box-shadow: 0 0 10px #ccc;
+    cursor: default;
+    width: 80%;
+    z-index: 99999;
+    position: fixed;
+    left: 50%;
+    margin-left: -40%;
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+.progress-content .progress-bar {
+    height: 10px;
+    background-color: #8cc1e9;
+    margin-bottom: 5px;
+    background-image: -webkit-gradient(linear, 50% 100%, 50% 0%, color-stop(0%, #72a7cf), color-stop(100%, #8cc1e9));
+    background-image: -webkit-linear-gradient(bottom, #72a7cf, #8cc1e9);
+    background-image: -moz-linear-gradient(bottom, #72a7cf, #8cc1e9);
+    background-image: -o-linear-gradient(bottom, #72a7cf, #8cc1e9);
+    background-image: linear-gradient(bottom, #72a7cf, #8cc1e9);
+}
+
+.progress-content .progress-title {
+    font-size: 18px;
+    font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", sans-serif;
+    font-weight: normal;
+    float: left;
+}
+
+.progress-content .progress-bar {
+    width: 0%;
+}
+
+.progress-content .progress-info-wrapper {
+    margin-bottom: 10px;
+}
+
+.progress-content .progress-text {
+    clear: left;
+    float: left;
+    width: 100%;
+}
+
+.progress-content .timer {
+    float: right;
+}
+
+.progress-content .progress-tables {
+    overflow: hidden;
+    margin-bottom: 2px;
+    padding: 0 0 20px 0;
+}
+
+.progress-content .progress-bar-wrapper {
+    position: relative;
+}
+
+.progress-content .progress-bar-wrapper:before {
+    content: '';
+    display: block;
+    height: 5px;
+    width: 1px;
+    background-color: #ccc;
+    position: absolute;
+    top: 15px;
+    left: 0px;
+}
+
+.progress-content .progress-tables-hover-boxes {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    display: block;
+    width: 100%;
+}
+
+.progress-content .progress-chunk-hover {
+    display: block;
+    float: left;
+    height: 35px;
+    position: relative;
+    top: -5px;
+    z-index: 1;
+}
+
+.progress-content .progress-chunk {
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+    float: left;
+    display: block;
+    height: 6px;
+    border-right: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+    color: #999;
+    position: relative;
+    text-align: center;
+}
+
+.progress-content .progress-chunk>span {
+    padding: 0px 3px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    margin-top: 10px;
+    display: inline-block;
+}
+
+.progress-content .progress-label {
+    padding: 5px 10px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background-color: #fff;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+    display: inline-block;
+    top: -35px;
+    position: absolute;
+    opacity: 0;
+    -webkit-transition: opacity 200ms ease-in-out;
+    -moz-transition: opacity 200ms ease-in-out;
+    -ms-transition: opacity 200ms ease-in-out;
+    -o-transition: opacity 200ms ease-in-out;
+    transition: opacity 200ms ease-in-out;
+}
+
+.progress-content .label-visible {
+    opacity: 1;
+}
+
+.progress-content .progress-label:before {
+    content: "";
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid #ccc;
+    display: block;
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    margin-left: -2px;
+}
+
+.progress-content .progress-label:after {
+    content: "";
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid #fff;
+    display: block;
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    margin-left: -2px;
+}
+
+.progress-content .migration-progress-ajax-spinner {
+    left: 7px;
+    position: relative;
+    top: 15px;
+}
+
+.progress-content .close-progress-content {
+    color: #999999;
+    cursor: pointer;
+    font-family: "Times New Roman", serif;
+    font-size: 26px;
+    font-weight: 200;
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    padding: 5px;
+    display: none;
+}
+
+.progress-content .close-progress-content:hover {
+    color: #666;
+    border-color: #aaa;
+}
+
+.progress-content .migration-controls {
+    display: block;
+    margin-top: 45px;
+}
+
+.progress-content .migration-controls span {
+    float: left;
+    text-align: center;
+    display: block;
+}
+
+.progress-content .migration-controls span:first-child {
+    margin-right: 10px;
+    width: 71px;
+}

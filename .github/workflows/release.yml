@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check plugin version matches release tag
         run: |
@@ -25,6 +25,22 @@ jobs:
             exit 1
           fi
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check that the built assets are up to date
+        run: |
+          npm ci
+          npm run build
+          if [ -n "$(git status --porcelain -- asset/css)" ]; then
+            echo "::error::asset/css is not up to date, run 'npm run build' and commit the result"
+            git status --porcelain -- asset/css
+            exit 1
+          fi
+
       - name: Build plugin ZIP
         run: |
           mkdir -p /tmp/sync-pilot
@@ -32,8 +48,13 @@ jobs:
             --exclude='.git' \
             --exclude='.github' \
             --exclude='node_modules' \
+            --exclude='asset/src' \
+            --exclude='package.json' \
+            --exclude='package-lock.json' \
             --exclude='composer.json' \
             --exclude='composer.lock' \
+            --exclude='.editorconfig' \
+            --exclude='.gitignore' \
             --exclude='*.md' \
             --exclude='*.txt' \
             ./ /tmp/sync-pilot/sync-pilot/
@@ -41,6 +62,6 @@ jobs:
           zip -r sync-pilot.zip sync-pilot/
 
       - name: Attach ZIP to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: /tmp/sync-pilot/sync-pilot.zip

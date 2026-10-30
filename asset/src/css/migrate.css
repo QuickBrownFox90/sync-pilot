@@ -1,0 +1,88 @@
+.syncpilot .option-group li {
+    margin-bottom: 5px;
+}
+
+.syncpilot .option-group>li {
+    margin-bottom: 8px;
+}
+
+.syncpilot .option-group li>label {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.syncpilot .option-group ul {
+    display: none;
+    margin: 10px 0px 10px 25px;
+}
+
+.syncpilot .option-group ul label {
+    font-size: 12px;
+    font-weight: normal;
+}
+
+.syncpilot .option-heading,
+.syncpilot .checkbox-label {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.syncpilot .checkbox-label input[type=checkbox] {
+    margin-right: 7px;
+    position: relative;
+    top: -1px;
+}
+
+.syncpilot .expand-collapse-arrow {
+    margin-right: 9px;
+}
+
+.syncpilot .migrate-connection-info {
+    min-width: 675px;
+    margin: 0;
+}
+
+.syncpilot .migrate-tab .pull-push-connection-info {
+    width: 418px;
+    height: 65px;
+    color: #333;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 15px;
+    line-height: 21px;
+    padding: 10px;
+}
+
+.syncpilot .basic-access-auth-wrapper {
+    display: none;
+    margin-bottom: 5px;
+}
+
+.syncpilot .auth-username,
+.syncpilot .auth-password {
+    width: 206px;
+    margin-top: 3px;
+}
+
+.syncpilot .auth-password {
+    width: 207px;
+}
+
+.syncpilot .connection-info-wrapper {
+    display: none;
+    width: 670px;
+}
+
+.syncpilot .connect-button {
+    margin-top: 2px;
+}
+
+.syncpilot .temp-disabled {
+    background-color: #EEEEEE;
+    color: #888888;
+    font-family: Consolas, Monaco, monospace;
+    text-shadow: 0 1px 0 #FFFFFF;
+}
+
+.syncpilot .push-list ul {
+    margin-bottom: 0px;
+}

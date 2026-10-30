@@ -1,0 +1,41 @@
+.syncpilot .label-disabled {
+    color: #888;
+}
+
+.syncpilot .prefix-notice,
+.syncpilot .ssl-notice,
+.syncpilot .different-plugin-version-notice,
+.syncpilot .directory-permission-notice {
+    background-color: #FFFFE0;
+    border: 1px solid #E6DB55;
+    padding: 15px;
+    border-radius: 3px;
+    margin-bottom: 15px;
+    display: none;
+}
+
+.syncpilot .prefix-notice p,
+.syncpilot .ssl-notice p,
+.syncpilot .different-plugin-version-notice p,
+.syncpilot .directory-permission-notice p {
+    margin-top: 0px;
+}
+
+.syncpilot .prefix-notice p:last-child,
+.syncpilot .ssl-notice p:last-child,
+.syncpilot .different-plugin-version-notice p:last-child,
+.syncpilot .directory-permission-notice p:last-child {
+    margin: 0px;
+}
+
+.syncpilot .different-plugin-version-notice,
+.syncpilot .directory-permission-notice {
+    background-color: #FFEBE8;
+    border-color: #CC0000;
+}
+
+.syncpilot .different-plugin-version-notice a,
+.syncpilot .directory-permission-notice a {
+    color: #CC0000;
+    text-decoration: underline;
+}

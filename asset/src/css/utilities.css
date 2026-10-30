@@ -1,0 +1,30 @@
+/* Progress Information */
+/* Contain floats: h5bp.com/q */
+.clearfix:before,
+.clearfix:after {
+    content: "";
+    display: table;
+}
+
+.clearfix:after {
+    clear: both;
+}
+
+.clearfix {
+    zoom: 1;
+}
+
+.general-spinner {
+    width: 16px;
+    height: 16px;
+}
+
+.migration-error {
+    color: #A21B1B;
+    display: block;
+    font-weight: bold;
+    max-height: 400px;
+    max-width: 100%;
+    overflow: scroll;
+    word-wrap: break-word;
+}

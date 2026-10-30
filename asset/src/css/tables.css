@@ -1,0 +1,46 @@
+.syncpilot .tables-header {
+    display: inline-block;
+}
+
+.syncpilot .expand-collapse-arrow {
+    display: inline-block;
+    position: relative;
+    top: -2px;
+    font-size: 11px;
+}
+
+.syncpilot .collapsed {
+    -moz-transform: scale(1) rotate(-90deg) translateX(0px) translateY(0px) skewX(0deg) skewY(0deg);
+    -webkit-transform: scale(1) rotate(-90deg) translateX(0px) translateY(0px) skewX(0deg) skewY(0deg);
+    -o-transform: scale(1) rotate(-90deg) translateX(0px) translateY(0px) skewX(0deg) skewY(0deg);
+    -ms-transform: scale(1) rotate(-90deg) translateX(0px) translateY(0px) skewX(0deg) skewY(0deg);
+    transform: scale(1) rotate(-90deg) translateX(0px) translateY(0px) skewX(0deg) skewY(0deg);
+}
+
+.syncpilot .select-deselect-divider {
+    margin: 0 6px;
+}
+
+.syncpilot .select-wrap {
+    display: none;
+    margin-top: 12px;
+}
+
+.syncpilot .select-post-types-wrap {
+    display: block;
+}
+
+.syncpilot .multiselect {
+    min-width: 420px;
+    min-height: 180px;
+    margin-bottom: 10px;
+}
+
+.syncpilot .table-migrate-options li label {
+    font-size: 12px;
+    font-weight: normal;
+}
+
+.syncpilot .table-migrate-options li {
+    margin-bottom: 5px;
+}

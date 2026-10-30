@@ -1,0 +1,302 @@
+body.mp6 input[type=checkbox]:disabled {
+    opacity: 1;
+    border-color: #ccc;
+}
+
+body.mp6 #syncpilot-main {
+    margin-top: 15px;
+    font-size: 14px;
+}
+
+body.mp6 p {
+    font-size: 14px;
+}
+
+body.mp6 .wrap h2 {
+    float: left;
+}
+
+body.mp6 .syncpilot input[type=checkbox],
+body.mp6 .syncpilot input[type=radio] {
+    vertical-align: middle;
+    margin-top: -4px;
+}
+
+body.mp6 .syncpilot input[type=text],
+body.mp6 .syncpilot input[type=password] {
+    padding: 3px 5px;
+}
+
+body.mp6 .syncpilot input.code {
+    padding-top: 6px;
+}
+
+body.mp6 .syncpilot label {
+    font-size: 14px;
+}
+
+body.mp6 .syncpilot h2.nav-tab-wrapper {
+    float: none;
+    margin-bottom: 0;
+    width: 722px;
+}
+
+body.mp6 .syncpilot .diagnostics-tab h3 {
+    margin-top: 0;
+}
+
+body.mp6 .syncpilot .temp-disabled {
+    background-color: #f9f9f9;
+}
+
+body.mp6 .syncpilot .migration-profile-options li a {
+    border-color: #ccc;
+    color: #555;
+    background-color: #e4e4e4;
+}
+
+body.mp6 .syncpilot .migration-profile-options li a:hover {
+    background-color: #fff;
+    color: #464646;
+}
+
+body.mp6 .syncpilot .settings-tab .slider-label span {
+    vertical-align: middle;
+}
+
+body.mp6 .syncpilot .settings-tab .slider-label-wrapper {
+    font-size: 14px;
+}
+
+body.mp6 .syncpilot .settings-tab .ui-slider {
+    border-color: #ccc;
+    background-color: #fff;
+}
+
+body.mp6 .syncpilot .settings-tab .ui-slider-range {
+    background-color: #d8fcd1;
+}
+
+body.mp6 .syncpilot .settings-tab .option-section li label {
+    font-size: 14px;
+}
+
+body.mp6 .syncpilot .connection-info,
+body.mp6 .syncpilot .migrate-tab .pull-push-connection-info {
+    font-weight: bold;
+    font-size: 14px;
+}
+
+body.mp6 .syncpilot .general-helper {
+    border: 0;
+    width: auto;
+    height: auto;
+    top: auto;
+    margin: 0;
+}
+
+body.mp6 .syncpilot .general-helper:after {
+    content: "\f223";
+    display: inline-block;
+    -webkit-font-smoothing: antialiased;
+    font: normal 22px/1 'dashicons';
+    vertical-align: top;
+    top: auto;
+    left: auto;
+    position: relative;
+}
+
+body.mp6 .syncpilot .helper-message {
+    font-size: 14px;
+    line-height: 1.4em;
+}
+
+body.mp6 .syncpilot .right-arrow {
+    display: none;
+}
+
+body.mp6 .syncpilot .arrow-col {
+    width: 75px;
+}
+
+body.mp6 .syncpilot .arrow-col:after {
+    content: "\f344";
+    display: inline-block;
+    -webkit-font-smoothing: antialiased;
+    font: normal 22px/1 'dashicons';
+    vertical-align: top;
+    color: #999;
+}
+
+body.mp6 .syncpilot .find-heading {
+    width: 409px;
+}
+
+body.mp6 .syncpilot .replace-fields input {
+    width: 304px;
+}
+
+body.mp6 .syncpilot .replace-right-col span {
+    border-color: #999;
+}
+
+body.mp6 .syncpilot .replace-right-col span:hover {
+    border-color: #666;
+}
+
+body.mp6 .syncpilot .replace-add-row:after,
+body.mp6 .syncpilot .replace-add-row:before {
+    background-color: #999;
+}
+
+body.mp6 .syncpilot .replace-add-row:hover:after,
+body.mp6 .syncpilot .replace-add-row:hover:before {
+    background-color: #666;
+}
+
+body.mp6 .syncpilot .option-group.migrate-selection>li>label {
+    font-size: 16px;
+}
+
+body.mp6 .syncpilot .saved-migration-profile-label {
+    font-size: 16px;
+}
+
+body.mp6 .syncpilot .option-heading,
+body.mp6 .syncpilot .checkbox-label {
+    font-size: 16px;
+}
+
+body.mp6 .syncpilot .checkbox-label input[type=checkbox] {
+    top: auto;
+}
+
+body.mp6 .syncpilot .return-to-profile-selection {
+    font-size: 14px;
+}
+
+body.mp6 .syncpilot .option-description {
+    font-size: 13px;
+}
+
+body.mp6 .syncpilot .save-migration-profile-wrap li {
+    position: relative;
+}
+
+body.mp6 .syncpilot .replace-remove-row,
+body.mp6 .syncpilot .delete-profile {
+    border: 0;
+    border-radius: 0;
+    height: auto;
+    width: auto;
+    left: 0;
+    top: 50%;
+    margin-left: 0;
+}
+
+body.mp6 .syncpilot .replace-remove-row:after,
+body.mp6 .syncpilot .delete-profile:after {
+    content: "\f153";
+    display: inline-block;
+    -webkit-font-smoothing: antialiased;
+    font: normal 18px/1 'dashicons';
+    vertical-align: middle;
+    color: #999;
+}
+
+body.mp6 .syncpilot .replace-remove-row:hover:after,
+body.mp6 .syncpilot .delete-profile:hover:after {
+    color: #666;
+}
+
+body.mp6 .syncpilot .inline-message,
+body.mp6 .syncpilot .notification-message {
+    border-radius: 0;
+    border: 0;
+    box-shadow: 0 1px 1px 0 rgba(0, 0, 0, 0.1);
+    padding: 10px 14px;
+    font-size: 13px;
+}
+
+body.mp6 .syncpilot .notification-message {
+    margin-bottom: 20px;
+    background-color: #fff;
+}
+
+body.mp6 .syncpilot .notification-message p {
+    font-size: 13px;
+    margin-top: 0;
+}
+
+body.mp6 .syncpilot .notification-message p:last-child {
+    margin: 0;
+}
+
+body.mp6 .syncpilot .notification-message h4 {
+    margin-top: 0;
+}
+
+body.mp6 .syncpilot .notification-message a {
+    color: #0074a2;
+    text-decoration: none;
+}
+
+body.mp6 .syncpilot .notification-message a:hover {
+    color: #2ea2cc;
+}
+
+body.mp6 .syncpilot .inline-message.error,
+body.mp6 .syncpilot .notification-message.error-notice {
+    border-left: 4px solid #dd3d36;
+    background-color: #fff;
+}
+
+body.mp6 .syncpilot .inline-message.warning,
+body.mp6 .syncpilot .notification-message.warning-notice {
+    background-color: #fff;
+    border-left: 4px solid #ffba00;
+}
+
+body.mp6 .syncpilot .inline-message.success,
+body.mp6 .syncpilot .notification-message.success-notice {
+    border-left: 4px solid #7ad03a;
+}
+
+body.mp6 .syncpilot .ssl-notice {
+    margin-bottom: 0;
+}
+
+body.mp6 .syncpilot .different-plugin-version-notice,
+body.mp6 .syncpilot .directory-permission-notice {
+    margin-bottom: 10px;
+}
+
+body.mp6 .progress-content {
+    font-size: 14px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    background-color: #eee;
+}
+
+body.mp6 .progress-content .progress-title {
+    font-family: 'Open Sans', sans-serif;
+    font-weight: normal;
+    font-size: 22px;
+}
+
+body.mp6 .progress-content .dashicons-yes {
+    font-size: 42px;
+    line-height: 0.5em;
+}
+
+body.mp6 .progress-content .progress-bar {
+    background-image: none;
+    background-color: #0074a2;
+}
+
+body.mp6 #overlay {
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+body.mp6 .migration-progress-ajax-spinner {
+    top: 20px;
+}

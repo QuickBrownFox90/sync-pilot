@@ -2686,7 +2686,10 @@ class SyncPilot extends SyncPilot_Base {
 		$plugins_url = trailingslashit( plugins_url( '', $this->plugin_file_path ) );
 		$version     = defined('SCRIPT_DEBUG') && SCRIPT_DEBUG ? time() : $this->plugin_version;
 
-		$src = $plugins_url . 'asset/css/styles.css';
+		// asset/css is built from asset/src (npm run build): styles.css is readable, styles.min.css is what runs normally
+		$suffix = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : '.min';
+
+		$src = $plugins_url . 'asset/css/styles' . $suffix . '.css';
 		wp_enqueue_style( 'sync-pilot-styles', $src, array(), $version );
 
 		$src = $plugins_url . 'asset/js/common.js';

@@ -1,5 +1,12 @@
 == Changelog ==
 
+= Version 0.2.1 =
+
+* Changed: The stylesheet is split into 14 modules in `asset/src/css/` (base, profiles, migrate, search-replace, tables, helpers, notices, save-profile, settings, diagnostics, utilities, progress, wp-admin, dialog), joined by `main.css` with `@import` in the order of the old file, and built with esbuild (`npm run build`) into `asset/css/styles.css` and `asset/css/styles.min.css`; the built files are in the repository. The plugin loads `styles.min.css`, and `styles.css` when `SCRIPT_DEBUG` is on. The minified result is byte-for-byte what esbuild makes of the old single file, so nothing changes in the look
+* Changed: The release workflow sets up Node.js, builds the assets and stops when `asset/css` is not up to date; the ZIP leaves out `asset/src`, `package.json`, `package-lock.json`, `.editorconfig` and `.gitignore`
+* Changed: The actions of the release workflow run on Node.js 24 (`actions/checkout@v5`, `actions/setup-node@v5`, `softprops/action-gh-release@v3`); GitHub warned that Node.js 20 is deprecated
+* Changed: The version is raised to 0.2.1 in the plugin header, in `$GLOBALS['syncpilot_meta']`, in the MU compatibility plugin and in the README
+
 = Version 0.2.0 =
 
 * Fixed: `maybe_update_profile()` saved a converted profile in the old format under the number from the URL (starts at 1), but the profiles are stored from 0, so loading an old profile wrote the converted copy into the wrong place (a new entry, or the next profile overwritten). It uses the same index as `get_profile()` now and only writes when that profile exists

@@ -1,0 +1,12 @@
+{
+  "name": "sync-pilot",
+  "private": true,
+  "description": "Build of the SyncPilot admin assets: asset/src -> asset/css",
+  "scripts": {
+    "build": "npm run build:css",
+    "build:css": "esbuild asset/src/css/main.css --bundle --outfile=asset/css/styles.css && esbuild asset/src/css/main.css --bundle --minify --outfile=asset/css/styles.min.css"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.5"
+  }
+}
