@@ -18,6 +18,83 @@ function syncpilot_call_next_hook() {
     window[func](); // Uses the string from the array to call the function of the same name
 }
 
+// Replacement for alert() and confirm(): one <dialog> element for the whole page. The text is set as text, so a message
+// of the other site can never bring markup into the page. Browsers without <dialog> fall back to alert() / confirm().
+function syncpilot_dialog( text, on_confirm, on_cancel ) {
+
+    var is_confirm = ( 'function' === typeof on_confirm );
+    var l10n       = window.syncpilot_i10n || {};
+    var dialog     = document.getElementById( 'syncpilot-dialog' );
+
+    if ( ! dialog || 'function' !== typeof dialog.showModal ) {
+
+        if ( ! is_confirm ) {
+            window.alert( text );
+            return;
+        }
+
+        if ( window.confirm( text ) )
+            on_confirm();
+
+        else if ( 'function' === typeof on_cancel )
+            on_cancel();
+
+        return;
+    }
+
+    dialog.querySelector( '.syncpilot-dialog-message' ).textContent  = text;
+    dialog.querySelector( '.syncpilot-dialog-cancel' ).textContent   = l10n.dialog_cancel || 'Cancel';
+    dialog.querySelector( '.syncpilot-dialog-ok' ).textContent       = l10n.dialog_ok || 'OK';
+    dialog.querySelector( '.syncpilot-dialog-cancel' ).style.display = is_confirm ? '' : 'none';
+
+    dialog.returnValue = '';
+
+    // one-time handler: the same element is used for every message
+    dialog.addEventListener( 'close', function handle_close() {
+
+        dialog.removeEventListener( 'close', handle_close );
+
+        if ( ! is_confirm )
+            return;
+
+        if ( 'ok' === dialog.returnValue )
+            on_confirm();
+
+        else if ( 'function' === typeof on_cancel )
+            on_cancel();
+    } );
+
+    dialog.showModal();
+    dialog.querySelector( '.syncpilot-dialog-ok' ).focus();
+}
+
+function syncpilot_alert( text ) {
+    syncpilot_dialog( text );
+}
+
+function syncpilot_confirm( text, on_confirm, on_cancel ) {
+    syncpilot_dialog( text, on_confirm, on_cancel );
+}
+
+// the element is created once the page is ready
+document.addEventListener( 'DOMContentLoaded', function () {
+
+    if ( document.getElementById( 'syncpilot-dialog' ) )
+        return;
+
+    var dialog       = document.createElement( 'dialog' );
+    dialog.id        = 'syncpilot-dialog';
+    dialog.className = 'syncpilot-dialog';
+    dialog.innerHTML = '<form method="dialog">' +
+        '<p class="syncpilot-dialog-message"></p>' +
+        '<div class="syncpilot-dialog-buttons">' +
+        '<button type="submit" value="cancel" class="button syncpilot-dialog-cancel"></button> ' +
+        '<button type="submit" value="ok" class="button button-primary syncpilot-dialog-ok"></button>' +
+        '</div></form>';
+
+    document.body.appendChild( dialog );
+} );
+
 // Messages of the other site are shown with .html(). Only harmless markup stays, everything else is removed or
 // shown as text. The parser is DOMParser: it neither runs scripts nor loads images or event handlers.
 function syncpilot_sanitize_html( html ) {

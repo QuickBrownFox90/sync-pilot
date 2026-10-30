@@ -723,10 +723,12 @@
 
 .syncpilot .settings-tab .slider-success-msg {
     display: none;
-    right: -53px;
+    left: 100%;
+    margin-left: 10px;
     bottom: -13px;
     position: absolute;
     font-weight: bold;
+    white-space: nowrap;
 }
 
 .syncpilot .settings-tab .ui-slider {
@@ -777,19 +779,16 @@
 }
 
 .syncpilot .settings-tab .option-section .ajax-success-msg {
-    right: -42px;
-    left: inherit;
+    left: 100%;
+    margin-left: 10px;
     top: 0px;
     position: absolute;
     font-weight: bold;
+    white-space: nowrap;
 }
 
 .syncpilot .settings-tab .option-section .bubble .ajax-spinner {
     right: -45px;
-}
-
-.syncpilot .settings-tab .option-section .bubble .ajax-success-msg {
-    right: -65px;
 }
 
 .syncpilot .allow-remote-reqeusts {
@@ -1424,4 +1423,31 @@ body.mp6 #overlay {
 
 body.mp6 .migration-progress-ajax-spinner {
     top: 20px;
+}
+/* Replacement for alert() / confirm(), see syncpilot_dialog() in common.js */
+.syncpilot-dialog {
+    max-width: 480px;
+    width: calc(100% - 40px);
+    padding: 20px 24px;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    background: #fff;
+    color: #1d2327;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3);
+}
+
+.syncpilot-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.syncpilot-dialog .syncpilot-dialog-message {
+    margin: 0 0 20px;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.syncpilot-dialog .syncpilot-dialog-buttons {
+    text-align: right;
 }

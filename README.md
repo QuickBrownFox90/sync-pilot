@@ -30,9 +30,12 @@ Features that cannot run due to your server configuration will not appear in the
 
 ## Installation
 
-1. Copy the `sync-pilot` folder to `wp-content/plugins/` on **both** sites and activate it.
-2. Open **Tools → SyncPilot** (on multisite: **Settings → SyncPilot** in the network admin).
-3. Enable pull/push on the remote site and copy its connection info into the local site.
+1. Download the latest `sync-pilot.zip` from the [Releases page](https://github.com/QuickBrownFox90/sync-pilot/releases).
+2. In your WordPress admin go to **Plugins → Add New → Upload Plugin**, select the ZIP and click **Install Now**.
+3. Activate the plugin, then go to **Tools → SyncPilot** (on multisite: **Settings → SyncPilot** in the network admin).
+4. Enable pull/push on the remote site and copy its connection info into the local site.
+
+Once installed, future updates appear in the standard WordPress update flow — no manual download needed.
 
 Both sites need SyncPilot. A remote site that still runs WP Sync DB cannot be reached, because all request names were renamed on purpose.
 
@@ -42,7 +45,7 @@ On the first load SyncPilot copies the settings of WP Sync DB (API key, pull/pus
 
 ## Status
 
-Version 0.1.2 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged, with fixes for PHP 8.2+ and the first security fixes (see [changelog.txt](changelog.txt)). Pull, push and export were tested on PHP 8.4; Media Files, multisite and WP-CLI are not verified yet. Further hardening is planned, so use it only between sites you control and only on a trusted connection.
+Version 0.2.0 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged, with fixes for PHP 8.2+ and the first security fixes (see [changelog.txt](changelog.txt)). Pull, push and export were tested on PHP 8.4; Media Files, multisite and WP-CLI are not verified yet. Further hardening is planned, so use it only between sites you control and only on a trusted connection.
 
 ## License
 

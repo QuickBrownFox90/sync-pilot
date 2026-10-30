@@ -1139,3 +1139,95 @@ msgstr "Die Liste der Mediendateien passt nicht zu den hochgeladenen Dateien."
 #, php-format
 msgid "The media file would end up outside the uploads folder: %s"
 msgstr "Die Mediendatei würde außerhalb des Upload-Ordners landen: %s"
+
+#: class/syncpilot.php:2703
+msgid "local"
+msgstr "lokal"
+
+#: class/syncpilot.php:2703
+msgid "remote"
+msgstr "remote"
+
+#: template/migrate.php:121
+msgid "Username"
+msgstr "Benutzername"
+
+#: template/migrate.php:122
+msgid "Password"
+msgstr "Passwort"
+
+#: template/migrate.php:164
+msgid "Old value"
+msgstr "Alter Wert"
+
+#: template/migrate.php:170
+msgid "New value"
+msgstr "Neuer Wert"
+
+#: template/migrate.php:180
+msgid "Old URL"
+msgstr "Alte URL"
+
+#: template/migrate.php:186
+msgid "New URL"
+msgstr "Neue URL"
+
+#: template/migrate.php:196
+msgid "Old file path"
+msgstr "Alter Dateipfad"
+
+#: template/migrate.php:202
+msgid "New file path"
+msgstr "Neuer Dateipfad"
+
+#: template/migrate.php:435
+msgid "e.g. Live Site"
+msgstr "z. B. Live-Seite"
+
+#: template/migrate.php:349
+msgid "Exclude <a href=\"%s\" target=\"_blank\">transients</a> (temporary cached data)"
+msgstr ""
+"<a href=\"%s\" target=\"_blank\">Transients</a> (temporär zwischengespeicherte Daten) "
+"ausschließen"
+
+#: template/migrate.php:229
+msgid "Add Row"
+msgstr "Zeile hinzufügen"
+
+#: template/migrate.php:243
+msgid "Tables"
+msgstr "Tabellen"
+
+#: class/syncpilot.php:2703
+msgid "OK"
+msgstr "OK"
+
+#: class/syncpilot.php:2703
+msgid ""
+"If confirmed we will install an additional WordPress \"Must Use\" plugin. "
+"This plugin will allow us to control which plugins are loaded during "
+"SyncPilot specific operations. Do you wish to continue?"
+msgstr ""
+"Wenn du bestätigst, installieren wir ein zusätzliches WordPress-„Must "
+"Use“-Plugin. Damit lässt sich steuern, welche Plugins bei SyncPilot-"
+"Vorgängen geladen werden. Möchtest du fortfahren?"
+
+#: class/syncpilot.php:2703
+msgid ""
+"A problem occurred when trying to change the plugin compatibility setting."
+msgstr ""
+"Beim Ändern der Einstellung zur Plugin-Kompatibilität ist ein Problem "
+"aufgetreten."
+
+#: class/syncpilot.php:2703
+msgid "A problem occurred when trying to add plugins to the blacklist."
+msgstr ""
+"Beim Speichern der Plugin-Blacklist ist ein Problem aufgetreten."
+
+#: template/migrate.php:124
+msgid "Connect"
+msgstr "Verbinden"
+
+#: template/migrate.php:464
+msgid "Save Profile"
+msgstr "Profil speichern"

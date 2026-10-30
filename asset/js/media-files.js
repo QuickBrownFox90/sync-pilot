@@ -69,11 +69,11 @@ var media_successfully_determined;
 
         $.syncpilot.add_action('move_connection_info_box', function () {
             hide_show_options(remote_media_files_unavailable);
-            $('.remove-scope-1').html('remote');
-            $('.remove-scope-2').html('local');
+            $('.remove-scope-1').text(syncpilot_i10n.scope_remote);
+            $('.remove-scope-2').text(syncpilot_i10n.scope_local);
             if (migration_type() == 'pull') {
-                $('.remove-scope-1').html('local');
-                $('.remove-scope-2').html('remote');
+                $('.remove-scope-1').text(syncpilot_i10n.scope_local);
+                $('.remove-scope-2').text(syncpilot_i10n.scope_remote);
             }
         });
 

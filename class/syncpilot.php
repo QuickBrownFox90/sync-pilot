@@ -2701,6 +2701,13 @@ class SyncPilot extends SyncPilot_Base {
 		wp_enqueue_script( 'sync-pilot-script', $src, array( 'jquery' ), $version, true );
 
 		wp_localize_script( 'sync-pilot-script', 'syncpilot_i10n', array(
+			'dialog_ok'								=> __( "OK", self::TEXT_DOMAIN ),
+			'dialog_cancel'							=> __( "Cancel", self::TEXT_DOMAIN ),
+			'plugin_compatibility_confirm'			=> __( "If confirmed we will install an additional WordPress \"Must Use\" plugin. This plugin will allow us to control which plugins are loaded during SyncPilot specific operations. Do you wish to continue?", self::TEXT_DOMAIN ),
+			'plugin_compatibility_problem'			=> __( "A problem occurred when trying to change the plugin compatibility setting.", self::TEXT_DOMAIN ),
+			'blacklist_problem'						=> __( "A problem occurred when trying to add plugins to the blacklist.", self::TEXT_DOMAIN ),
+			'scope_local'							=> __( "local", self::TEXT_DOMAIN ),
+			'scope_remote'							=> __( "remote", self::TEXT_DOMAIN ),
 			'max_request_size_problem'				=> __( "A problem occurred when trying to change the maximum request size, please try again.", self::TEXT_DOMAIN ),
 			'establishing_remote_connection'		=> __( "Establishing connection to remote server, please wait", self::TEXT_DOMAIN ),
 			'connection_local_server_problem'		=> __( "A problem occurred when attempting to connect to the local server, please check the details and try again.", self::TEXT_DOMAIN ),
@@ -2846,8 +2853,16 @@ class SyncPilot extends SyncPilot_Base {
 		<?php
 	}
 
+	/**
+	 * Convert a saved profile in the old format to the current one and store it under its own number
+	 * @since   0.2.0
+	 * @param   array $profile    The loaded profile
+	 * @param   mixed $profile_id Number of the profile from the URL (starts at 1)
+	 * @return  array
+	 */
 	function maybe_update_profile( $profile, $profile_id ) {
 		$profile_changed = false;
+		$profile_key     = (int) $profile_id - 1;
 
 		if ( isset( $profile['exclude_revisions'] ) ) {
 
@@ -2867,8 +2882,8 @@ class SyncPilot extends SyncPilot_Base {
 			$profile_changed               = true;
 		}
 
-		if ( $profile_changed ) {
-			$this->settings['profiles'][$profile_id] = $profile;
+		if ( $profile_changed && isset( $this->settings['profiles'][$profile_key] ) ) {
+			$this->settings['profiles'][$profile_key] = $profile;
 
 			update_option( 'syncpilot_settings', $this->settings );
 		}

@@ -118,10 +118,10 @@
 				<textarea class="pull-push-connection-info" name="connection_info" placeholder="<?php _e( 'Connection Info - Site URL &amp; Secret Key', self::TEXT_DOMAIN ); ?>"><?php echo ( isset( $loaded_profile['connection_info'] ) ? $loaded_profile['connection_info'] : '' ); ?></textarea>
 				<br />
 				<div class="basic-access-auth-wrapper clearfix">
-					<input type="text" name="auth_username" class="auth-username auth-credentials" placeholder="Username" autocomplete="off" />
-					<input type="password" name="auth_password" class="auth-password auth-credentials" placeholder="Password" autocomplete="off" />
+					<input type="text" name="auth_username" class="auth-username auth-credentials" placeholder="<?php esc_attr_e( 'Username', self::TEXT_DOMAIN ); ?>" autocomplete="off" />
+					<input type="password" name="auth_password" class="auth-password auth-credentials" placeholder="<?php esc_attr_e( 'Password', self::TEXT_DOMAIN ); ?>" autocomplete="off" />
 				</div>
-				<input class="button connect-button" type="submit" value="Connect" name="Connect" autocomplete="off" />
+				<input class="button connect-button" type="submit" value="<?php esc_attr_e( 'Connect', self::TEXT_DOMAIN ); ?>" name="Connect" autocomplete="off" />
 			</div>
 
 			<div class="notification-message warning-notice ssl-notice inline-message">
@@ -161,13 +161,13 @@
 							<span class="sort-handle"></span>
 						</td>
 						<td class="old-replace-col">
-							<input type="text" size="40" name="replace_old[]" class="code" placeholder="Old value" autocomplete="off" />
+							<input type="text" size="40" name="replace_old[]" class="code" placeholder="<?php esc_attr_e( 'Old value', self::TEXT_DOMAIN ); ?>" autocomplete="off" />
 						</td>
 						<td class="arrow-col">
 							<span class="right-arrow">&rarr;</span>
 						</td>
 						<td class="replace-right-col">
-							<input type="text" size="40" name="replace_new[]" class="code" placeholder="New value" autocomplete="off" />
+							<input type="text" size="40" name="replace_new[]" class="code" placeholder="<?php esc_attr_e( 'New value', self::TEXT_DOMAIN ); ?>" autocomplete="off" />
 							<span style="display: none;" class="replace-remove-row" data-profile-id="0"></span>
 						</td>
 					</tr>
@@ -177,13 +177,13 @@
 								<span class="sort-handle"></span>
 							</td>
 							<td class="old-replace-col">
-								<input type="text" size="40" name="replace_old[]" class="code" id="old-url" placeholder="Old URL" value="<?php echo preg_replace( '#^https?:#', '', htmlentities( home_url() ) ); ?>" autocomplete="off" />
+								<input type="text" size="40" name="replace_old[]" class="code" id="old-url" placeholder="<?php esc_attr_e( 'Old URL', self::TEXT_DOMAIN ); ?>" value="<?php echo preg_replace( '#^https?:#', '', htmlentities( home_url() ) ); ?>" autocomplete="off" />
 							</td>
 							<td class="arrow-col">
 								<span class="right-arrow">&rarr;</span>
 							</td>
 							<td class="replace-right-col">
-								<input type="text" size="40" name="replace_new[]" class="code" id="new-url" placeholder="New URL" autocomplete="off" />
+								<input type="text" size="40" name="replace_new[]" class="code" id="new-url" placeholder="<?php esc_attr_e( 'New URL', self::TEXT_DOMAIN ); ?>" autocomplete="off" />
 								<!-- <span class="replace-remove-row"></span> -->
 								<span style="display: none;" class="replace-remove-row" data-profile-id="0"></span>
 							</td>
@@ -193,13 +193,13 @@
 								<span class="sort-handle"></span>
 							</td>
 							<td class="old-replace-col">
-								<input type="text" size="40" name="replace_old[]" class="code" id="old-path" placeholder="Old file path" value="<?php echo htmlentities( $this->absolute_root_file_path ); ?>" autocomplete="off" />
+								<input type="text" size="40" name="replace_old[]" class="code" id="old-path" placeholder="<?php esc_attr_e( 'Old file path', self::TEXT_DOMAIN ); ?>" value="<?php echo htmlentities( $this->absolute_root_file_path ); ?>" autocomplete="off" />
 							</td>
 							<td class="arrow-col">
 								<span class="right-arrow">&rarr;</span>
 							</td>
 							<td class="replace-right-col">
-								<input type="text" size="40" name="replace_new[]" class="code" id="new-path" placeholder="New file path" autocomplete="off" />
+								<input type="text" size="40" name="replace_new[]" class="code" id="new-path" placeholder="<?php esc_attr_e( 'New file path', self::TEXT_DOMAIN ); ?>" autocomplete="off" />
 								<span style="display: none;" class="replace-remove-row" data-profile-id="0"></span>
 							</td>
 						</tr>
@@ -211,13 +211,13 @@
 									<span class="sort-handle"></span>
 								</td>
 								<td class="old-replace-col">
-									<input type="text" size="40" name="replace_old[]" class="code" placeholder="Old value" value="<?php echo esc_attr( $replace_old ); ?>" autocomplete="off" />
+									<input type="text" size="40" name="replace_old[]" class="code" placeholder="<?php esc_attr_e( 'Old value', self::TEXT_DOMAIN ); ?>" value="<?php echo esc_attr( $replace_old ); ?>" autocomplete="off" />
 								</td>
 								<td class="arrow-col">
 									<span class="right-arrow">&rarr;</span>
 								</td>
 								<td class="replace-right-col">
-									<input type="text" size="40" name="replace_new[]" class="code" placeholder="New value" value="<?php echo esc_attr( isset( $loaded_profile['replace_new'][$i] ) ? $loaded_profile['replace_new'][$i] : '' ); ?>" autocomplete="off" />
+									<input type="text" size="40" name="replace_new[]" class="code" placeholder="<?php esc_attr_e( 'New value', self::TEXT_DOMAIN ); ?>" value="<?php echo esc_attr( isset( $loaded_profile['replace_new'][$i] ) ? $loaded_profile['replace_new'][$i] : '' ); ?>" autocomplete="off" />
 									<span style="display: none;" class="replace-remove-row" data-profile-id="0"></span>
 								</td>
 							</tr>
@@ -226,7 +226,7 @@
 						endforeach; ?>
 					<?php endif; ?>
 							<tr class="pin">
-								<td colspan="4"><a class="button add-row">Add Row</a></td>
+								<td colspan="4"><a class="button add-row"><?php _e( 'Add Row', self::TEXT_DOMAIN ); ?></a></td>
 							</tr>
 					</tbody>
 				</table>
@@ -240,7 +240,7 @@
 				<?php $tables = $this->get_table_sizes(); ?>
 				<div class="header-expand-collapse clearfix">
 					<div class="expand-collapse-arrow collapsed">&#x25BC;</div>
-					<div class="option-heading tables-header">Tables</div>
+					<div class="option-heading tables-header"><?php _e( 'Tables', self::TEXT_DOMAIN ); ?></div>
 				</div>
 
 				<div class="indent-wrap expandable-content table-select-wrap" style="display: none;">
@@ -346,7 +346,7 @@
 						<li>
 							<label for="exclude-transients">
 							<input id="exclude-transients" type="checkbox" value="1" autocomplete="off" name="exclude_transients"<?php $this->maybe_checked( $loaded_profile['exclude_transients'] ); ?> />
-							Exclude <a href="https://codex.wordpress.org/Transients_API" target="_blank">transients</a> (temporary cached data)
+							<?php printf( __( 'Exclude <a href="%s" target="_blank">transients</a> (temporary cached data)', self::TEXT_DOMAIN ), esc_url( 'https://codex.wordpress.org/Transients_API' ) ); ?>
 							</label>
 						</li>
 					</ul>
@@ -432,7 +432,7 @@
 							<input id="create_new" type="radio" value="new" name="save_migration_profile_option"<?php echo (  $is_default_profile ? ' checked="checked"' : '' ); ?> />
 							<?php _e( 'Create new profile', self::TEXT_DOMAIN ); ?>
 							</label>
-							<input type="text" placeholder="e.g. Live Site" name="create_new_profile" class="create-new-profile" />
+							<input type="text" placeholder="<?php esc_attr_e( 'e.g. Live Site', self::TEXT_DOMAIN ); ?>" name="create_new_profile" class="create-new-profile" />
 						</li>
 					</ul>
 				</div>
@@ -460,8 +460,8 @@
 
 			<p class="migrate-db">
 				<input type="hidden" class="remote-json-data" name="remote_json_data" autocomplete="off" />
-				<input class="button-primary migrate-db-button" type="submit" value="Migrate DB" name="Submit" autocomplete="off" />
-				<input class="button save-settings-button" type="submit" value="Save Profile" name="submit_save_profile" autocomplete="off" />
+				<input class="button-primary migrate-db-button" type="submit" value="<?php esc_attr_e( 'Migrate DB', self::TEXT_DOMAIN ); ?>" name="Submit" autocomplete="off" />
+				<input class="button save-settings-button" type="submit" value="<?php esc_attr_e( 'Save Profile', self::TEXT_DOMAIN ); ?>" name="submit_save_profile" autocomplete="off" />
 			</p>
 
 		</div>
