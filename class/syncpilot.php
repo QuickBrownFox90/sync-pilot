@@ -96,6 +96,9 @@ class SyncPilot extends SyncPilot_Base {
 		add_action( 'wp_ajax_nopriv_syncpilot_remote_finalize_migration', array( $this, 'respond_to_remote_finalize_migration' ) );
 		add_action( 'wp_ajax_nopriv_syncpilot_process_push_migration_cancellation', array( $this, 'respond_to_process_push_migration_cancellation' ) );
 
+		// an error log of an older version can be big and autoloaded
+		add_action( 'init', array( $this, 'trim_error_log' ) );
+
 		// Clear update transients when the user clicks the "Check Again" button from the update screen
 		add_action( 'current_screen', array( $this, 'check_again_clear_transients' ) );
 

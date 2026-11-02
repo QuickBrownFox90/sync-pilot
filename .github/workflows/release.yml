@@ -49,6 +49,7 @@ jobs:
             --exclude='.github' \
             --exclude='node_modules' \
             --exclude='asset/src' \
+            --exclude='tests' \
             --exclude='package.json' \
             --exclude='package-lock.json' \
             --exclude='composer.json' \

@@ -3,7 +3,7 @@
  * Plugin Name: SyncPilot Compatibility
  * Description: Prevents 3rd party plugins from being loaded during SyncPilot specific operations
  * Author: Patrick Mauersberger
- * Version: 0.2.2
+ * Version: 0.2.3
  * Author URI: http://dev.patrick-mauersberger.de
  */
 

@@ -45,11 +45,15 @@ On the first load SyncPilot copies the settings of WP Sync DB (API key, pull/pus
 
 ## Status
 
-Version 0.2.2 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged, with fixes for PHP 8.2+ and the first security fixes (see [changelog.txt](changelog.txt)). Pull, push and export were tested on PHP 8.4; Media Files, multisite and WP-CLI are not verified yet. Further hardening is planned, so use it only between sites you control and only on a trusted connection.
+Version 0.2.3 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged, with fixes for PHP 8.2+ and the first security fixes (see [changelog.txt](changelog.txt)). Pull, push and export were tested on PHP 8.4; Media Files, multisite and WP-CLI are not verified yet. Further hardening is planned, so use it only between sites you control and only on a trusted connection.
+
+## Updates
+
+SyncPilot looks for new versions in the releases of its GitHub repository and offers them like any other plugin update (Plugins, "Check for updates" in the row of the plugin forces a new look). It asks GitHub in the admin and in cron, at most once a day, and never for a visitor of the site. Pre-releases are offered as well; the filter `syncpilot_updater_prereleases` switches that off. The constant `SYNCPILOT_DISABLE_UPDATER` or the filter `syncpilot_updater_enabled` switches the updater off.
 
 ## Development
 
-The admin styles are written as modules in `asset/src/css/` and the scripts live in `asset/src/js/`; both are built into `asset/css/` and `asset/js/` (the readable file and a `.min` file; the plugin loads the minified files unless `SCRIPT_DEBUG` is on). Edit only `asset/src`. Run `npm install` once. `npm run dev` builds and then watches `asset/src` (a browser extension such as LiveReload then reloads the page), `npm run build` builds once; commit the built files; the release workflow stops if `asset/css` or `asset/js` is not up to date. The ZIP of a release does not contain `asset/src`, `package.json` or `package-lock.json`.
+The admin styles are written as modules in `asset/src/css/` and the scripts live in `asset/src/js/`; both are built into `asset/css/` and `asset/js/` (the readable file and a `.min` file; the plugin loads the minified files unless `SCRIPT_DEBUG` is on). Edit only `asset/src`. Run `npm install` once. `npm run dev` builds and then watches `asset/src` (a browser extension such as LiveReload then reloads the page), `npm run build` builds once; commit the built files; the release workflow stops if `asset/css` or `asset/js` is not up to date. The ZIP of a release does not contain `asset/src`, `tests`, `package.json` or `package-lock.json`. The checks in `tests/` run with `wp eval-file` on a test installation (they say what they change and put it back).
 
 ## License
 

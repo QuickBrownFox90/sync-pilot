@@ -1247,3 +1247,19 @@ msgstr "Migration wird abgeschlossen"
 #: class/syncpilot.php:2703
 msgid "Migration complete"
 msgstr "Migration abgeschlossen"
+
+#: class/syncpilot-updater.php
+msgid "Check for updates"
+msgstr "Nach Updates suchen"
+
+#: class/syncpilot-updater.php
+msgid "You do not have permission to do this."
+msgstr "Du hast keine Berechtigung dafür."
+
+#: class/syncpilot-updater.php
+msgid "The update data was cleared. WordPress asks for a new SyncPilot version at the next check."
+msgstr "Die Update-Daten wurden zurückgesetzt. WordPress fragt beim nächsten Abruf nach einer neuen SyncPilot-Version."
+
+#: class/syncpilot-updater.php
+msgid "The folder of the update could not be renamed."
+msgstr "Der Ordner des Updates konnte nicht umbenannt werden."

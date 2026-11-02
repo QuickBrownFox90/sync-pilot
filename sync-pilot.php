@@ -4,7 +4,7 @@
  * Description: Export, push, and pull to migrate your WordPress databases and media files.
  * Author: Patrick Mauersberger
  * Author URI: http://dev.patrick-mauersberger.de
- * Version: 0.2.2
+ * Version: 0.2.3
  * Requires PHP: 8.2
  * Requires at least: 6.0
  * License: GPL-2.0
@@ -18,7 +18,7 @@
  * Delicious Brains.
  */
 
-$GLOBALS['syncpilot_meta']['sync-pilot']['version'] = '0.2.2';
+$GLOBALS['syncpilot_meta']['sync-pilot']['version'] = '0.2.3';
 $GLOBALS['syncpilot_meta']['sync-pilot']['folder'] = basename( plugin_dir_path( __FILE__ ) );
 
 // Define the directory seperator if it isn't already
@@ -32,6 +32,12 @@ if ( ! defined( 'DS' ) ) {
 }
 
 function syncpilot_loaded() {
+
+	// the update checks of WordPress also run in cron, so the updater is registered before the quick exit; it asks GitHub
+	// only in the admin and in cron, never for a visitor
+	require_once 'class/syncpilot-updater.php';
+
+	( new SyncPilot_Updater( 'QuickBrownFox90/sync-pilot', __FILE__ ) )->init();
 
 	// if neither WordPress admin nor running from wp-cli, exit quickly to prevent performance impact
 	if ( ! is_admin() && ! ( defined( 'WP_CLI' ) && WP_CLI ) ) return;

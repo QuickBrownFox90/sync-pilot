@@ -5,6 +5,10 @@ class SyncPilot_Base {
 	// the tables that are replaced are renamed to <this prefix><name> first and dropped when the migration has worked
 	const OLD_TABLE_PREFIX = '_old_';
 
+	// the error log keeps its newest entries up to this size; one entry is cut at the second size
+	const LOG_MAX_BYTES       = 102400;
+	const LOG_ENTRY_MAX_BYTES = 4096;
+
 	protected $settings;
 	protected $plugin_file_path;
 	protected $plugin_dir_path;
@@ -301,26 +305,157 @@ class SyncPilot_Base {
 		return $result;
 	}
 
-	function log_error( $syncpilot_error, $additional_error_var = false ){
+	/**
+	 * Add an entry to the error log. The log is an option that is not loaded on every request, it keeps only its newest
+	 * LOG_MAX_BYTES, and the data that belongs to an error is described and never copied: the public endpoints log
+	 * requests of anyone, before the signature is known to be right, and such a request can be as big as the server
+	 * accepts and contains SQL rows, the signature and keys
+	 * @since   0.2.3
+	 * @param   string $syncpilot_error       What went wrong
+	 * @param   mixed  $additional_error_var  Request data, a response or an error object; false for nothing
+	 */
+	function log_error( $syncpilot_error, $additional_error_var = false ) {
 
 		$error_header = "********************************************\n******  Log date: " . date( 'Y/m/d H:i:s' ) . " ******\n********************************************\n\n";
-		$error        = $error_header . "SyncPilot Error: " . $syncpilot_error . "\n\n";
+		$error        = $error_header . "SyncPilot Error: " . $this->shorten_log_text( (string) $syncpilot_error, 2000 ) . "\n\n";
 
 		if ( ! empty( $this->attempting_to_connect_to ) )
-			$error .= "Attempted to connect to: " . $this->attempting_to_connect_to . "\n\n";
+			$error .= "Attempted to connect to: " . $this->shorten_log_text( (string) $this->attempting_to_connect_to, 300 ) . "\n\n";
+
+		if ( ! empty( $_SERVER['CONTENT_LENGTH'] ) )
+			$error .= "Size of the request: " . (int) $_SERVER['CONTENT_LENGTH'] . " bytes\n\n";
 
 		if ( $additional_error_var !== false )
-			$error .= print_r( $additional_error_var, true ) . "\n\n";
+			$error .= $this->describe_log_data( $additional_error_var ) . "\n";
 
-		$log = get_option( 'syncpilot_error_log' );
+		$this->save_error_log( (string) get_option( 'syncpilot_error_log' ), $this->cut_log_text( $error, self::LOG_ENTRY_MAX_BYTES ) );
+	}
 
-		if( $log )
-			$log = $log . $error;
+	/**
+	 * Append an entry to the log and cut the log to its size; the oldest entries go first
+	 * @since   0.2.3
+	 * @param   string $log    The log as it is stored
+	 * @param   string $entry  The new entry
+	 */
+	function save_error_log( $log, $entry ) {
 
-		else
-			$log = $error;
+		$log .= $entry;
 
-		update_option( 'syncpilot_error_log', $log );
+		if ( strlen( $log ) > self::LOG_MAX_BYTES ) {
+
+			$log    = substr( $log, -self::LOG_MAX_BYTES );
+			$marker = "********************************************\n******  Log date:";
+			$start  = strpos( $log, $marker );
+
+			// start at the beginning of an entry, not in the middle of one
+			if ( false !== $start )
+				$log = substr( $log, $start );
+		}
+
+		// not autoloaded: a log that grows must not be read on every page
+		update_option( 'syncpilot_error_log', $log, false );
+	}
+
+	/**
+	 * An error log of an older version can be big and is loaded on every request; it is cut and stored without autoload
+	 * once. Only an autoloaded log is in the options that WordPress has loaded already, so this costs no query.
+	 * @since   0.2.3
+	 */
+	function trim_error_log() {
+
+		$alloptions = wp_load_alloptions();
+
+		if ( ! isset( $alloptions['syncpilot_error_log'] ) )
+			return;
+
+		$log = (string) $alloptions['syncpilot_error_log'];
+
+		delete_option( 'syncpilot_error_log' );
+
+		if ( '' !== $log )
+			$this->save_error_log( '', $log );
+	}
+
+	/**
+	 * Describe data for the log in a few lines: names and sizes, short beginnings of values, nothing that is secret
+	 * @since   0.2.3
+	 * @param   mixed  $data   Array, WP_Error, object or scalar
+	 * @param   int    $depth  How deep it went already
+	 * @return  string
+	 */
+	function describe_log_data( $data, $depth = 0 ) {
+
+		$indent = str_repeat( '  ', $depth );
+
+		if ( is_wp_error( $data ) )
+			return $indent . 'WP_Error ' . $this->shorten_log_text( (string) $data->get_error_code() . ': ' . $data->get_error_message(), 500 ) . "\n";
+
+		if ( is_object( $data ) )
+			return $indent . get_class( $data ) . "\n";
+
+		if ( ! is_array( $data ) )
+			return $indent . $this->shorten_log_text( is_scalar( $data ) ? (string) $data : gettype( $data ), 500 ) . "\n";
+
+		$secret = array( 'sig', 'key', 'secret_key', 'nonce', 'chunk', 'form_data', 'connection_info', 'auth', 'password', 'cookies', 'authorization', 'set-cookie' );
+		$text   = '';
+		$count  = 0;
+
+		foreach ( $data as $name => $value ) {
+
+			if ( ++$count > 20 ) {
+				$text .= $indent . "... " . ( count( $data ) - 20 ) . " more\n";
+				break;
+			}
+
+			$label = $indent . $this->shorten_log_text( (string) $name, 60 ) . ': ';
+
+			if ( in_array( strtolower( (string) $name ), $secret, true ) )
+				$text .= $label . '[not logged' . ( is_string( $value ) ? ', ' . strlen( $value ) . ' bytes' : '' ) . "]\n";
+
+			elseif ( is_array( $value ) && $depth < 2 )
+				$text .= rtrim( $label ) . "\n" . $this->describe_log_data( $value, $depth + 1 );
+
+			elseif ( is_array( $value ) )
+				$text .= $label . '[array, ' . count( $value ) . " items]\n";
+
+			elseif ( is_object( $value ) )
+				$text .= $label . get_class( $value ) . "\n";
+
+			else
+				$text .= $label . $this->shorten_log_text( is_scalar( $value ) ? (string) $value : gettype( $value ), 300 ) . "\n";
+		}
+
+		return $text;
+	}
+
+	/**
+	 * The beginning of a text, with its size when it is cut
+	 * @since   0.2.3
+	 * @param   string $text    The text
+	 * @param   int    $length  How many bytes stay
+	 * @return  string
+	 */
+	function shorten_log_text( $text, $length ) {
+
+		if ( strlen( $text ) <= $length )
+			return $text;
+
+		return $this->cut_log_text( $text, $length ) . '... (' . strlen( $text ) . ' bytes)';
+	}
+
+	/**
+	 * Cut a text to a number of bytes without breaking a multibyte character
+	 * @since   0.2.3
+	 * @param   string $text    The text
+	 * @param   int    $length  How many bytes stay at most
+	 * @return  string
+	 */
+	function cut_log_text( $text, $length ) {
+
+		if ( strlen( $text ) <= $length )
+			return $text;
+
+		return function_exists( 'mb_strcut' ) ? mb_strcut( $text, 0, $length, 'UTF-8' ) : substr( $text, 0, $length );
 	}
 
 	function display_errors() {
