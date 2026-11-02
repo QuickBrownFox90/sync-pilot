@@ -1,21 +1,18 @@
 // global vars
-var hooks                  = [];
 var call_stack             = [];
 var non_fatal_errors       = '';
 var migration_error        = false;
 var connection_data        = null;
 var next_step_in_migration = null;
 
-function syncpilot_call_next_hook() {
+// What runs after the last table of a migration is a list of functions in call_stack (script.js fills it): the media
+// files if they are chosen, then the end of the migration. Every step ends by calling this function for the next one.
+function run_next_step() {
 
-    if ( ! call_stack.length )
-        call_stack = hooks;
+    var step = call_stack.shift();
 
-    var func = call_stack[0];
-
-    call_stack.shift();
-
-    window[func](); // Uses the string from the array to call the function of the same name
+    if ( 'function' === typeof step )
+        step();
 }
 
 // Replacement for alert() and confirm(): one <dialog> element for the whole page. The text is set as text, so a message
@@ -30,6 +27,7 @@ function syncpilot_dialog( text, on_confirm, on_cancel ) {
 
         if ( ! is_confirm ) {
             window.alert( text );
+
             return;
         }
 
@@ -83,8 +81,10 @@ document.addEventListener( 'DOMContentLoaded', function () {
         return;
 
     var dialog       = document.createElement( 'dialog' );
+
     dialog.id        = 'syncpilot-dialog';
     dialog.className = 'syncpilot-dialog';
+
     dialog.innerHTML = '<form method="dialog">' +
         '<p class="syncpilot-dialog-message"></p>' +
         '<div class="syncpilot-dialog-buttons">' +
@@ -146,7 +146,7 @@ function syncpilot_sanitize_html( html ) {
 
                 var name = attribute.name.toLowerCase();
 
-                if ( -1 === allowed[ child.tagName ].indexOf( name ) )
+                if ( -1 === allowed[child.tagName].indexOf( name ) )
                     child.removeAttribute( attribute.name );
             } );
 
@@ -189,9 +189,7 @@ function syncpilot_parse_json( maybe_json ) {
 
     try {
         var json_object = jQuery.parseJSON( maybe_json );
-    }
-
-    catch ( e ) {
+    } catch ( e ) {
         // we simply return false here because the json data itself will never just contain a value of "false"
         return false;
     }

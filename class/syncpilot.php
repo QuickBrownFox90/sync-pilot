@@ -2696,15 +2696,8 @@ class SyncPilot extends SyncPilot_Base {
 		$src = $plugins_url . 'asset/css/styles' . $suffix . '.css';
 		wp_enqueue_style( 'sync-pilot-styles', $src, array(), $version );
 
-		$src = $plugins_url . 'asset/js/common' . $suffix . '.js';
-		wp_enqueue_script( 'sync-pilot-common', $src, NULL, $version, true );
-
-		$src = $plugins_url . 'asset/js/hook' . $suffix . '.js';
-		wp_enqueue_script( 'sync-pilot-hook', $src, NULL, $version, true );
-
-		do_action( 'syncpilot_load_assets' );
-
-		$src = $plugins_url . 'asset/js/script' . $suffix . '.js';
+		// one script for the whole admin page: common, hook, script and media-files, joined by the build
+		$src = $plugins_url . 'asset/js/sync-pilot' . $suffix . '.js';
 		wp_enqueue_script( 'sync-pilot-script', $src, array( 'jquery' ), $version, true );
 
 		wp_localize_script( 'sync-pilot-script', 'syncpilot_i10n', array(
@@ -2774,6 +2767,9 @@ class SyncPilot extends SyncPilot_Base {
 			'manually_remove_temp_files'			=> __( "A problem occurred while cancelling the migration, you may have to manually delete some temporary files / tables.", self::TEXT_DOMAIN ),
 			'migration_cancelled'					=> __( "Migration cancelled", self::TEXT_DOMAIN ),
 		) );
+
+		// the texts of Media Files are localized on the same script
+		do_action( 'syncpilot_load_assets' );
 
 		wp_enqueue_script('jquery');
 		wp_enqueue_script('jquery-ui-core');

@@ -752,14 +752,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 
 	function load_assets() {
 
-		$plugins_url = trailingslashit( plugins_url() ) . trailingslashit( $this->plugin_folder_name );
-		$suffix      = defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ? '' : '.min';
-		$src         = $plugins_url . 'asset/js/media-files' . $suffix . '.js';
-		$version     = defined('SCRIPT_DEBUG') && SCRIPT_DEBUG ? time() : $this->plugin_version;
-
-		wp_enqueue_script( 'sync-pilot-media-files', $src, array( 'jquery', 'sync-pilot-common', 'sync-pilot-hook', 'sync-pilot-script' ), $version, true );
-
-		wp_localize_script( 'sync-pilot-media-files', 'syncpilot_mf_strings', array(
+		// the script of Media Files is part of the script of the plugin; only its texts are added here
+		wp_localize_script( 'sync-pilot-script', 'syncpilot_mf_strings', array(
 			'determining'				=> __( "Determining which media files to migrate, please wait...", self::TEXT_DOMAIN ),
 			'error_determining'			=> __( "Error while attempting to determine which media files to migrate.", self::TEXT_DOMAIN ),
 			'migration_failed'			=> __( "Migration failed", self::TEXT_DOMAIN ),

@@ -1,0 +1,6 @@
+{
+    "wp"         : "/path/to/first-test-site/wordpress",
+    "site"       : "https://first-test-site.test",
+    "remoteWp"   : "/path/to/second-test-site/wordpress",
+    "remoteSite" : "https://second-test-site.test"
+}

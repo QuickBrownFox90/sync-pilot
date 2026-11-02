@@ -1,12 +1,18 @@
 {
   "name": "sync-pilot",
   "private": true,
-  "description": "Build of the SyncPilot admin assets: asset/src -> asset/css and asset/js",
+  "description": "Build, style check and browser tests of the SyncPilot admin assets: asset/src -> asset/css and asset/js",
   "scripts": {
     "build": "node asset/src/build.mjs",
-    "dev": "node asset/src/build.mjs --watch"
+    "dev": "node asset/src/build.mjs --watch",
+    "test:browser": "node tests/browser/smoke.mjs",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix",
+    "release:check": "node tests/release-check.mjs"
   },
   "devDependencies": {
-    "esbuild": "0.25.5"
+    "@stylistic/eslint-plugin": "5.10.0",
+    "esbuild": "0.25.5",
+    "eslint": "9.39.5"
   }
 }

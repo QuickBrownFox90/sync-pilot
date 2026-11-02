@@ -3,3 +3,4 @@
 .claude
 _helper/
 node_modules/
+tests/browser/local.config.json

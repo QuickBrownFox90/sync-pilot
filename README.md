@@ -45,7 +45,7 @@ On the first load SyncPilot copies the settings of WP Sync DB (API key, pull/pus
 
 ## Status
 
-Version 0.2.3 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged, with fixes for PHP 8.2+ and the first security fixes (see [changelog.txt](changelog.txt)). Pull, push and export were tested on PHP 8.4; Media Files, multisite and WP-CLI are not verified yet. Further hardening is planned, so use it only between sites you control and only on a trusted connection.
+Version 0.2.4 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged, with fixes for PHP 8.2+ and the first security fixes (see [changelog.txt](changelog.txt)). Pull, push and export were tested on PHP 8.4; Media Files, multisite and WP-CLI are not verified yet. Further hardening is planned, so use it only between sites you control and only on a trusted connection.
 
 ## Updates
 
@@ -53,7 +53,7 @@ SyncPilot looks for new versions in the releases of its GitHub repository and of
 
 ## Development
 
-The admin styles are written as modules in `asset/src/css/` and the scripts live in `asset/src/js/`; both are built into `asset/css/` and `asset/js/` (the readable file and a `.min` file; the plugin loads the minified files unless `SCRIPT_DEBUG` is on). Edit only `asset/src`. Run `npm install` once. `npm run dev` builds and then watches `asset/src` (a browser extension such as LiveReload then reloads the page), `npm run build` builds once; commit the built files; the release workflow stops if `asset/css` or `asset/js` is not up to date. The ZIP of a release does not contain `asset/src`, `tests`, `package.json` or `package-lock.json`. The checks in `tests/` run with `wp eval-file` on a test installation (they say what they change and put it back).
+The admin styles are written as modules in `asset/src/css/` and the scripts live in `asset/src/js/`; both are built into `asset/css/styles.css` and `asset/js/sync-pilot.js` (the readable file and a `.min` file; the plugin loads the minified files unless `SCRIPT_DEBUG` is on). The admin page loads one script. Edit only `asset/src`. Run `npm install` once. `npm run dev` builds and then watches `asset/src` (a browser extension such as LiveReload then reloads the page), `npm run build` builds once; commit the built files; the release workflow stops if `asset/css` or `asset/js` is not up to date. The ZIP of a release does not contain `asset/src`, `tests`, `package.json` or `package-lock.json`. Before a release is tagged, `npm run release:check -- <version>` checks what the release workflow would stop for (everything committed, the same version everywhere, the built files up to date, the tag not yet there). The style of the scripts is checked with `npm run lint` (ESLint with `@stylistic`; `npm run lint:fix` repairs it). The checks in `tests/` run on a test installation (they say what they change and put it back): the PHP checks with `wp eval-file`, the browser tests with `npm run test:browser` (a headless Chromium clicks through the admin page) and, for a complete push to a second test site, `node tests/browser/push.mjs --yes`, which puts both databases back from a reference backup. They need two test installations of WordPress with wp-cli, named in `tests/browser/local.config.json` (copy `config.example.json`; the file is not part of the repository) or in environment variables.
 
 ## License
 
