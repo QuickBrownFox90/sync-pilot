@@ -1,12 +1,13 @@
 // Click through the admin page of SyncPilot in a headless browser with real mouse and keyboard events and check that
 // the page works: the three views, the dialogs, the settings (changed and put back), the slider, and a complete export
-// of all tables with a progress bar that moves. Nothing is sent to another site.
+// with a progress bar that moves. Nothing is sent to another site.
 //
-//   node tests/browser/smoke.mjs            (see lib.mjs for the test installation that is used)
+//   node tests/browser/smoke.mjs            export of a few small tables (see lib.mjs for the test installation that is used)
+//   node tests/browser/smoke.mjs --full     export of all tables
 //
 // The tests do not depend on the language of the interface.
 
-import { launch, checks, config, need, wp, wait } from './lib.mjs';
+import { launch, checks, config, need, wp, wait, full, quickTables } from './lib.mjs';
 
 need( 'wp', 'site' );
 
@@ -121,9 +122,11 @@ try {
 
         check( id + ': "saved" appears behind the label', spot && spot.msgLeft >= spot.labelRight, JSON.stringify( spot ) );
 
-        await wait( 2500 );
-        await browser.click( '#' + id, 450 );
-        await wait( 2500 );
+        // wait for the request to end, not for the message to fade out, and take the message away
+        await browser.waitFor( `!document.querySelector('.ajax-spinner')`, 5000, 50 );
+        await browser.click( '#' + id, 100 );
+        await browser.waitFor( `!document.querySelector('.ajax-spinner')`, 5000, 50 );
+        await browser.ev( `jQuery('.ajax-success-msg').remove()` );
     }
 
     // the slider: moving it must not end in an error message
@@ -135,23 +138,25 @@ try {
     check( 'slider: moved, one request, no dialog', await browser.ev( `jQuery('.slider').slider('value')` ) !== value && browser.requests.length === before + 1 && ( await dialog( browser ) ).open === false, `${ value } -> ${ await browser.ev( `jQuery('.slider').slider('value')` ) } kB` );
     check( 'settings: no error in the page', browser.takeProblems().length === 0, browser.takeProblems().join( ' | ' ) );
 
-    section( 'export of all tables' );
+    section( full ? 'export of all tables' : 'export of a few tables' );
 
     await browser.goto( page + '&syncpilot-profile=-1' );
     await browser.click( '#savefile' );
+
+    if ( ! full )
+        await browser.chooseTables( quickTables( wp( config.wp, 'global $wpdb; echo $wpdb->prefix;' ) ) );
+
     await browser.ev( `jQuery('#new-url').val('//export.test').trigger('input').trigger('change'); jQuery('#new-path').val('/tmp/export-test').trigger('input').trigger('change');` );
     await wait( 300 );
+    await browser.watchProgress();
     await browser.click( '.migrate-db-button', 800 );
 
-    const widths = [];
     const end    = Date.now() + 180000;
     let finished = false, failed = false;
 
     while ( Date.now() < end ) {
 
-        const s = await browser.ev( `({ width : parseFloat(document.querySelector('.progress-bar')?.style.width) || 0, done : jQuery('.close-progress-content').is(':visible'), error : jQuery('.progress-text').hasClass('migration-error') })` );
-
-        widths.push( s.width );
+        const s = await browser.ev( `({ done : jQuery('.close-progress-content').is(':visible'), error : jQuery('.progress-text').hasClass('migration-error') })` );
 
         if ( s.error ) { failed = true; break; }
 
@@ -160,6 +165,7 @@ try {
         await wait( 400 );
     }
 
+    const widths = await browser.progressWidths();
     const steps = widths.filter( w => w > 0 && w < 100 );
 
     check( 'the export runs to the end without an error message', finished && ! failed );

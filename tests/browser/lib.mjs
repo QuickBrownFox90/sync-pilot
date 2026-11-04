@@ -47,6 +47,12 @@ export function need( ...keys ) {
 
 export const wait = ms => new Promise( resolve => setTimeout( resolve, ms ) );
 
+// The tests migrate a few small tables with content by default (a migration costs time for every table, not for the
+// data), and all tables with --full. The options are not among them: they hold the key of the site.
+export const full = process.argv.includes( '--full' );
+
+export const quickTables = prefix => [ 'posts', 'postmeta', 'terms', 'term_taxonomy', 'term_relationships' ].map( name => prefix + name );
+
 // run PHP in a WordPress installation (wp-cli) and return what it prints
 export function wp( path, php ) {
     return execFileSync( 'wp', [ '--path=' + path, 'eval', php ], { encoding : 'utf8', stdio : [ 'ignore', 'pipe', 'ignore' ], maxBuffer : 64 * 1024 * 1024 } ).trim();
@@ -199,8 +205,13 @@ export async function launch() {
 
             const spot = await ev( `(() => { const e = document.querySelector(${ JSON.stringify( selector ) }); if (!e) return null; e.scrollIntoView({ block : 'center' }); const r = e.getBoundingClientRect(); return r.width && r.height ? [ r.left + r.width / 2, r.top + r.height / 2 ] : null; })()` );
 
-            if ( ! spot )
-                throw new Error( 'cannot click, not found or not visible: ' + selector );
+            if ( ! spot ) {
+
+                // say why: the first ancestor that takes no space or is not displayed
+                const why = await ev( `(() => { const e = document.querySelector(${ JSON.stringify( selector ) }); if (!e) return 'not in the page'; for (let n = e; n && n !== document.body; n = n.parentElement) { const s = getComputedStyle(n); if (s.display === 'none' || ! n.offsetHeight) return n.tagName + '.' + n.className + ' display=' + s.display + ' height=' + n.offsetHeight; } return 'size ' + e.offsetWidth + 'x' + e.offsetHeight; })()` ).catch( () => '?' );
+
+                throw new Error( 'cannot click, not found or not visible: ' + selector + ' (' + why + ')' );
+            }
 
             for ( const type of [ 'mouseMoved', 'mousePressed', 'mouseReleased' ] )
                 await send( 'Input.dispatchMouseEvent', { type, x : spot[0], y : spot[1], button : 'left', clickCount : 1 } );
@@ -237,6 +248,24 @@ export async function launch() {
             writeFileSync( join( config.shots, name + '.png' ), Buffer.from( r.result.data, 'base64' ) );
         },
 
+        // record every width of the progress bar in the page itself (a fast migration is over before a poll would see it)
+        async watchProgress() {
+
+            await ev( `window.__widths = []; new MutationObserver( list => { for ( const m of list ) if ( m.target.classList && m.target.classList.contains( 'progress-bar' ) ) window.__widths.push( parseFloat( m.target.style.width ) || 0 ); } ).observe( document.body, { attributes : true, subtree : true, attributeFilter : [ 'style' ] } )` );
+        },
+
+        async progressWidths() {
+            return await ev( 'window.__widths' ) || [];
+        },
+
+        // migrate only these tables: open the table section, choose "selected tables", select them
+        async chooseTables( tables ) {
+
+            await page.click( '.tables-header' );
+            await page.click( '#migrate-selected' );
+            await ev( `jQuery('#select-tables').val(${ JSON.stringify( tables ) }).trigger('change')` );
+        },
+
         // what went wrong since the last call (and forget it)
         takeProblems() {
             return [ ...new Set( problems.splice( 0 ) ) ];
@@ -261,7 +290,7 @@ export async function launch() {
 // checks with a summary; the exit code is 1 when one failed
 export function checks() {
 
-    let ok = 0, bad = 0;
+    let ok = 0, bad = 0, last = 0;
 
     return {
 
@@ -274,12 +303,16 @@ export function checks() {
         },
 
         section( title ) {
-            console.log( '\n-- ' + title );
+
+            const now = Date.now();
+
+            console.log( '\n-- ' + title + ( last ? `  (the section before took ${ Math.round( ( now - last ) / 100 ) / 10 } s)` : '' ) );
+            last = now;
         },
 
         finish() {
 
-            console.log( `\n${ ok } ok, ${ bad } failed` );
+            console.log( `\n${ ok } ok, ${ bad } failed` + ( last ? `  (the last section took ${ Math.round( ( Date.now() - last ) / 100 ) / 10 } s)` : '' ) );
 
             return bad ? 1 : 0;
         },
