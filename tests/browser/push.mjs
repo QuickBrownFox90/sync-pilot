@@ -4,6 +4,12 @@
 //   node tests/browser/push.mjs --yes --full           all tables
 //   node tests/browser/push.mjs --yes --media          with the media files (files that are new on the other site are copied
 //                                                      into its uploads folder and removed again at the end)
+//   node tests/browser/push.mjs --yes --backup         with the backup of the receiving site before the data is replaced (the
+//                                                      stage "backup", then the switch to the migration); the backup file is
+//                                                      removed again through the plugin of that site
+//   node tests/browser/push.mjs --yes --pull           the other direction: the second site is pulled into the first one
+//                                                      (it permits pulls for the time of the test); the media files of
+//                                                      the first site are the ones that are taken away and come back
 //
 // THIS OVERWRITES THE DATABASES OF BOTH TEST SITES. They exist only for tests. A reference backup of both is kept in
 // ~/.cache/syncpilot-tests/<id of the pair of sites> (or SP_BACKUP_DIR); it is made from the current state when it does not exist yet (or with
@@ -15,7 +21,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { launch, checks, config, need, wp, wait, full, quickTables } from './lib.mjs';
@@ -26,12 +32,19 @@ const { check, section, finish } = checks();
 
 if ( ! process.argv.includes( '--yes' ) ) {
 
-    console.log( `Push from ${ config.site } (${ config.wp }) to ${ config.remoteSite } (${ config.remoteWp }).` );
+    console.log( pull ? `Pull from ${ config.remoteSite } (${ config.remoteWp }) into ${ config.site } (${ config.wp }).` : `Push from ${ config.site } (${ config.wp }) to ${ config.remoteSite } (${ config.remoteWp }).` );
     console.log( 'The databases of both sites are overwritten and put back from the reference backup afterwards. Run again with --yes to do it.' );
     process.exit( 0 );
 }
 
 const withMedia = process.argv.includes( '--media' );
+const pull      = process.argv.includes( '--pull' );
+const backup    = process.argv.includes( '--backup' );
+
+// the site that receives the data, and the one it comes from (the names of the sides in the checksums: source is config.wp)
+const receiver = pull ? config.wp : config.remoteWp;
+const sender   = pull ? config.remoteWp : config.wp;
+const received = pull ? 'source' : 'target';
 
 // the tables that are pushed (all of them with --full)
 const prefix = wp( config.wp, 'global $wpdb; echo $wpdb->prefix;' );
@@ -70,6 +83,10 @@ const attachmentFiles = ( path, number ) => JSON.parse( wp( path, '$d = wp_uploa
 const copyBack = ( from, to, list ) => wp( to, '$src = ' + JSON.stringify( wp( from, 'echo wp_upload_dir()["basedir"];' ) ) + '; $d = wp_upload_dir()["basedir"]; foreach ( json_decode( base64_decode( "' + Buffer.from( JSON.stringify( list ) ).toString( 'base64' ) + '" ), true ) as $r ) { if ( false === strpos( $r, ".." ) && is_file( "$src/$r" ) && ! is_file( "$d/$r" ) ) { wp_mkdir_p( dirname( "$d/$r" ) ); copy( "$src/$r", "$d/$r" ); } }' );
 const remove   = ( path, list ) => wp( path, '$d = wp_upload_dir()["basedir"]; $l = json_decode( base64_decode( "' + Buffer.from( JSON.stringify( list ) ).toString( 'base64' ) + '" ), true ); foreach ( $l as $r ) { if ( false === strpos( $r, ".." ) && is_file( "$d/$r" ) ) { unlink( "$d/$r" ); $p = dirname( "$d/$r" ); while ( $p !== $d && 0 === strpos( $p, $d ) && @rmdir( $p ) ) $p = dirname( $p ); } }' );
 const counts   = path => JSON.parse( wp( path, 'global $wpdb; $o = array(); foreach ( $wpdb->get_col( "SHOW TABLES" ) as $t ) $o[$t] = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `$t`" ); echo json_encode( $o );' ) );
+
+// the backups that a site made (the plugin writes them into its folder in the uploads)
+const backupDir   = path => join( wp( path, 'echo wp_upload_dir()["basedir"];' ), 'sync-pilot' );
+const backupFiles = path => existsSync( backupDir( path ) ) ? readdirSync( backupDir( path ) ).filter( f => /-backup-.*\.sql(\.gz)?$/.test( f ) ) : [];
 
 section( 'reference backup (' + dir + ')' );
 
@@ -126,27 +143,34 @@ if ( process.argv.includes( '--refresh-baseline' ) || ! existsSync( source ) || 
 }
 
 const before      = { source : sums( config.wp ), target : sums( config.remoteWp ) };
-const filesBefore = withMedia ? files( config.remoteWp ) : [];
+const filesBefore   = withMedia ? files( receiver ) : [];
+const backupsBefore = backupFiles( receiver );
 
 // media files: take the files of two attachments away from the other site, so that the push has something to copy
-const takenAway = withMedia ? attachmentFiles( config.wp, 2 ).filter( f => filesBefore.includes( f ) ) : [];
+const takenAway = withMedia ? attachmentFiles( sender, 2 ).filter( f => filesBefore.includes( f ) ) : [];
 
 if ( withMedia ) {
 
     if ( takenAway.length === 0 )
         console.log( 'WARNING: no attachment files that exist on both sites, the media part has nothing to do' );
 
-    remove( config.remoteWp, takenAway );
+    remove( receiver, takenAway );
 }
 
 const key    = wp( config.remoteWp, 'echo get_option( "syncpilot_settings" )["key"];' );
 
+// a pull needs the permission on the other site (it is put back at the end)
+const remoteSettings = wp( config.remoteWp, 'echo base64_encode( serialize( get_option( "syncpilot_settings" ) ) );' );
+
+if ( pull )
+    wp( config.remoteWp, '$s = get_option( "syncpilot_settings" ); $s["allow_pull"] = true; update_option( "syncpilot_settings", $s );' );
+
 // a row that exists only on the other site: the push has to replace the table, so it must be gone afterwards (the two test
 // sites are copies of each other, without it a push that sends nothing would pass as well)
 const marker = 'syncpilot-test-marker';
-const marked = () => wp( config.remoteWp, 'global $wpdb; echo (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $wpdb->terms WHERE slug = %s", "' + marker + '" ) );' );
+const marked = () => wp( receiver, 'global $wpdb; echo (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $wpdb->terms WHERE slug = %s", "' + marker + '" ) );' );
 
-wp( config.remoteWp, 'global $wpdb; $wpdb->insert( $wpdb->terms, array( "name" => "SyncPilot test marker", "slug" => "' + marker + '" ) );' );
+wp( receiver, 'global $wpdb; $wpdb->insert( $wpdb->terms, array( "name" => "SyncPilot test marker", "slug" => "' + marker + '" ) );' );
 
 check( 'both sites are in the state of the backup', true, `${ Object.keys( before.source ).length } and ${ Object.keys( before.target ).length } tables` );
 
@@ -157,9 +181,9 @@ try {
     await browser.login();
     await browser.goto( `${ config.site }/wp-admin/tools.php?page=sync-pilot&syncpilot-profile=-1` );
 
-    section( 'push' );
+    section( pull ? 'pull' : 'push' );
 
-    await browser.click( 'input[name=action][value=push]' );
+    await browser.click( `input[name=action][value=${ pull ? 'pull' : 'push' }]` );
     await browser.ev( `(() => { const t = document.querySelector('.pull-push-connection-info'); t.focus(); t.value = ${ JSON.stringify( config.remoteSite + '\n' + key ) }; jQuery(t).trigger('paste').trigger('keyup').trigger('input').trigger('change'); })()` );
 
     check( 'the connection to the other site is verified (tables are listed)', await browser.waitFor( `jQuery('#select-tables option').length > 0`, 60000 ) );
@@ -174,6 +198,13 @@ try {
         check( 'the option "media files" is checked', await browser.ev( `jQuery('#media-files').is(':checked')` ) );
     }
 
+    if ( backup ) {
+
+        await browser.click( '#create-backup', 400 );
+        await browser.click( '#backup-selected', 300 );
+        check( 'the backup is switched on, with the selected tables', await browser.ev( `jQuery('#create-backup').is(':checked') && jQuery('#backup-selected').is(':checked')` ) );
+    }
+
     check( 'the option for the media files is offered (it is set up by the media files part)', await browser.ev( `jQuery('.media-files').length > 0` ) );
 
     if ( chosen )
@@ -183,7 +214,7 @@ try {
     await browser.watchProgress();
     await browser.click( '.migrate-db-button', 800 );
 
-    const end    = Date.now() + 540000;
+    const end    = Date.now() + ( full ? 540000 : 150000 );
     let finished = false, failed = false, text = '';
 
     while ( Date.now() < end ) {
@@ -199,31 +230,56 @@ try {
         await wait( 1000 );
     }
 
+    // when it did not end: what the box looks like (the part with the closing button)
+    if ( ! finished && ! failed )
+        console.log( 'the box at the end: ' + await browser.ev( `(() => { const c = jQuery('.close-progress-content'); return JSON.stringify({ closeButtons : c.length, display : c.css('display'), visible : c.is(':visible'), parentVisible : c.parent().is(':visible'), controls : jQuery('.migration-controls').is(':visible'), overlay : jQuery('#overlay').length, boxTop : jQuery('.progress-content').css('top'), title : jQuery('.progress-title').html(), doingAjax : null, html : (jQuery('.progress-content')[0] || {}).outerHTML.replace(/\\s+/g, ' ').slice(0, 900) }); })()` ) );
+
     await browser.shot( 'push-done' );
 
     const widths = await browser.progressWidths();
 
-    check( 'the push runs to the end without an error message', finished && ! failed, text );
+    check( `the ${ pull ? 'pull' : 'push' } runs to the end without an error message`, finished && ! failed, text );
 
     // with media files the bar starts again at 0 for the files, so it only has to rise within each part
-    check( 'the progress bar moves', widths.some( w => w > 0 && w < 100 ) && ( withMedia || widths.every( ( w, i ) => i === 0 || w >= widths[i - 1] ) ), `${ widths.length } samples, highest ${ Math.max( ...widths ) }%` );
+    check( 'the progress bar moves', widths.some( w => w > 0 && w < 100 ) && ( withMedia || backup || widths.every( ( w, i ) => i === 0 || w >= widths[i - 1] ) ), `${ widths.length } samples, highest ${ Math.max( ...widths ) }%` );
     check( 'no error in the page', browser.takeProblems().length === 0, browser.takeProblems().join( ' | ' ) );
 
     section( 'the other site afterwards' );
 
+    if ( backup ) {
+
+        const made = backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) );
+
+        check( 'one backup was made, with content', made.length === 1 && statSync( join( backupDir( receiver ), made[0] ) ).size > 1000, made.map( f => f + ' ' + statSync( join( backupDir( receiver ), made[0] ) ).size + ' bytes' ).join( ', ' ) );
+
+        // the backup belongs to the web server (the folder is not writable for this user): the plugin of that site removes it
+        // the way it removes the backup of a cancelled migration
+        const site = pull ? config.site : config.remoteSite;
+
+        if ( ! pull )
+            await browser.login( config.remoteWp, config.remoteSite );
+
+        await browser.goto( `${ site }/wp-admin/tools.php?page=sync-pilot` );
+
+        for ( const file of made )
+            await browser.ev( `fetch( ajaxurl, { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams( { action : 'syncpilot_cancel_migration', intent : 'pull', stage : 'backup', dump_filename : ${ JSON.stringify( file.replace( /\.sql(\.gz)?$/, '' ) ) }, form_data : '', temp_prefix : '_mig_', nonce : syncpilot_nonces.cancel_migration } ) } ).then( r => r.text() )` );
+
+        check( 'the backup is removed again', backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) ).length === 0, backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) ).join( ', ' ) );
+    }
+
     if ( withMedia ) {
 
-        const onTarget = new Set( files( config.remoteWp ) );
+        const onTarget = new Set( files( receiver ) );
         const missing  = takenAway.filter( f => ! onTarget.has( f ) );
 
         check( 'the files that were taken away are back on the other site', takenAway.length > 0 && missing.length === 0, `${ takenAway.length } files taken away, ${ missing.length } not back${ missing.length ? ': ' + missing.slice( 0, 3 ).join( ', ' ) : '' }` );
     }
 
-    const rowsSource = counts( config.wp ), rowsTarget = counts( config.remoteWp );
+    const rowsSource = counts( sender ), rowsTarget = counts( receiver );
     const left       = Object.keys( rowsTarget ).filter( t => t.startsWith( '_mig_' ) || t.startsWith( '_old_' ) );
     const differ     = Object.keys( rowsSource ).filter( t => rowsSource[t] !== rowsTarget[t] );
 
-    check( 'the data of this site replaced the table on the other site (its marker row is gone)', marked() === '0' );
+    check( 'the data of the sending site replaced the table on the receiving site (its marker row is gone)', marked() === '0' );
     check( 'no temporary or old tables are left', left.length === 0, left.join( ', ' ) );
 
     if ( chosen ) {
@@ -233,16 +289,19 @@ try {
 
         check( 'the pushed tables have the same number of rows on both sites', wrong.length === 0 && chosen.every( t => t in rowsTarget ), wrong.join( ', ' ) );
 
-        const nowTarget = sums( config.remoteWp );
-        const changed   = Object.keys( before.target ).filter( t => ! chosen.includes( t ) && before.target[t] !== nowTarget[t] && ! t.endsWith( 'options' ) );
+        const nowTarget = sums( receiver );
 
-        check( 'the other tables of the other site were not touched', changed.length === 0, changed.join( ', ' ) );
+        // the options are written by WordPress itself; the users' meta (sessions) of a site that is logged in change as well
+        // (the pull is received by the site of the test, and the backup is removed through the receiving site)
+        const changed   = Object.keys( before[received] ).filter( t => ! chosen.includes( t ) && before[received][t] !== nowTarget[t] && ! t.endsWith( 'options' ) && ! t.endsWith( 'usermeta' ) );
+
+        check( 'the other tables of the receiving site were not touched', changed.length === 0, changed.join( ', ' ) );
     } else {
 
         check( 'same tables, same number of rows (except the options, whose transients are not sent)', Object.keys( rowsSource ).length === Object.keys( rowsTarget ).length && differ.every( t => t.endsWith( 'options' ) ), 'different: ' + differ.join( ', ' ) );
     }
 
-    check( 'the other site kept its address and its key', wp( config.remoteWp, 'echo get_option( "home" );' ) === config.remoteSite && wp( config.remoteWp, 'echo get_option( "syncpilot_settings" )["key"];' ) === key );
+    check( 'the receiving site kept its address and its key', wp( receiver, 'echo get_option( "home" );' ) === ( pull ? config.site : config.remoteSite ) && wp( receiver, 'echo get_option( "syncpilot_settings" )["key"];' ) === ( pull ? wp( config.wp, 'echo get_option( "syncpilot_settings" )["key"];' ) : key ) );
 } catch ( error ) {
 
     check( 'the test itself ran through', false, error.message );
@@ -251,6 +310,8 @@ try {
     // whatever happens, both sites are put back
     try { await browser.close(); } catch {}
 
+    wp( config.remoteWp, 'update_option( "syncpilot_settings", unserialize( base64_decode( ' + JSON.stringify( remoteSettings ) + ' ) ) );' );
+
     section( 'put everything back' );
 
     console.log( `target: ${ putBack( config.remoteWp, target, 'target' ) }, source: ${ putBack( config.wp, source, 'source' ) }` );
@@ -258,13 +319,13 @@ try {
     // what the push did not bring back is copied back, and what came in addition is removed again
     if ( withMedia ) {
 
-        copyBack( config.wp, config.remoteWp, takenAway );
+        copyBack( sender, receiver, takenAway );
 
         const known = new Set( filesBefore );
-        const added = files( config.remoteWp ).filter( f => ! known.has( f ) );
+        const added = files( receiver ).filter( f => ! known.has( f ) );
 
-        remove( config.remoteWp, added );
-        check( 'the uploads folder of the other site is as before', files( config.remoteWp ).length === filesBefore.length, `${ added.length } extra files removed` );
+        remove( receiver, added );
+        check( 'the uploads folder of the receiving site is as before', files( receiver ).length === filesBefore.length, `${ added.length } extra files removed` );
     }
 
     const after = { source : sums( config.wp ), target : sums( config.remoteWp ) };

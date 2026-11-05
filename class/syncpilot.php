@@ -20,8 +20,18 @@ class SyncPilot extends SyncPilot_Base {
 	protected $primary_keys;
 	protected $checkbox_options;
 
+	/**
+	 * Set the defaults of a fresh installation and add the missing settings of an older one. The option does not exist
+	 * on a fresh installation (get_option() gives false), so it is made an array first; PHP 8.1 and later report
+	 * "automatic conversion of false to array" when a key is set on false
+	 * @since   0.1.0
+	 * @param   string $plugin_file_path  The main file of the plugin
+	 */
 	function __construct( $plugin_file_path ) {
 		parent::__construct( $plugin_file_path );
+
+		if ( ! is_array( $this->settings ) )
+			$this->settings = array();
 
 		$this->plugin_slug = 'sync-pilot';
 		$this->plugin_version = $GLOBALS['syncpilot_meta']['sync-pilot']['version'];

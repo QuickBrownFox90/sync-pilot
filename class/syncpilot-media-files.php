@@ -223,6 +223,14 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		return trailingslashit( $upload_dir );
 	}
 
+	/**
+	 * The files in the uploads folder with their sizes, by their path relative to the folder. An entry whose size
+	 * cannot be read (a link that leads nowhere, a file that is removed while the folder is read) and a subfolder
+	 * that cannot be opened are skipped: before, the exception ended the request with the "critical error" page of
+	 * WordPress (HTTP 500) and the media files could not be determined at all
+	 * @since   0.2.6
+	 * @return  array  Relative path => size in bytes
+	 */
 	function get_local_media() {
 
 		$upload_dir = untrailingslashit( $this->uploads_dir() );
@@ -230,12 +238,19 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		if ( ! file_exists( $upload_dir ) )
 			return array();
 
-		$files       = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $upload_dir ), RecursiveIteratorIterator::SELF_FIRST );
+		$files       = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $upload_dir ), RecursiveIteratorIterator::SELF_FIRST, RecursiveIteratorIterator::CATCH_GET_CHILD );
 		$local_media = array();
 
 		foreach( $files as $name => $object ) {
+
+			try {
+				$size = $object->getSize();
+			} catch ( RuntimeException $e ) {
+				continue;
+			}
+
 			$name               = str_replace( array( $upload_dir . DS, '\\' ), array( '', '/' ), $name );
-			$local_media[$name] = $object->getSize();
+			$local_media[$name] = $size;
 		}
 
 		return $local_media;

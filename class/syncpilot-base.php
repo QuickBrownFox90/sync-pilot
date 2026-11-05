@@ -47,13 +47,19 @@ class SyncPilot_Base {
 		update_option( 'syncpilot_legacy_migrated', time() );
 	}
 
+	/**
+	 * Read the settings and set up the paths. Nothing is translated here: the constructor runs on plugins_loaded, and
+	 * WordPress 6.7 and later report a text domain that is used before init as loaded too early
+	 * @since   0.1.0
+	 * @param   string $plugin_file_path  The main file of the plugin
+	 */
 	function __construct( $plugin_file_path ) {
 
 		$this->settings = get_option( 'syncpilot_settings' );
 
-		$this->invalid_content_verification_error = __( 'Invalid content verification signature, please verify the connection information on the remote site and try again.', self::TEXT_DOMAIN );
+		add_action( 'init', array( $this, 'set_translated_texts' ), 20 );
 
-		$this->transient_timeout       = 60 * 60 * 12;
+		$this->transient_timeout      = 60 * 60 * 12;
 		$this->transient_retry_timeout = 60 * 60 * 2;
 
 		$this->plugin_file_path   = $plugin_file_path;
@@ -71,6 +77,16 @@ class SyncPilot_Base {
 
 		// allow devs to change the temporary prefix applied to the tables
 		$this->temp_prefix = apply_filters( 'syncpilot_temporary_prefix', $this->temp_prefix );
+	}
+
+	/**
+	 * Translate the texts that are kept in properties. It runs on init after the text domain is loaded (priority 10
+	 * in syncpilot_init()); every use of the texts is in a request handler or on the admin page, which come later
+	 * @since   0.2.6
+	 */
+	function set_translated_texts() {
+
+		$this->invalid_content_verification_error = __( 'Invalid content verification signature, please verify the connection information on the remote site and try again.', self::TEXT_DOMAIN );
 	}
 
 	function template( $template ) {

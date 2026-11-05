@@ -154,11 +154,12 @@ export async function launch() {
 
         send, ev, problems, requests,
 
-        // log in as the administrator: a session that wp-cli creates, valid for two hours
-        async login() {
+        // log in as the administrator: a session that wp-cli creates, valid for two hours (by default on the site of the
+        // test, with the site and the path of another installation on that one; the browser can be logged in on both)
+        async login( path = config.wp, site = config.site ) {
 
-            const out    = wp( config.wp, '$u = ' + Number( config.user ) + '; $exp = time() + 7200; $t = WP_Session_Tokens::get_instance( $u )->create( $exp ); echo LOGGED_IN_COOKIE, "\\t", wp_generate_auth_cookie( $u, $exp, "logged_in", $t ), "\\n", AUTH_COOKIE, "\\t", wp_generate_auth_cookie( $u, $exp, "auth", $t );' );
-            const domain = new URL( config.site ).hostname;
+            const out    = wp( path, '$u = ' + Number( config.user ) + '; $exp = time() + 7200; $t = WP_Session_Tokens::get_instance( $u )->create( $exp ); echo LOGGED_IN_COOKIE, "\\t", wp_generate_auth_cookie( $u, $exp, "logged_in", $t ), "\\n", AUTH_COOKIE, "\\t", wp_generate_auth_cookie( $u, $exp, "auth", $t );' );
+            const domain = new URL( site ).hostname;
             const cookies = out.split( '\n' ).map( line => {
 
                 const [ name, value ] = line.split( '\t' );

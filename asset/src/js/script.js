@@ -12,7 +12,10 @@ import { init_profiles } from './modules/profiles.js';
 import { init_api_key } from './modules/api-key.js';
 import { init_settings } from './modules/settings.js';
 import { init_tabs } from './modules/tabs.js';
-import { get_intersect, get_query_var, get_domain_name, get_default_profile_name, remove_protocol } from './modules/helpers.js';
+import { tables_are_chosen, form_is_valid } from './modules/form-check.js';
+import { choose_tables, draw_table_chunks, create_overlay, show_progress_box, slide_in_progress_box } from './modules/progress.js';
+import { profile_has_name, is_new_profile, send_profile, add_profile_to_list } from './modules/save-profile.js';
+import { get_query_var, get_domain_name, get_default_profile_name, remove_protocol } from './modules/helpers.js';
 
 // These four are global on purpose: media-files.js uses them (common.js and the media files part are plain scripts). In
 // the file that esbuild makes they would be local to it, so they are put on window.
@@ -305,116 +308,49 @@ window.execute_next_step         = undefined;
         init_tabs();
 
         // AJAX migrate button
-        $( '.migrate-db-button' ).click( function ( event ) {
+        $( '.migrate-db-button' ).click( run_migration );
+
+        /**
+         * The whole migration, from the click on "Migrate DB" / "Export" / "Pull" / "Push": checks the form, saves the
+         * profile when asked, opens the progress box, decides which tables are migrated and sends the request that starts
+         * the migration. Its answer starts the tables one after the other (migrate_table_recursive); after the last one the
+         * media files, the finalizing and the end follow as steps (execute_next_step, call_stack)
+         * @since   0.2.6
+         * @param   {Event} event  The click; `this` is the button
+         */
+        function run_migration( event ) {
 
             $( this ).blur();
             event.preventDefault();
 
-            // check that they've selected some tables to migrate
-            // (jQuery 3 returns an empty array for a multiple select with nothing selected, older versions null)
-            if ( $( '#migrate-selected' ).is( ':checked' ) && ! ( $( '#select-tables' ).val() || [] ).length ) {
-                syncpilot_alert( syncpilot_i10n.please_select_one_table );
-
+            if ( ! form_is_valid() ) {
                 return;
             }
-
-            new_url_missing       = false;
-            new_file_path_missing = false;
-
-            if ( $( '#new-url' ).length && ! $( '#new-url' ).val() ) {
-                $( '#new-url-missing-warning' ).show();
-                $( '#new-url' ).focus();
-                $( 'html,body' ).scrollTop( 0 );
-                new_url_missing = true;
-            }
-
-            if ( $( '#new-path' ).length && ! $( '#new-path' ).val() ) {
-                $( '#new-path-missing-warning' ).show();
-
-                if ( false == new_url_missing ) {
-                    $( '#new-path' ).focus();
-                    $( 'html,body' ).scrollTop( 0 );
-                }
-
-                new_file_path_missing = true;
-            }
-
-            if ( true == new_url_missing || true == new_file_path_missing ) return;
 
             // also save profile
             if ( $( '#save-migration-profile' ).is( ':checked' ) ) {
 
-                if ( $.trim( $( '.create-new-profile' ).val() ) == '' && $(
-                    '#create_new' ).is( ':checked' ) ) {
-                    syncpilot_alert( syncpilot_i10n.enter_name_for_profile );
-                    $( '.create-new-profile' ).focus();
-
+                if ( ! profile_has_name() ) {
                     return;
                 }
 
-                var create_new_profile = false;
+                var create_new_profile = is_new_profile();
+                var profile_name       = $( '.create-new-profile' ).val();
 
-                if ( $( '#create_new' ).is( ':checked' ) ) {
-                    create_new_profile = true;
-                }
+                send_profile( function ( data ) {
 
-                var profile_name = $( '.create-new-profile' ).val();
-
-                profile = $( '#migrate-form' ).serialize();
-
-                $.ajax( {
-                    url      : ajaxurl,
-                    type     : 'POST',
-                    dataType : 'text',
-                    cache    : false,
-                    data     : {
-                        action  : 'syncpilot_save_profile',
-                        profile : profile,
-                        nonce   : syncpilot_nonces.save_profile,
-                    },
-                    error : function ( jqXHR, textStatus, errorThrown ) {
-                        syncpilot_alert( syncpilot_i10n.save_profile_problem );
-                    },
-                    success : function ( data ) {
-
-                        if ( create_new_profile ) {
-                            var new_profile_key = parseInt( data, 10 );
-                            var new_profile_id  = new_profile_key + 1;
-                            var new_li =
-                                '<li><span style="display: none;" class="delete-profile" data-profile-id="' +
-                                new_profile_id + '"></span><label for="profile-' +
-                                new_profile_id + '"><input id="profile-' +
-                                new_profile_id + '" value="' + new_profile_key +
-                                '" name="save_migration_profile_option" type="radio"> ' +
-                                profile_name + '</label></li>';
-
-                            $( '#create_new' ).parents( 'li' ).before( new_li );
-                            $( '#profile-' + new_profile_id ).attr( 'checked', 'checked' );
-                            $( '.create-new-profile' ).val( '' );
-                        }
+                    if ( create_new_profile ) {
+                        add_profile_to_list( data, profile_name );
+                        $( '.create-new-profile' ).val( '' );
                     }
                 } );
             }
 
             state.form_data = $( '#migrate-form' ).serialize();
 
-            var doc_height = $( document ).height();
+            create_overlay();
 
-            $( 'body' ).append( '<div id="overlay"></div>' );
-
-            $( '#overlay' )
-                .height( doc_height )
-                .css( {
-                    'position' : 'fixed',
-                    'top'      : 0,
-                    'left'     : 0,
-                    'width'    : '100%',
-                    'z-index'  : 99999,
-                    'display'  : 'none',
-                } );
-
-            $progress_content = progress_content_original.clone();
-            state.migration_intent  = $( 'input[name=action]:checked' ).val();
+            state.migration_intent = $( 'input[name=action]:checked' ).val();
 
             state.stage = 'backup';
 
@@ -426,17 +362,13 @@ window.execute_next_step         = undefined;
                 state.stage = 'migrate';
             }
 
-            var table_intent = $( 'input[name=table_migrate_option]:checked' ).val();
             var connection_info = $.trim( $( '.pull-push-connection-info' ).val() )
                 .split( '\n' );
-            var table_rows = '';
 
             state.remote_site = connection_info[0];
             state.secret_key  = connection_info[1];
 
             var static_migration_label = '';
-
-            $( '#overlay' ).after( $progress_content );
 
             state.completed_msg = syncpilot_i10n.exporting_complete;
 
@@ -450,166 +382,21 @@ window.execute_next_step         = undefined;
                     state.migration_intent, true ) + ' ' + syncpilot_i10n.complete;
             }
 
-            $( '.progress-title' ).html( static_migration_label );
+            show_progress_box( progress_content_original, static_migration_label );
 
-            $( '#overlay' ).show();
-            backup_option = $( 'input[name=backup_option]:checked' ).val();
-            table_option  = $( 'input[name=table_migrate_option]:checked' ).val();
-
-            if ( state.stage == 'backup' ) {
-                if ( table_option == 'migrate_only_with_prefix' && backup_option == 'backup_selected' ) {
-                    backup_option = 'backup_only_with_prefix';
-                }
-
-                if ( state.migration_intent == 'push' ) {
-                    table_rows = connection_data.table_rows;
-
-                    if ( backup_option == 'backup_only_with_prefix' ) {
-                        state.tables_to_migrate = connection_data.prefixed_tables;
-                    } else if ( backup_option == 'backup_selected' ) {
-                        selected_tables = $( '#select-tables' ).val();
-
-                        state.tables_to_migrate = get_intersect( selected_tables,
-                            connection_data.tables );
-                    } else if ( backup_option == 'backup_manual_select' ) {
-                        state.tables_to_migrate = $( '#select-backup' ).val();
-                    }
-                } else {
-                    table_rows = syncpilot_this_table_rows;
-
-                    if ( backup_option == 'backup_only_with_prefix' ) {
-                        state.tables_to_migrate = syncpilot_this_prefixed_tables;
-                    } else if ( backup_option == 'backup_selected' ) {
-                        selected_tables = $( '#select-tables' ).val();
-
-                        state.tables_to_migrate = get_intersect( selected_tables, syncpilot_this_tables );
-                    } else if ( backup_option == 'backup_manual_select' ) {
-                        state.tables_to_migrate = $( '#select-backup' ).val();
-                    }
-                }
-            } else {
-                if ( table_intent == 'migrate_select' ) { // user has elected to migrate only certain tables
-                    // grab tables as per what the user has selected from the multiselect box
-                    state.tables_to_migrate = $( '#select-tables' ).val();
-
-                    // user is pushing or exporting
-                    if ( state.migration_intent == 'push' || state.migration_intent == 'savefile' ) {
-                        // default value, assuming we're not backing up
-                        table_rows = syncpilot_this_table_rows;
-                    } else {
-                        table_rows = connection_data.table_rows;
-                    }
-                } else {
-                    if ( state.migration_intent == 'push' || state.migration_intent == 'savefile' ) {
-                        state.tables_to_migrate = syncpilot_this_prefixed_tables;
-                        table_rows              = syncpilot_this_table_rows;
-                    } else {
-                        state.tables_to_migrate = connection_data.prefixed_tables;
-                        table_rows              = connection_data.table_rows;
-                    }
-                }
-            }
-
-            function decide_tables_to_display_rows( tables_to_migrate, table_rows ) {
-
-                var total_size = 0;
-
-                $.each( tables_to_migrate, function ( index, value ) {
-                    total_size += parseInt( table_rows[value] );
-                } );
-
-                var last_element = '';
-
-                $.each( tables_to_migrate, function ( index, value ) {
-
-                    var percent         = table_rows[value] / total_size * 100;
-                    var percent_rounded = Math.round( percent * 1000 ) / 1000;
-
-                    $( '.progress-tables' ).append( '<div class="progress-chunk ' +
-                        value + '_chunk" style="width: ' + percent_rounded +
-                        '%;" title="' + value + '"><span>' + value +
-                        '</span></div>' );
-
-                    $( '.progress-tables-hover-boxes' ).append(
-                        '<div class="progress-chunk-hover" data-table="' + value +
-                        '" style="width: ' + percent_rounded + '%;"></div>' );
-
-                    var label = $( '.progress-tables .progress-chunk:last span' );
-
-                    last_element = value;
-                } );
-
-                // the box is hidden until it slides in (below); in a hidden box every width is 0, every table counts as
-                // "narrower than 1px" and is added to the last one, and the bar stays at 0% until the end. So it is laid
-                // out, but not visible, while the chunks are measured
-                $( '.progress-content' ).css( { display : 'block', visibility : 'hidden' } );
-
-                $( '.progress-chunk' ).each( function ( index ) {
-
-                    if ( $( this ).width() < 1 && tables_to_migrate[index] != last_element ) {
-                        $( this ).hide();
-
-                        $( '.progress-chunk-hover[data-table=' + tables_to_migrate[
-                            index] + ']' ).hide();
-
-                        table_rows[last_element] = Number( table_rows[last_element] );
-
-                        table_rows[last_element] += Number( table_rows[
-                            tables_to_migrate[index]] );
-
-                        table_rows[tables_to_migrate[index]] = 0;
-                    }
-
-                    var element = this;
-
-                    setTimeout( function () {
-                        hide_overflowing_elements( element );
-                    }, 0 );
-
-                    function hide_overflowing_elements( element ) {
-                        if ( $( 'span', element ).innerWidth() > $( element ).width() ) {
-                            $( 'span', element ).hide();
-                        }
-                    }
-                } );
-
-                $( '.progress-content' ).css( { display : '', visibility : '' } );
-
-                percent_rounded = 0;
-
-                if ( table_rows[last_element] != 0 ) {
-                    var percent         = table_rows[last_element] / total_size * 100;
-                    var percent_rounded = Math.round( percent * 1000 ) / 1000;
-                }
-
-                $( '.progress-tables .progress-chunk:last' ).css( 'width',
-                    percent_rounded + '%' );
-
-                $( '.progress-chunk-hover:last' ).css( 'width', percent_rounded +
-                    '%' );
-
-                var return_vals = [ table_rows, total_size ];
-
-                return return_vals;
-            }
-
-            table_details = decide_tables_to_display_rows( state.tables_to_migrate, table_rows );
+            var table_rows    = choose_tables( state.stage );
+            var table_details = draw_table_chunks( state.tables_to_migrate, table_rows );
+            var total_size    = table_details[1];
 
             table_rows = table_details[0];
-            total_size = table_details[1];
 
-            $( '.progress-title' ).after( '<img src="' + spinner_url +
-                '" alt="" class="migration-progress-ajax-spinner general-spinner" />'
-            );
-
-            var height = $( '.progress-content' ).outerHeight();
-
-            $( '.progress-content' ).css( 'top', '-' + height + 'px' ).show().animate( {
-                'top' : '0px'
-            } );
+            slide_in_progress_box();
 
             setup_counter();
             state.currently_migrating = true;
+
+            // a request is under way: Cancel waits for its answer instead of cancelling a migration that has no export file yet
+            state.doing_ajax = true;
 
             $.ajax( {
                 url      : ajaxurl,
@@ -626,6 +413,8 @@ window.execute_next_step         = undefined;
                     nonce     : syncpilot_nonces.initiate_migration,
                 },
                 error : function ( jqXHR, textStatus, errorThrown ) {
+
+                    state.doing_ajax = false;
 
                     $( '.progress-title' ).html( syncpilot_i10n.migration_failed );
 
@@ -645,6 +434,8 @@ window.execute_next_step         = undefined;
                     return;
                 },
                 success : function ( data ) {
+
+                    state.doing_ajax = false;
 
                     if ( typeof data.syncpilot_error != 'undefined' && data.syncpilot_error == 1 ) {
                         migration_error = true;
@@ -678,29 +469,12 @@ window.execute_next_step         = undefined;
                                 progress_size = 0;
                                 $( '.progress-bar' ).width( '0px' );
 
-                                if ( table_intent == 'migrate_select' ) {
-                                    state.tables_to_migrate = $( '#select-tables' ).val();
-
-                                    if ( state.migration_intent == 'push' || state.migration_intent == 'savefile' ) {
-                                        table_rows = syncpilot_this_table_rows;
-                                    } else {
-                                        table_rows = connection_data.table_rows;
-                                    }
-                                } else {
-                                    if ( state.migration_intent == 'push' || state.migration_intent == 'savefile' ) {
-                                        state.tables_to_migrate = syncpilot_this_prefixed_tables;
-                                        table_rows              = syncpilot_this_table_rows;
-                                    } else {
-                                        state.tables_to_migrate = connection_data.prefixed_tables;
-                                        table_rows              = connection_data.table_rows;
-                                    }
-                                }
+                                table_rows = choose_tables( 'migrate' );
 
                                 $( '.progress-tables' ).empty();
                                 $( '.progress-tables-hover-boxes' ).empty();
 
-                                table_details = decide_tables_to_display_rows(
-                                    state.tables_to_migrate, table_rows );
+                                table_details = draw_table_chunks( state.tables_to_migrate, table_rows );
 
                                 table_rows = table_details[0];
                                 total_size = table_details[1];
@@ -881,7 +655,7 @@ window.execute_next_step         = undefined;
                     execute_next_step();
                 }
             } ); // end ajax
-        } );
+        }
 
         migration_complete_events = function () {
 
@@ -953,6 +727,8 @@ window.execute_next_step         = undefined;
             } else { // rename temp tables, delete old tables
                 $( '.progress-text' ).html( syncpilot_i10n.finalizing_migration );
 
+                state.doing_ajax = true;
+
                 $.ajax( {
                     url      : ajaxurl,
                     type     : 'POST',
@@ -971,6 +747,8 @@ window.execute_next_step         = undefined;
                     },
                     error : function ( jqXHR, textStatus, errorThrown ) {
 
+                        state.doing_ajax = false;
+
                         $( '.progress-title' ).html( syncpilot_i10n.migration_failed );
                         $( '.progress-text' ).html( syncpilot_i10n.finalize_tables_problem );
                         $( '.progress-text' ).addClass( 'migration-error' );
@@ -984,6 +762,8 @@ window.execute_next_step         = undefined;
                         return;
                     },
                     success : function ( data ) {
+
+                        state.doing_ajax = false;
 
                         if ( $.trim( data ) != '' ) {
                             $( '.progress-title' ).html( syncpilot_i10n.migration_failed );
@@ -1034,105 +814,55 @@ window.execute_next_step         = undefined;
         // AJAX save button profile
         $( '.save-settings-button' ).click( function ( event ) {
 
-            var profile;
+            var $button = $( this );
 
-            $( this ).blur();
+            $button.blur();
             event.preventDefault();
 
             if ( state.doing_save_profile ) {
                 return;
             }
 
-            // check that they've selected some tables to migrate
-            // (jQuery 3 returns an empty array for a multiple select with nothing selected, older versions null)
-            if ( $( '#migrate-selected' ).is( ':checked' ) && ! ( $( '#select-tables' ).val() || [] ).length ) {
-                syncpilot_alert( syncpilot_i10n.please_select_one_table );
-
+            if ( ! tables_are_chosen() || ! profile_has_name() ) {
                 return;
             }
 
-            if ( $.trim( $( '.create-new-profile' ).val() ) == '' && $( '#create_new' )
-                .is( ':checked' ) ) {
-                syncpilot_alert( syncpilot_i10n.enter_name_for_profile );
-                $( '.create-new-profile' ).focus();
-
-                return;
-            }
-
-            var create_new_profile = false;
-
-            if ( $( '#create_new' ).is( ':checked' ) ) {
-                create_new_profile = true;
-            }
-
-            var profile_name = $( '.create-new-profile' ).val();
+            var create_new_profile = is_new_profile();
+            var profile_name       = $( '.create-new-profile' ).val();
 
             state.doing_save_profile = true;
-            profile                  = $( '#migrate-form' ).serialize();
 
-            $( '.save-settings-button' ).after( '<img src="' + spinner_url +
+            $button.after( '<img src="' + spinner_url +
                 '" alt="" class="save-profile-ajax-spinner general-spinner" />' );
 
-            $( this ).attr( 'disabled', 'disabled' );
+            $button.attr( 'disabled', 'disabled' );
 
-            $.ajax( {
-                url      : ajaxurl,
-                type     : 'POST',
-                dataType : 'text',
-                cache    : false,
-                data     : {
-                    action  : 'syncpilot_save_profile',
-                    profile : profile,
-                    nonce   : syncpilot_nonces.save_profile,
-                },
-                error : function ( jqXHR, textStatus, errorThrown ) {
+            // the same after a failed request and after a saved one: the button works again, "saved" fades out
+            function profile_request_ended() {
 
-                    syncpilot_alert( syncpilot_i10n.save_profile_problem );
-                    $( '.save-settings-button' ).removeAttr( 'disabled' );
-                    $( '.save-profile-ajax-spinner' ).remove();
+                $button.removeAttr( 'disabled' );
+                $( '.save-profile-ajax-spinner' ).remove();
 
-                    $( '.save-settings-button' ).after(
-                        '<span class="ajax-success-msg">' + syncpilot_i10n.saved +
-                        '</span>' );
+                $button.after(
+                    '<span class="ajax-success-msg">' + syncpilot_i10n.saved +
+                    '</span>' );
 
-                    $( '.ajax-success-msg' ).fadeOut( 2000, function () {
-                        $( this ).remove();
-                    } );
+                $( '.ajax-success-msg' ).fadeOut( 2000, function () {
+                    $( this ).remove();
+                } );
 
-                    state.doing_save_profile = false;
-                },
-                success : function ( data ) {
+                state.doing_save_profile = false;
+            }
 
-                    $( '.save-settings-button' ).removeAttr( 'disabled' );
-                    $( '.save-profile-ajax-spinner' ).remove();
+            send_profile( function ( data ) {
 
-                    $( '.save-settings-button' ).after(
-                        '<span class="ajax-success-msg">' + syncpilot_i10n.saved +
-                        '</span>' );
+                profile_request_ended();
+                $( '.create-new-profile' ).val( '' );
 
-                    $( '.ajax-success-msg' ).fadeOut( 2000, function () {
-                        $( this ).remove();
-                    } );
-
-                    state.doing_save_profile = false;
-                    $( '.create-new-profile' ).val( '' );
-
-                    if ( create_new_profile ) {
-                        var new_profile_key = parseInt( data, 10 );
-                        var new_profile_id  = new_profile_key + 1;
-                        var new_li =
-                            '<li><span style="display: none;" class="delete-profile" data-profile-id="' +
-                            new_profile_id + '"></span><label for="profile-' +
-                            new_profile_id + '"><input id="profile-' + new_profile_id +
-                            '" value="' + new_profile_key +
-                            '" name="save_migration_profile_option" type="radio"> ' +
-                            profile_name + '</label></li>';
-
-                        $( '#create_new' ).parents( 'li' ).before( new_li );
-                        $( '#profile-' + new_profile_id ).attr( 'checked', 'checked' );
-                    }
+                if ( create_new_profile ) {
+                    add_profile_to_list( data, profile_name );
                 }
-            } );
+            }, profile_request_ended );
         } );
 
         // progress label updating
@@ -1727,7 +1457,8 @@ window.execute_next_step         = undefined;
                     nonce         : syncpilot_nonces.cancel_migration,
                 };
 
-                if ( typeof connection_data != 'undefined' ) {
+                // connection_data is null (not undefined) until a connection to another site was checked, so an export has none
+                if ( connection_data ) {
                     request_data.temp_prefix = connection_data.temp_prefix;
                 }
 

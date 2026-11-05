@@ -860,12 +860,206 @@ function syncpilot_parse_json( maybe_json ) {
     }
   }
 
+  // asset/src/js/modules/form-check.js
+  var $13 = jQuery;
+  function tables_are_chosen() {
+    if ($13("#migrate-selected").is(":checked") && !($13("#select-tables").val() || []).length) {
+      syncpilot_alert(syncpilot_i10n.please_select_one_table);
+      return false;
+    }
+    return true;
+  }
+  function form_is_valid() {
+    if (!tables_are_chosen()) {
+      return false;
+    }
+    var new_url_missing = false;
+    var new_file_path_missing = false;
+    if ($13("#new-url").length && !$13("#new-url").val()) {
+      $13("#new-url-missing-warning").show();
+      $13("#new-url").focus();
+      $13("html,body").scrollTop(0);
+      new_url_missing = true;
+    }
+    if ($13("#new-path").length && !$13("#new-path").val()) {
+      $13("#new-path-missing-warning").show();
+      if (false == new_url_missing) {
+        $13("#new-path").focus();
+        $13("html,body").scrollTop(0);
+      }
+      new_file_path_missing = true;
+    }
+    return !(new_url_missing || new_file_path_missing);
+  }
+
+  // asset/src/js/modules/progress.js
+  var $14 = jQuery;
+  function choose_tables(stage) {
+    var table_rows = "";
+    if (stage == "backup") {
+      var backup_option = $14("input[name=backup_option]:checked").val();
+      var table_option = $14("input[name=table_migrate_option]:checked").val();
+      if (table_option == "migrate_only_with_prefix" && backup_option == "backup_selected") {
+        backup_option = "backup_only_with_prefix";
+      }
+      if (state.migration_intent == "push") {
+        table_rows = connection_data.table_rows;
+        if (backup_option == "backup_only_with_prefix") {
+          state.tables_to_migrate = connection_data.prefixed_tables;
+        } else if (backup_option == "backup_selected") {
+          state.tables_to_migrate = get_intersect($14("#select-tables").val(), connection_data.tables);
+        } else if (backup_option == "backup_manual_select") {
+          state.tables_to_migrate = $14("#select-backup").val();
+        }
+      } else {
+        table_rows = syncpilot_this_table_rows;
+        if (backup_option == "backup_only_with_prefix") {
+          state.tables_to_migrate = syncpilot_this_prefixed_tables;
+        } else if (backup_option == "backup_selected") {
+          state.tables_to_migrate = get_intersect($14("#select-tables").val(), syncpilot_this_tables);
+        } else if (backup_option == "backup_manual_select") {
+          state.tables_to_migrate = $14("#select-backup").val();
+        }
+      }
+      return table_rows;
+    }
+    var sends_from_here = state.migration_intent == "push" || state.migration_intent == "savefile";
+    if ($14("input[name=table_migrate_option]:checked").val() == "migrate_select") {
+      state.tables_to_migrate = $14("#select-tables").val();
+      table_rows = sends_from_here ? syncpilot_this_table_rows : connection_data.table_rows;
+    } else if (sends_from_here) {
+      state.tables_to_migrate = syncpilot_this_prefixed_tables;
+      table_rows = syncpilot_this_table_rows;
+    } else {
+      state.tables_to_migrate = connection_data.prefixed_tables;
+      table_rows = connection_data.table_rows;
+    }
+    return table_rows;
+  }
+  function draw_table_chunks(tables_to_migrate, table_rows) {
+    var total_size = 0;
+    $14.each(tables_to_migrate, function(index, value) {
+      total_size += parseInt(table_rows[value]);
+    });
+    var last_element = "";
+    $14.each(tables_to_migrate, function(index, value) {
+      var percent2 = table_rows[value] / total_size * 100;
+      var percent_rounded2 = Math.round(percent2 * 1e3) / 1e3;
+      $14(".progress-tables").append('<div class="progress-chunk ' + value + '_chunk" style="width: ' + percent_rounded2 + '%;" title="' + value + '"><span>' + value + "</span></div>");
+      $14(".progress-tables-hover-boxes").append(
+        '<div class="progress-chunk-hover" data-table="' + value + '" style="width: ' + percent_rounded2 + '%;"></div>'
+      );
+      var label2 = $14(".progress-tables .progress-chunk:last span");
+      last_element = value;
+    });
+    var box_style = { display: $14(".progress-content")[0].style.display, visibility: $14(".progress-content")[0].style.visibility };
+    $14(".progress-content").css({ display: "block", visibility: "hidden" });
+    $14(".progress-chunk").each(function(index) {
+      if ($14(this).width() < 1 && tables_to_migrate[index] != last_element) {
+        $14(this).hide();
+        $14(".progress-chunk-hover[data-table=" + tables_to_migrate[index] + "]").hide();
+        table_rows[last_element] = Number(table_rows[last_element]);
+        table_rows[last_element] += Number(table_rows[tables_to_migrate[index]]);
+        table_rows[tables_to_migrate[index]] = 0;
+      }
+      var element = this;
+      setTimeout(function() {
+        hide_overflowing_elements(element);
+      }, 0);
+      function hide_overflowing_elements(element2) {
+        if ($14("span", element2).innerWidth() > $14(element2).width()) {
+          $14("span", element2).hide();
+        }
+      }
+    });
+    $14(".progress-content").css(box_style);
+    var percent_rounded = 0;
+    if (table_rows[last_element] != 0) {
+      var percent = table_rows[last_element] / total_size * 100;
+      percent_rounded = Math.round(percent * 1e3) / 1e3;
+    }
+    $14(".progress-tables .progress-chunk:last").css(
+      "width",
+      percent_rounded + "%"
+    );
+    $14(".progress-chunk-hover:last").css("width", percent_rounded + "%");
+    var return_vals = [table_rows, total_size];
+    return return_vals;
+  }
+  function create_overlay() {
+    var doc_height = $14(document).height();
+    $14("body").append('<div id="overlay"></div>');
+    $14("#overlay").height(doc_height).css({
+      "position": "fixed",
+      "top": 0,
+      "left": 0,
+      "width": "100%",
+      "z-index": 99999,
+      "display": "none"
+    });
+  }
+  function show_progress_box(template, title) {
+    $14("#overlay").after(template.clone());
+    $14(".progress-title").html(title);
+    $14("#overlay").show();
+  }
+  function slide_in_progress_box() {
+    $14(".progress-title").after(
+      '<img src="' + spinner_url + '" alt="" class="migration-progress-ajax-spinner general-spinner" />'
+    );
+    var height = $14(".progress-content").outerHeight();
+    $14(".progress-content").css("top", "-" + height + "px").show().animate({
+      "top": "0px"
+    });
+  }
+
+  // asset/src/js/modules/save-profile.js
+  var $15 = jQuery;
+  function profile_has_name() {
+    if ($15.trim($15(".create-new-profile").val()) == "" && $15("#create_new").is(":checked")) {
+      syncpilot_alert(syncpilot_i10n.enter_name_for_profile);
+      $15(".create-new-profile").focus();
+      return false;
+    }
+    return true;
+  }
+  function is_new_profile() {
+    return $15("#create_new").is(":checked");
+  }
+  function send_profile(on_success, on_error) {
+    $15.ajax({
+      url: ajaxurl,
+      type: "POST",
+      dataType: "text",
+      cache: false,
+      data: {
+        action: "syncpilot_save_profile",
+        profile: $15("#migrate-form").serialize(),
+        nonce: syncpilot_nonces.save_profile
+      },
+      error: function(jqXHR, textStatus, errorThrown) {
+        syncpilot_alert(syncpilot_i10n.save_profile_problem);
+        if (on_error) {
+          on_error();
+        }
+      },
+      success: on_success
+    });
+  }
+  function add_profile_to_list(data, name) {
+    var new_profile_key = parseInt(data, 10);
+    var new_profile_id = new_profile_key + 1;
+    var new_li = '<li><span style="display: none;" class="delete-profile" data-profile-id="' + new_profile_id + '"></span><label for="profile-' + new_profile_id + '"><input id="profile-' + new_profile_id + '" value="' + new_profile_key + '" name="save_migration_profile_option" type="radio"> ' + name + "</label></li>";
+    $15("#create_new").parents("li").before(new_li);
+    $15("#profile-" + new_profile_id).attr("checked", "checked");
+  }
+
   // asset/src/js/script.js
   window.migration_complete = void 0;
   window.migration_complete_events = void 0;
   window.migrate_table_recursive = void 0;
   window.execute_next_step = void 0;
-  (function($13) {
+  (function($16) {
     window.onbeforeunload = function(e) {
       if (state.currently_migrating) {
         e = e || window.event;
@@ -875,39 +1069,39 @@ function syncpilot_parse_json( maybe_json ) {
         return "Sure?";
       }
     };
-    $13(document).ready(function() {
+    $16(document).ready(function() {
       init_plugin_compatibility();
       init_slider();
-      var progress_content_original = $13(".progress-content").clone();
-      $13(".progress-content").remove();
-      var push_select = $13("#select-tables").clone();
-      var pull_select = $13("#select-tables").clone();
-      var push_post_type_select = $13("#select-post-types").clone();
-      var pull_post_type_select = $13("#select-post-types").clone();
-      var push_select_backup = $13("#select-backup").clone();
-      var pull_select_backup = $13("#select-backup").clone();
-      $13(".backup-options").show();
-      $13(".keep-active-plugins").show();
-      if ($13("#savefile").is(":checked")) {
-        $13(".backup-options").hide();
-        $13(".keep-active-plugins").hide();
+      var progress_content_original = $16(".progress-content").clone();
+      $16(".progress-content").remove();
+      var push_select = $16("#select-tables").clone();
+      var pull_select = $16("#select-tables").clone();
+      var push_post_type_select = $16("#select-post-types").clone();
+      var pull_post_type_select = $16("#select-post-types").clone();
+      var push_select_backup = $16("#select-backup").clone();
+      var pull_select_backup = $16("#select-backup").clone();
+      $16(".backup-options").show();
+      $16(".keep-active-plugins").show();
+      if ($16("#savefile").is(":checked")) {
+        $16(".backup-options").hide();
+        $16(".keep-active-plugins").hide();
       }
       function disable_export_type_controls() {
-        $13(".option-group").each(function(index) {
-          $13("input", this).attr("disabled", "disabled");
-          $13("label", this).css("cursor", "default");
+        $16(".option-group").each(function(index) {
+          $16("input", this).attr("disabled", "disabled");
+          $16("label", this).css("cursor", "default");
         });
       }
       function enable_export_type_controls() {
-        $13(".option-group").each(function(index) {
-          $13("input", this).removeAttr("disabled");
-          $13("label", this).css("cursor", "pointer");
+        $16(".option-group").each(function(index) {
+          $16("input", this).removeAttr("disabled");
+          $16("label", this).css("cursor", "pointer");
         });
       }
       establish_remote_connection_from_saved_profile();
       function establish_remote_connection_from_saved_profile() {
-        var action = $13("input[name=action]:checked").val();
-        var connection_info = $13.trim($13(".pull-push-connection-info").val()).split(
+        var action = $16("input[name=action]:checked").val();
+        var connection_info = $16.trim($16(".pull-push-connection-info").val()).split(
           "\n"
         );
         if (typeof syncpilot_default_profile == "undefined" || syncpilot_default_profile == true || action == "savefile" || state.doing_ajax) {
@@ -916,13 +1110,13 @@ function syncpilot_parse_json( maybe_json ) {
         state.last_replace_switch = action;
         state.doing_ajax = true;
         disable_export_type_controls();
-        $13(".connection-status").html(syncpilot_i10n.establishing_remote_connection);
-        $13(".connection-status").removeClass(
+        $16(".connection-status").html(syncpilot_i10n.establishing_remote_connection);
+        $16(".connection-status").removeClass(
           "notification-message error-notice migration-error"
         );
-        $13(".connection-status").append('<img src="' + spinner_url + '" alt="" class="ajax-spinner general-spinner" />');
-        var intent = $13("input[name=action]:checked").val();
-        $13.ajax({
+        $16(".connection-status").append('<img src="' + spinner_url + '" alt="" class="ajax-spinner general-spinner" />');
+        var intent = $16("input[name=action]:checked").val();
+        $16.ajax({
           url: ajaxurl,
           type: "POST",
           dataType: "json",
@@ -937,37 +1131,37 @@ function syncpilot_parse_json( maybe_json ) {
             profile: syncpilot_profile
           },
           error: function(jqXHR, textStatus, errorThrown) {
-            $13(".connection-status").html(syncpilot_i10n.connection_local_server_problem + " (#102)");
-            $13(".connection-status").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
-            $13(".connection-status").addClass(
+            $16(".connection-status").html(syncpilot_i10n.connection_local_server_problem + " (#102)");
+            $16(".connection-status").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
+            $16(".connection-status").addClass(
               "notification-message error-notice migration-error"
             );
-            $13(".ajax-spinner").remove();
+            $16(".ajax-spinner").remove();
             state.doing_ajax = false;
             enable_export_type_controls();
           },
           success: function(data) {
-            $13(".ajax-spinner").remove();
+            $16(".ajax-spinner").remove();
             state.doing_ajax = false;
             enable_export_type_controls();
             if (typeof data.syncpilot_error != "undefined" && data.syncpilot_error == 1) {
-              $13(".connection-status").html(syncpilot_sanitize_html(data.body));
-              $13(".connection-status").addClass(
+              $16(".connection-status").html(syncpilot_sanitize_html(data.body));
+              $16(".connection-status").addClass(
                 "notification-message error-notice migration-error"
               );
               if (data.body.indexOf("401 Unauthorized") > -1) {
-                $13(".basic-access-auth-wrapper").show();
+                $16(".basic-access-auth-wrapper").show();
               }
               return;
             }
             maybe_show_ssl_warning(connection_info[0], connection_info[1], data.scheme);
             maybe_show_version_warning(data.plugin_version, connection_info[0]);
             maybe_show_prefix_notice(data.prefix);
-            $13(".pull-push-connection-info").addClass("temp-disabled");
-            $13(".pull-push-connection-info").attr("readonly", "readonly");
-            $13(".connect-button").hide();
-            $13(".connection-status").hide();
-            $13(".step-two").show();
+            $16(".pull-push-connection-info").addClass("temp-disabled");
+            $16(".pull-push-connection-info").attr("readonly", "readonly");
+            $16(".connect-button").hide();
+            $16(".connection-status").hide();
+            $16(".step-two").show();
             state.connection_established = true;
             connection_data = data;
             move_connection_info_box();
@@ -976,47 +1170,47 @@ function syncpilot_parse_json( maybe_json ) {
               loaded_tables = syncpilot_loaded_tables;
             }
             var table_select = document.createElement("select");
-            $13(table_select).attr({
+            $16(table_select).attr({
               multiple: "multiple",
               name: "select_tables[]",
               id: "select-tables",
               class: "multiselect"
             });
-            $13.each(connection_data.tables, function(index, value) {
-              var selected = $13.inArray(value, loaded_tables);
+            $16.each(connection_data.tables, function(index, value) {
+              var selected = $16.inArray(value, loaded_tables);
               if (selected != -1) {
                 selected = ' selected="selected" ';
               } else {
                 selected = " ";
               }
-              $13(table_select).append("<option" + selected + 'value="' + value + '">' + value + " (" + connection_data.table_sizes_hr[value] + ")</option>");
+              $16(table_select).append("<option" + selected + 'value="' + value + '">' + value + " (" + connection_data.table_sizes_hr[value] + ")</option>");
             });
             pull_select = table_select;
             var loaded_post_types = "";
             if (syncpilot_default_profile == false && typeof syncpilot_loaded_post_types != "undefined") {
               if (typeof data.select_post_types != "undefined") {
-                $13("#exclude-post-types").attr("checked", "checked");
-                $13(".post-type-select-wrap").show();
+                $16("#exclude-post-types").attr("checked", "checked");
+                $16(".post-type-select-wrap").show();
                 loaded_post_types = data.select_post_types;
               } else {
                 loaded_post_types = syncpilot_loaded_post_types;
               }
             }
             var post_type_select = document.createElement("select");
-            $13(post_type_select).attr({
+            $16(post_type_select).attr({
               multiple: "multiple",
               name: "select_post_types[]",
               id: "select-post-types",
               class: "multiselect"
             });
-            $13.each(connection_data.post_types, function(index, value) {
-              var selected = $13.inArray(value, loaded_post_types);
+            $16.each(connection_data.post_types, function(index, value) {
+              var selected = $16.inArray(value, loaded_post_types);
               if (selected != -1 || syncpilot_convert_exclude_revisions == true && value != "revision") {
                 selected = ' selected="selected" ';
               } else {
                 selected = " ";
               }
-              $13(post_type_select).append("<option" + selected + 'value="' + value + '">' + value + "</option>");
+              $16(post_type_select).append("<option" + selected + 'value="' + value + '">' + value + "</option>");
             });
             pull_post_type_select = post_type_select;
             var loaded_tables_backup = "";
@@ -1024,34 +1218,34 @@ function syncpilot_parse_json( maybe_json ) {
               loaded_tables_backup = syncpilot_loaded_tables_backup;
             }
             var table_select_backup = document.createElement("select");
-            $13(table_select_backup).attr({
+            $16(table_select_backup).attr({
               multiple: "multiple",
               name: "select_backup[]",
               id: "select-backup",
               class: "multiselect"
             });
-            $13.each(connection_data.tables, function(index, value) {
-              var selected = $13.inArray(value, loaded_tables_backup);
+            $16.each(connection_data.tables, function(index, value) {
+              var selected = $16.inArray(value, loaded_tables_backup);
               if (selected != -1) {
                 selected = ' selected="selected" ';
               } else {
                 selected = " ";
               }
-              $13(table_select_backup).append("<option" + selected + 'value="' + value + '">' + value + " (" + connection_data.table_sizes_hr[value] + ")</option>");
+              $16(table_select_backup).append("<option" + selected + 'value="' + value + '">' + value + " (" + connection_data.table_sizes_hr[value] + ")</option>");
             });
             push_select_backup = table_select_backup;
-            if ($13("#pull").is(":checked")) {
-              $13("#select-tables").remove();
-              $13(".select-tables-wrap").prepend(pull_select);
-              $13("#select-post-types").remove();
-              $13(".select-post-types-wrap").prepend(pull_post_type_select);
-              $13("#select-backup").remove();
-              $13(".backup-tables-wrap").prepend(pull_select_backup);
-              $13(".table-prefix").text(data.prefix);
-              $13(".uploads-dir").html(syncpilot_this_uploads_dir);
+            if ($16("#pull").is(":checked")) {
+              $16("#select-tables").remove();
+              $16(".select-tables-wrap").prepend(pull_select);
+              $16("#select-post-types").remove();
+              $16(".select-post-types-wrap").prepend(pull_post_type_select);
+              $16("#select-backup").remove();
+              $16(".backup-tables-wrap").prepend(pull_select_backup);
+              $16(".table-prefix").text(data.prefix);
+              $16(".uploads-dir").html(syncpilot_this_uploads_dir);
             } else {
-              $13("#select-backup").remove();
-              $13(".backup-tables-wrap").prepend(push_select_backup);
+              $16("#select-backup").remove();
+              $16(".backup-tables-wrap").prepend(push_select_backup);
             }
             media_files_connection_verified(connection_data);
           }
@@ -1065,96 +1259,40 @@ function syncpilot_parse_json( maybe_json ) {
       init_api_key();
       init_settings();
       init_tabs();
-      $13(".migrate-db-button").click(function(event) {
-        $13(this).blur();
+      $16(".migrate-db-button").click(run_migration);
+      function run_migration(event) {
+        $16(this).blur();
         event.preventDefault();
-        if ($13("#migrate-selected").is(":checked") && !($13("#select-tables").val() || []).length) {
-          syncpilot_alert(syncpilot_i10n.please_select_one_table);
+        if (!form_is_valid()) {
           return;
         }
-        new_url_missing = false;
-        new_file_path_missing = false;
-        if ($13("#new-url").length && !$13("#new-url").val()) {
-          $13("#new-url-missing-warning").show();
-          $13("#new-url").focus();
-          $13("html,body").scrollTop(0);
-          new_url_missing = true;
-        }
-        if ($13("#new-path").length && !$13("#new-path").val()) {
-          $13("#new-path-missing-warning").show();
-          if (false == new_url_missing) {
-            $13("#new-path").focus();
-            $13("html,body").scrollTop(0);
-          }
-          new_file_path_missing = true;
-        }
-        if (true == new_url_missing || true == new_file_path_missing) return;
-        if ($13("#save-migration-profile").is(":checked")) {
-          if ($13.trim($13(".create-new-profile").val()) == "" && $13(
-            "#create_new"
-          ).is(":checked")) {
-            syncpilot_alert(syncpilot_i10n.enter_name_for_profile);
-            $13(".create-new-profile").focus();
+        if ($16("#save-migration-profile").is(":checked")) {
+          if (!profile_has_name()) {
             return;
           }
-          var create_new_profile = false;
-          if ($13("#create_new").is(":checked")) {
-            create_new_profile = true;
-          }
-          var profile_name = $13(".create-new-profile").val();
-          profile = $13("#migrate-form").serialize();
-          $13.ajax({
-            url: ajaxurl,
-            type: "POST",
-            dataType: "text",
-            cache: false,
-            data: {
-              action: "syncpilot_save_profile",
-              profile,
-              nonce: syncpilot_nonces.save_profile
-            },
-            error: function(jqXHR, textStatus, errorThrown) {
-              syncpilot_alert(syncpilot_i10n.save_profile_problem);
-            },
-            success: function(data) {
-              if (create_new_profile) {
-                var new_profile_key = parseInt(data, 10);
-                var new_profile_id = new_profile_key + 1;
-                var new_li = '<li><span style="display: none;" class="delete-profile" data-profile-id="' + new_profile_id + '"></span><label for="profile-' + new_profile_id + '"><input id="profile-' + new_profile_id + '" value="' + new_profile_key + '" name="save_migration_profile_option" type="radio"> ' + profile_name + "</label></li>";
-                $13("#create_new").parents("li").before(new_li);
-                $13("#profile-" + new_profile_id).attr("checked", "checked");
-                $13(".create-new-profile").val("");
-              }
+          var create_new_profile = is_new_profile();
+          var profile_name = $16(".create-new-profile").val();
+          send_profile(function(data) {
+            if (create_new_profile) {
+              add_profile_to_list(data, profile_name);
+              $16(".create-new-profile").val("");
             }
           });
         }
-        state.form_data = $13("#migrate-form").serialize();
-        var doc_height = $13(document).height();
-        $13("body").append('<div id="overlay"></div>');
-        $13("#overlay").height(doc_height).css({
-          "position": "fixed",
-          "top": 0,
-          "left": 0,
-          "width": "100%",
-          "z-index": 99999,
-          "display": "none"
-        });
-        $progress_content = progress_content_original.clone();
-        state.migration_intent = $13("input[name=action]:checked").val();
+        state.form_data = $16("#migrate-form").serialize();
+        create_overlay();
+        state.migration_intent = $16("input[name=action]:checked").val();
         state.stage = "backup";
         if (state.migration_intent == "savefile") {
           state.stage = "migrate";
         }
-        if ($13("#create-backup").is(":checked") == false) {
+        if ($16("#create-backup").is(":checked") == false) {
           state.stage = "migrate";
         }
-        var table_intent = $13("input[name=table_migrate_option]:checked").val();
-        var connection_info = $13.trim($13(".pull-push-connection-info").val()).split("\n");
-        var table_rows = "";
+        var connection_info = $16.trim($16(".pull-push-connection-info").val()).split("\n");
         state.remote_site = connection_info[0];
         state.secret_key = connection_info[1];
         var static_migration_label = "";
-        $13("#overlay").after($progress_content);
         state.completed_msg = syncpilot_i10n.exporting_complete;
         if (state.migration_intent == "savefile") {
           static_migration_label = syncpilot_i10n.exporting_please_wait;
@@ -1170,118 +1308,16 @@ function syncpilot_parse_json( maybe_json ) {
             true
           ) + " " + syncpilot_i10n.complete;
         }
-        $13(".progress-title").html(static_migration_label);
-        $13("#overlay").show();
-        backup_option = $13("input[name=backup_option]:checked").val();
-        table_option = $13("input[name=table_migrate_option]:checked").val();
-        if (state.stage == "backup") {
-          if (table_option == "migrate_only_with_prefix" && backup_option == "backup_selected") {
-            backup_option = "backup_only_with_prefix";
-          }
-          if (state.migration_intent == "push") {
-            table_rows = connection_data.table_rows;
-            if (backup_option == "backup_only_with_prefix") {
-              state.tables_to_migrate = connection_data.prefixed_tables;
-            } else if (backup_option == "backup_selected") {
-              selected_tables = $13("#select-tables").val();
-              state.tables_to_migrate = get_intersect(
-                selected_tables,
-                connection_data.tables
-              );
-            } else if (backup_option == "backup_manual_select") {
-              state.tables_to_migrate = $13("#select-backup").val();
-            }
-          } else {
-            table_rows = syncpilot_this_table_rows;
-            if (backup_option == "backup_only_with_prefix") {
-              state.tables_to_migrate = syncpilot_this_prefixed_tables;
-            } else if (backup_option == "backup_selected") {
-              selected_tables = $13("#select-tables").val();
-              state.tables_to_migrate = get_intersect(selected_tables, syncpilot_this_tables);
-            } else if (backup_option == "backup_manual_select") {
-              state.tables_to_migrate = $13("#select-backup").val();
-            }
-          }
-        } else {
-          if (table_intent == "migrate_select") {
-            state.tables_to_migrate = $13("#select-tables").val();
-            if (state.migration_intent == "push" || state.migration_intent == "savefile") {
-              table_rows = syncpilot_this_table_rows;
-            } else {
-              table_rows = connection_data.table_rows;
-            }
-          } else {
-            if (state.migration_intent == "push" || state.migration_intent == "savefile") {
-              state.tables_to_migrate = syncpilot_this_prefixed_tables;
-              table_rows = syncpilot_this_table_rows;
-            } else {
-              state.tables_to_migrate = connection_data.prefixed_tables;
-              table_rows = connection_data.table_rows;
-            }
-          }
-        }
-        function decide_tables_to_display_rows(tables_to_migrate, table_rows2) {
-          var total_size2 = 0;
-          $13.each(tables_to_migrate, function(index, value) {
-            total_size2 += parseInt(table_rows2[value]);
-          });
-          var last_element = "";
-          $13.each(tables_to_migrate, function(index, value) {
-            var percent2 = table_rows2[value] / total_size2 * 100;
-            var percent_rounded2 = Math.round(percent2 * 1e3) / 1e3;
-            $13(".progress-tables").append('<div class="progress-chunk ' + value + '_chunk" style="width: ' + percent_rounded2 + '%;" title="' + value + '"><span>' + value + "</span></div>");
-            $13(".progress-tables-hover-boxes").append(
-              '<div class="progress-chunk-hover" data-table="' + value + '" style="width: ' + percent_rounded2 + '%;"></div>'
-            );
-            var label2 = $13(".progress-tables .progress-chunk:last span");
-            last_element = value;
-          });
-          $13(".progress-content").css({ display: "block", visibility: "hidden" });
-          $13(".progress-chunk").each(function(index) {
-            if ($13(this).width() < 1 && tables_to_migrate[index] != last_element) {
-              $13(this).hide();
-              $13(".progress-chunk-hover[data-table=" + tables_to_migrate[index] + "]").hide();
-              table_rows2[last_element] = Number(table_rows2[last_element]);
-              table_rows2[last_element] += Number(table_rows2[tables_to_migrate[index]]);
-              table_rows2[tables_to_migrate[index]] = 0;
-            }
-            var element = this;
-            setTimeout(function() {
-              hide_overflowing_elements(element);
-            }, 0);
-            function hide_overflowing_elements(element2) {
-              if ($13("span", element2).innerWidth() > $13(element2).width()) {
-                $13("span", element2).hide();
-              }
-            }
-          });
-          $13(".progress-content").css({ display: "", visibility: "" });
-          percent_rounded = 0;
-          if (table_rows2[last_element] != 0) {
-            var percent = table_rows2[last_element] / total_size2 * 100;
-            var percent_rounded = Math.round(percent * 1e3) / 1e3;
-          }
-          $13(".progress-tables .progress-chunk:last").css(
-            "width",
-            percent_rounded + "%"
-          );
-          $13(".progress-chunk-hover:last").css("width", percent_rounded + "%");
-          var return_vals = [table_rows2, total_size2];
-          return return_vals;
-        }
-        table_details = decide_tables_to_display_rows(state.tables_to_migrate, table_rows);
+        show_progress_box(progress_content_original, static_migration_label);
+        var table_rows = choose_tables(state.stage);
+        var table_details = draw_table_chunks(state.tables_to_migrate, table_rows);
+        var total_size = table_details[1];
         table_rows = table_details[0];
-        total_size = table_details[1];
-        $13(".progress-title").after(
-          '<img src="' + spinner_url + '" alt="" class="migration-progress-ajax-spinner general-spinner" />'
-        );
-        var height = $13(".progress-content").outerHeight();
-        $13(".progress-content").css("top", "-" + height + "px").show().animate({
-          "top": "0px"
-        });
+        slide_in_progress_box();
         setup_counter();
         state.currently_migrating = true;
-        $13.ajax({
+        state.doing_ajax = true;
+        $16.ajax({
           url: ajaxurl,
           type: "POST",
           dataType: "json",
@@ -1296,10 +1332,11 @@ function syncpilot_parse_json( maybe_json ) {
             nonce: syncpilot_nonces.initiate_migration
           },
           error: function(jqXHR, textStatus, errorThrown) {
-            $13(".progress-title").html(syncpilot_i10n.migration_failed);
-            $13(".progress-text").html(syncpilot_i10n.connection_local_server_problem + " (#112)");
-            $13(".progress-text").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
-            $13(".progress-text").addClass("migration-error");
+            state.doing_ajax = false;
+            $16(".progress-title").html(syncpilot_i10n.migration_failed);
+            $16(".progress-text").html(syncpilot_i10n.connection_local_server_problem + " (#112)");
+            $16(".progress-text").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
+            $16(".progress-text").addClass("migration-error");
             console.log(jqXHR);
             console.log(textStatus);
             console.log(errorThrown);
@@ -1308,12 +1345,13 @@ function syncpilot_parse_json( maybe_json ) {
             return;
           },
           success: function(data) {
+            state.doing_ajax = false;
             if (typeof data.syncpilot_error != "undefined" && data.syncpilot_error == 1) {
               migration_error = true;
               migration_complete_events();
-              $13(".progress-title").html(syncpilot_i10n.migration_failed);
-              $13(".progress-text").addClass("migration-error");
-              $13(".progress-text").html(syncpilot_sanitize_html(data.body));
+              $16(".progress-title").html(syncpilot_i10n.migration_failed);
+              $16(".progress-text").addClass("migration-error");
+              $16(".progress-text").html(syncpilot_sanitize_html(data.body));
               return;
             }
             state.dump_url = data.dump_url;
@@ -1331,29 +1369,11 @@ function syncpilot_parse_json( maybe_json ) {
                   state.stage = "migrate";
                   i = 0;
                   progress_size = 0;
-                  $13(".progress-bar").width("0px");
-                  if (table_intent == "migrate_select") {
-                    state.tables_to_migrate = $13("#select-tables").val();
-                    if (state.migration_intent == "push" || state.migration_intent == "savefile") {
-                      table_rows = syncpilot_this_table_rows;
-                    } else {
-                      table_rows = connection_data.table_rows;
-                    }
-                  } else {
-                    if (state.migration_intent == "push" || state.migration_intent == "savefile") {
-                      state.tables_to_migrate = syncpilot_this_prefixed_tables;
-                      table_rows = syncpilot_this_table_rows;
-                    } else {
-                      state.tables_to_migrate = connection_data.prefixed_tables;
-                      table_rows = connection_data.table_rows;
-                    }
-                  }
-                  $13(".progress-tables").empty();
-                  $13(".progress-tables-hover-boxes").empty();
-                  table_details = decide_tables_to_display_rows(
-                    state.tables_to_migrate,
-                    table_rows
-                  );
+                  $16(".progress-bar").width("0px");
+                  table_rows = choose_tables("migrate");
+                  $16(".progress-tables").empty();
+                  $16(".progress-tables-hover-boxes").empty();
+                  table_details = draw_table_chunks(state.tables_to_migrate, table_rows);
                   table_rows = table_details[0];
                   total_size = table_details[1];
                 } else {
@@ -1370,9 +1390,9 @@ function syncpilot_parse_json( maybe_json ) {
                 }
               }
               if (state.stage == "backup") {
-                $13(".progress-text").html(state.overall_percent + "% - " + syncpilot_i10n.backing_up + ' "' + state.tables_to_migrate[i] + '"');
+                $16(".progress-text").html(state.overall_percent + "% - " + syncpilot_i10n.backing_up + ' "' + state.tables_to_migrate[i] + '"');
               } else {
-                $13(".progress-text").html(state.overall_percent + "% - " + syncpilot_i10n.migrating + ' "' + state.tables_to_migrate[i] + '"');
+                $16(".progress-text").html(state.overall_percent + "% - " + syncpilot_i10n.migrating + ' "' + state.tables_to_migrate[i] + '"');
               }
               last_table = 0;
               if (i == state.tables_to_migrate.length - 1) {
@@ -1408,7 +1428,7 @@ function syncpilot_parse_json( maybe_json ) {
                 request_data.domain_current_site = connection_data.domain;
               }
               state.doing_ajax = true;
-              $13.ajax({
+              $16.ajax({
                 url: ajaxurl,
                 type: "POST",
                 dataType: "text",
@@ -1416,10 +1436,10 @@ function syncpilot_parse_json( maybe_json ) {
                 timeout: 0,
                 data: request_data,
                 error: function(jqXHR, textStatus, errorThrown) {
-                  $13(".progress-title").html(syncpilot_i10n.migration_failed);
-                  $13(".progress-text").html(syncpilot_i10n.table_process_problem + " " + state.tables_to_migrate[i]);
-                  $13(".progress-text").append("<br /><br />" + syncpilot_i10n.status + ": " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />" + syncpilot_i10n.response + ":<br />" + jqXHR.responseText);
-                  $13(".progress-text").addClass("migration-error");
+                  $16(".progress-title").html(syncpilot_i10n.migration_failed);
+                  $16(".progress-text").html(syncpilot_i10n.table_process_problem + " " + state.tables_to_migrate[i]);
+                  $16(".progress-text").append("<br /><br />" + syncpilot_i10n.status + ": " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />" + syncpilot_i10n.response + ":<br />" + jqXHR.responseText);
+                  $16(".progress-text").addClass("migration-error");
                   state.doing_ajax = false;
                   console.log(jqXHR);
                   console.log(textStatus);
@@ -1434,21 +1454,21 @@ function syncpilot_parse_json( maybe_json ) {
                   try {
                     row_information = JSON.parse(data2);
                   } catch (variable) {
-                    $13(".progress-title").html(syncpilot_i10n.migration_failed);
+                    $16(".progress-title").html(syncpilot_i10n.migration_failed);
                     if ("" == data2 || null == data2) {
-                      $13(".progress-text").html(syncpilot_i10n.table_process_problem_empty_response + " " + state.tables_to_migrate[i]);
+                      $16(".progress-text").html(syncpilot_i10n.table_process_problem_empty_response + " " + state.tables_to_migrate[i]);
                     } else {
-                      $13(".progress-text").html(syncpilot_sanitize_html(data2));
+                      $16(".progress-text").html(syncpilot_sanitize_html(data2));
                     }
-                    $13(".progress-text").addClass("migration-error");
+                    $16(".progress-text").addClass("migration-error");
                     migration_error = true;
                     migration_complete_events();
                     return;
                   }
                   if (typeof row_information.syncpilot_error != "undefined" && row_information.syncpilot_error == 1) {
-                    $13(".progress-title").html(syncpilot_i10n.migration_failed);
-                    $13(".progress-text").addClass("migration-error");
-                    $13(".progress-text").html(syncpilot_sanitize_html(row_information.body));
+                    $16(".progress-title").html(syncpilot_i10n.migration_failed);
+                    $16(".progress-text").addClass("migration-error");
+                    $16(".progress-text").html(syncpilot_sanitize_html(row_information.body));
                     migration_error = true;
                     migration_complete_events();
                     return;
@@ -1469,7 +1489,7 @@ function syncpilot_parse_json( maybe_json ) {
                     overall_table_progress += table_progress;
                   }
                   var percent = 100 * progress_size / total_size;
-                  $13(".progress-bar").width(percent + "%");
+                  $16(".progress-bar").width(percent + "%");
                   state.overall_percent = Math.floor(percent);
                   next_step_in_migration = {
                     fn: migrate_table_recursive,
@@ -1489,24 +1509,24 @@ function syncpilot_parse_json( maybe_json ) {
             execute_next_step();
           }
         });
-      });
+      }
       migration_complete_events = function() {
         if (false == migration_error) {
           if (non_fatal_errors == "") {
-            if ("savefile" != state.migration_intent && true == $13("#save_computer").is(":checked")) {
-              $13(".progress-text").css("visibility", "hidden");
+            if ("savefile" != state.migration_intent && true == $16("#save_computer").is(":checked")) {
+              $16(".progress-text").css("visibility", "hidden");
             }
-            $13(".progress-title").html(state.completed_msg).append(
+            $16(".progress-title").html(state.completed_msg).append(
               '<div class="dashicons dashicons-yes"></div>'
             );
           } else {
-            $13(".progress-text").html(syncpilot_sanitize_html(non_fatal_errors));
-            $13(".progress-text").addClass("migration-error");
-            $13(".progress-title").html(syncpilot_i10n.completed_with_some_errors);
+            $16(".progress-text").html(syncpilot_sanitize_html(non_fatal_errors));
+            $16(".progress-text").addClass("migration-error");
+            $16(".progress-title").html(syncpilot_i10n.completed_with_some_errors);
           }
-          $13(".progress-bar-wrapper").hide();
+          $16(".progress-bar-wrapper").hide();
         }
-        $13(".migration-controls").hide();
+        $16(".migration-controls").hide();
         call_stack = [];
         migration_error = false;
         state.currently_migrating = false;
@@ -1515,20 +1535,20 @@ function syncpilot_parse_json( maybe_json ) {
         state.migration_cancelled = false;
         state.doing_ajax = false;
         non_fatal_errors = "";
-        $13(".progress-label").remove();
-        $13(".migration-progress-ajax-spinner").remove();
-        $13(".close-progress-content").show();
-        $13("#overlay").css("cursor", "pointer");
+        $16(".progress-label").remove();
+        $16(".migration-progress-ajax-spinner").remove();
+        $16(".close-progress-content").show();
+        $16("#overlay").css("cursor", "pointer");
         clearInterval(state.elapsed_interval);
       };
       migration_complete = function() {
-        $13(".migration-controls").fadeOut();
+        $16(".migration-controls").fadeOut();
         if (state.migration_intent == "savefile") {
           state.currently_migrating = false;
           var migrate_complete_text = syncpilot_i10n.migration_complete;
-          if ($13("#save_computer").is(":checked")) {
+          if ($16("#save_computer").is(":checked")) {
             var url = syncpilot_this_download_url + encodeURIComponent(state.dump_filename);
-            if ($13("#gzip_file").is(":checked")) {
+            if ($16("#gzip_file").is(":checked")) {
               url += "&gzip=1";
             }
             window.location = url;
@@ -1536,13 +1556,14 @@ function syncpilot_parse_json( maybe_json ) {
             migrate_complete_text = syncpilot_i10n.completed_dump_located_at + ' <a href="' + state.dump_url + '">' + state.dump_url + "</a>.";
           }
           if (migration_error == false) {
-            $13(".progress-text").html(migrate_complete_text);
+            $16(".progress-text").html(migrate_complete_text);
             migration_complete_events();
-            $13(".progress-title").html(state.completed_msg);
+            $16(".progress-title").html(state.completed_msg);
           }
         } else {
-          $13(".progress-text").html(syncpilot_i10n.finalizing_migration);
-          $13.ajax({
+          $16(".progress-text").html(syncpilot_i10n.finalizing_migration);
+          state.doing_ajax = true;
+          $16.ajax({
             url: ajaxurl,
             type: "POST",
             dataType: "text",
@@ -1559,9 +1580,10 @@ function syncpilot_parse_json( maybe_json ) {
               nonce: syncpilot_nonces.finalize_migration
             },
             error: function(jqXHR, textStatus, errorThrown) {
-              $13(".progress-title").html(syncpilot_i10n.migration_failed);
-              $13(".progress-text").html(syncpilot_i10n.finalize_tables_problem);
-              $13(".progress-text").addClass("migration-error");
+              state.doing_ajax = false;
+              $16(".progress-title").html(syncpilot_i10n.migration_failed);
+              $16(".progress-text").html(syncpilot_i10n.finalize_tables_problem);
+              $16(".progress-text").addClass("migration-error");
               if (window.console && console.log)
                 console.log("SyncPilot: finalize", textStatus, errorThrown, jqXHR.responseText);
               migration_error = true;
@@ -1569,10 +1591,11 @@ function syncpilot_parse_json( maybe_json ) {
               return;
             },
             success: function(data) {
-              if ($13.trim(data) != "") {
-                $13(".progress-title").html(syncpilot_i10n.migration_failed);
-                $13(".progress-text").html(syncpilot_sanitize_html(data));
-                $13(".progress-text").addClass("migration-error");
+              state.doing_ajax = false;
+              if ($16.trim(data) != "") {
+                $16(".progress-title").html(syncpilot_i10n.migration_failed);
+                $16(".progress-text").html(syncpilot_sanitize_html(data));
+                $16(".progress-text").addClass("migration-error");
                 migration_error = true;
                 migration_complete_events();
                 return;
@@ -1585,310 +1608,276 @@ function syncpilot_parse_json( maybe_json ) {
           });
         }
       };
-      $13("body").on("click", ".close-progress-content-button", function(e) {
+      $16("body").on("click", ".close-progress-content-button", function(e) {
         hide_overlay();
       });
-      $13("body").on("click", "#overlay", function() {
+      $16("body").on("click", "#overlay", function() {
         if (state.migration_completed == true) {
           hide_overlay();
         }
       });
       function hide_overlay() {
-        var height = $13(".progress-content").outerHeight();
-        $13(".progress-content").animate({
+        var height = $16(".progress-content").outerHeight();
+        $16(".progress-content").animate({
           "top": "-" + height + "px"
         }, 400, "swing", function() {
-          $13("#overlay").remove();
-          $13(".progress-content").remove();
+          $16("#overlay").remove();
+          $16(".progress-content").remove();
         });
         state.migration_completed = false;
       }
-      $13(".save-settings-button").click(function(event) {
-        var profile2;
-        $13(this).blur();
+      $16(".save-settings-button").click(function(event) {
+        var $button = $16(this);
+        $button.blur();
         event.preventDefault();
         if (state.doing_save_profile) {
           return;
         }
-        if ($13("#migrate-selected").is(":checked") && !($13("#select-tables").val() || []).length) {
-          syncpilot_alert(syncpilot_i10n.please_select_one_table);
+        if (!tables_are_chosen() || !profile_has_name()) {
           return;
         }
-        if ($13.trim($13(".create-new-profile").val()) == "" && $13("#create_new").is(":checked")) {
-          syncpilot_alert(syncpilot_i10n.enter_name_for_profile);
-          $13(".create-new-profile").focus();
-          return;
-        }
-        var create_new_profile = false;
-        if ($13("#create_new").is(":checked")) {
-          create_new_profile = true;
-        }
-        var profile_name = $13(".create-new-profile").val();
+        var create_new_profile = is_new_profile();
+        var profile_name = $16(".create-new-profile").val();
         state.doing_save_profile = true;
-        profile2 = $13("#migrate-form").serialize();
-        $13(".save-settings-button").after('<img src="' + spinner_url + '" alt="" class="save-profile-ajax-spinner general-spinner" />');
-        $13(this).attr("disabled", "disabled");
-        $13.ajax({
-          url: ajaxurl,
-          type: "POST",
-          dataType: "text",
-          cache: false,
-          data: {
-            action: "syncpilot_save_profile",
-            profile: profile2,
-            nonce: syncpilot_nonces.save_profile
-          },
-          error: function(jqXHR, textStatus, errorThrown) {
-            syncpilot_alert(syncpilot_i10n.save_profile_problem);
-            $13(".save-settings-button").removeAttr("disabled");
-            $13(".save-profile-ajax-spinner").remove();
-            $13(".save-settings-button").after(
-              '<span class="ajax-success-msg">' + syncpilot_i10n.saved + "</span>"
-            );
-            $13(".ajax-success-msg").fadeOut(2e3, function() {
-              $13(this).remove();
-            });
-            state.doing_save_profile = false;
-          },
-          success: function(data) {
-            $13(".save-settings-button").removeAttr("disabled");
-            $13(".save-profile-ajax-spinner").remove();
-            $13(".save-settings-button").after(
-              '<span class="ajax-success-msg">' + syncpilot_i10n.saved + "</span>"
-            );
-            $13(".ajax-success-msg").fadeOut(2e3, function() {
-              $13(this).remove();
-            });
-            state.doing_save_profile = false;
-            $13(".create-new-profile").val("");
-            if (create_new_profile) {
-              var new_profile_key = parseInt(data, 10);
-              var new_profile_id = new_profile_key + 1;
-              var new_li = '<li><span style="display: none;" class="delete-profile" data-profile-id="' + new_profile_id + '"></span><label for="profile-' + new_profile_id + '"><input id="profile-' + new_profile_id + '" value="' + new_profile_key + '" name="save_migration_profile_option" type="radio"> ' + profile_name + "</label></li>";
-              $13("#create_new").parents("li").before(new_li);
-              $13("#profile-" + new_profile_id).attr("checked", "checked");
-            }
+        $button.after('<img src="' + spinner_url + '" alt="" class="save-profile-ajax-spinner general-spinner" />');
+        $button.attr("disabled", "disabled");
+        function profile_request_ended() {
+          $button.removeAttr("disabled");
+          $16(".save-profile-ajax-spinner").remove();
+          $button.after(
+            '<span class="ajax-success-msg">' + syncpilot_i10n.saved + "</span>"
+          );
+          $16(".ajax-success-msg").fadeOut(2e3, function() {
+            $16(this).remove();
+          });
+          state.doing_save_profile = false;
+        }
+        send_profile(function(data) {
+          profile_request_ended();
+          $16(".create-new-profile").val("");
+          if (create_new_profile) {
+            add_profile_to_list(data, profile_name);
           }
-        });
+        }, profile_request_ended);
       });
-      $13("body").on("mousemove", ".progress-chunk-hover", function(e) {
+      $16("body").on("mousemove", ".progress-chunk-hover", function(e) {
         mX = e.pageX;
-        offset = $13(".progress-bar-wrapper").offset();
-        label_offset = $13(".progress-label").outerWidth() / 2;
+        offset = $16(".progress-bar-wrapper").offset();
+        label_offset = $16(".progress-label").outerWidth() / 2;
         mX = mX - offset.left - label_offset;
-        $13(".progress-label").css("left", mX + "px");
-        $13(".progress-label").html($13(this).attr("data-table"));
+        $16(".progress-label").css("left", mX + "px");
+        $16(".progress-label").html($16(this).attr("data-table"));
       });
-      $13("body").on("mouseenter mouseleave", ".progress-chunk-hover", function(event) {
+      $16("body").on("mouseenter mouseleave", ".progress-chunk-hover", function(event) {
         if (event.type === "mouseenter") {
-          $13(".progress-label").addClass("label-visible");
+          $16(".progress-label").addClass("label-visible");
         } else {
-          $13(".progress-label").removeClass("label-visible");
+          $16(".progress-label").removeClass("label-visible");
         }
       });
-      connection_info_box = $13(".connection-info-wrapper");
+      connection_info_box = $16(".connection-info-wrapper");
       move_connection_info_box();
-      $13(".migrate-selection.option-group input[type=radio]").change(function() {
+      $16(".migrate-selection.option-group input[type=radio]").change(function() {
         move_connection_info_box();
         if (state.connection_established) {
           change_replace_values();
         }
       });
       function move_connection_info_box() {
-        $13(".connection-status").hide();
-        $13(".prefix-notice").hide();
-        $13(".ssl-notice").hide();
-        $13(".different-plugin-version-notice").hide();
-        $13(".step-two").show();
-        $13(".backup-options").show();
-        $13(".keep-active-plugins").show();
-        $13(".directory-permission-notice").hide();
-        $13("#create-backup").removeAttr("disabled");
-        $13("#create-backup-label").removeClass("disabled");
-        $13(".backup-option-disabled").hide();
-        var connection_info = $13.trim($13(".pull-push-connection-info").val()).split(
+        $16(".connection-status").hide();
+        $16(".prefix-notice").hide();
+        $16(".ssl-notice").hide();
+        $16(".different-plugin-version-notice").hide();
+        $16(".step-two").show();
+        $16(".backup-options").show();
+        $16(".keep-active-plugins").show();
+        $16(".directory-permission-notice").hide();
+        $16("#create-backup").removeAttr("disabled");
+        $16("#create-backup-label").removeClass("disabled");
+        $16(".backup-option-disabled").hide();
+        var connection_info = $16.trim($16(".pull-push-connection-info").val()).split(
           "\n"
         );
-        if ($13("#pull").is(":checked")) {
-          $13(".pull-list li").append(connection_info_box);
+        if ($16("#pull").is(":checked")) {
+          $16(".pull-list li").append(connection_info_box);
           connection_info_box.show();
           if (state.connection_established) {
-            $13(".connection-status").hide();
-            $13(".step-two").show();
-            $13(".table-prefix").text(connection_data.prefix);
-            $13(".uploads-dir").html(syncpilot_this_uploads_dir);
+            $16(".connection-status").hide();
+            $16(".step-two").show();
+            $16(".table-prefix").text(connection_data.prefix);
+            $16(".uploads-dir").html(syncpilot_this_uploads_dir);
             if (state.profile_name_edited == false) {
               var profile_name = get_domain_name(connection_info[0]);
-              $13(".create-new-profile").val(profile_name);
+              $16(".create-new-profile").val(profile_name);
             }
             if (state.show_prefix_notice == true) {
-              $13(".prefix-notice.pull").show();
+              $16(".prefix-notice.pull").show();
             }
             if (state.show_ssl_notice == true) {
-              $13(".ssl-notice").show();
+              $16(".ssl-notice").show();
             }
             if (state.show_version_notice == true) {
-              $13(".different-plugin-version-notice").show();
-              $13(".step-two").hide();
+              $16(".different-plugin-version-notice").show();
+              $16(".step-two").hide();
             }
-            $13(".directory-scope").text(syncpilot_i10n.scope_local);
+            $16(".directory-scope").text(syncpilot_i10n.scope_local);
             if (false == syncpilot_write_permission) {
-              $13("#create-backup").prop("checked", false);
-              $13("#create-backup").attr("disabled", "disabled");
-              $13("#create-backup-label").addClass("disabled");
-              $13(".backup-option-disabled").show();
-              $13(".upload-directory-location").html(syncpilot_this_upload_dir_long);
+              $16("#create-backup").prop("checked", false);
+              $16("#create-backup").attr("disabled", "disabled");
+              $16("#create-backup-label").addClass("disabled");
+              $16(".backup-option-disabled").show();
+              $16(".upload-directory-location").html(syncpilot_this_upload_dir_long);
             }
           } else {
-            $13(".connection-status").show();
-            $13(".step-two").hide();
+            $16(".connection-status").show();
+            $16(".step-two").hide();
           }
-        } else if ($13("#push").is(":checked")) {
-          $13(".push-list li").append(connection_info_box);
+        } else if ($16("#push").is(":checked")) {
+          $16(".push-list li").append(connection_info_box);
           connection_info_box.show();
           if (state.connection_established) {
-            $13(".connection-status").hide();
-            $13(".step-two").show();
-            $13(".table-prefix").html(syncpilot_this_prefix);
-            $13(".uploads-dir").text(connection_data.uploads_dir);
+            $16(".connection-status").hide();
+            $16(".step-two").show();
+            $16(".table-prefix").html(syncpilot_this_prefix);
+            $16(".uploads-dir").text(connection_data.uploads_dir);
             if (state.profile_name_edited == false) {
               var profile_name = get_domain_name(connection_info[0]);
-              $13(".create-new-profile").val(profile_name);
+              $16(".create-new-profile").val(profile_name);
             }
             if (state.show_prefix_notice == true) {
-              $13(".prefix-notice.push").show();
+              $16(".prefix-notice.push").show();
             }
             if (state.show_ssl_notice == true) {
-              $13(".ssl-notice").show();
+              $16(".ssl-notice").show();
             }
             if (state.show_version_notice == true) {
-              $13(".different-plugin-version-notice").show();
-              $13(".step-two").hide();
+              $16(".different-plugin-version-notice").show();
+              $16(".step-two").hide();
             }
-            $13(".directory-scope").text(syncpilot_i10n.scope_remote);
+            $16(".directory-scope").text(syncpilot_i10n.scope_remote);
             if ("0" == connection_data.write_permissions) {
-              $13("#create-backup").prop("checked", false);
-              $13("#create-backup").attr("disabled", "disabled");
-              $13("#create-backup-label").addClass("disabled");
-              $13(".backup-option-disabled").show();
-              $13(".upload-directory-location").text(connection_data.upload_dir_long);
+              $16("#create-backup").prop("checked", false);
+              $16("#create-backup").attr("disabled", "disabled");
+              $16("#create-backup-label").addClass("disabled");
+              $16(".backup-option-disabled").show();
+              $16(".upload-directory-location").text(connection_data.upload_dir_long);
             }
           } else {
-            $13(".connection-status").show();
-            $13(".step-two").hide();
+            $16(".connection-status").show();
+            $16(".step-two").hide();
           }
-        } else if ($13("#savefile").is(":checked")) {
-          $13(".connection-status").hide();
-          $13(".step-two").show();
-          $13(".table-prefix").html(syncpilot_this_prefix);
+        } else if ($16("#savefile").is(":checked")) {
+          $16(".connection-status").hide();
+          $16(".step-two").show();
+          $16(".table-prefix").html(syncpilot_this_prefix);
           if (state.profile_name_edited == false) {
-            $13(".create-new-profile").val("");
+            $16(".create-new-profile").val("");
           }
-          $13(".backup-options").hide();
-          $13(".keep-active-plugins").hide();
+          $16(".backup-options").hide();
+          $16(".keep-active-plugins").hide();
           if (false == syncpilot_write_permission) {
-            $13(".directory-permission-notice").show();
-            $13(".step-two").hide();
+            $16(".directory-permission-notice").show();
+            $16(".step-two").hide();
           }
         }
         media_files_connection_box_moved();
       }
       function change_replace_values() {
-        if ($13("#push").is(":checked") || $13("#savefile").is(":checked")) {
+        if ($16("#push").is(":checked") || $16("#savefile").is(":checked")) {
           if (state.last_replace_switch == "" || state.last_replace_switch == "pull") {
-            $13(".replace-row").each(function() {
-              var old_val = $13(".old-replace-col input", this).val();
-              $13(".old-replace-col input", this).val($13(
+            $16(".replace-row").each(function() {
+              var old_val = $16(".old-replace-col input", this).val();
+              $16(".old-replace-col input", this).val($16(
                 ".replace-right-col input",
                 this
               ).val());
-              $13(".replace-right-col input", this).val(old_val);
+              $16(".replace-right-col input", this).val(old_val);
             });
           }
-          $13("#select-tables").remove();
-          $13(".select-tables-wrap").prepend(push_select);
-          $13("#select-post-types").remove();
-          $13(".select-post-types-wrap").prepend(push_post_type_select);
-          $13("#select-backup").remove();
-          $13(".backup-tables-wrap").prepend(push_select_backup);
+          $16("#select-tables").remove();
+          $16(".select-tables-wrap").prepend(push_select);
+          $16("#select-post-types").remove();
+          $16(".select-post-types-wrap").prepend(push_post_type_select);
+          $16("#select-backup").remove();
+          $16(".backup-tables-wrap").prepend(push_select_backup);
           state.last_replace_switch = "push";
-        } else if ($13("#pull").is(":checked")) {
+        } else if ($16("#pull").is(":checked")) {
           if (state.last_replace_switch == "" || state.last_replace_switch == "push") {
-            $13(".replace-row").each(function() {
-              var old_val = $13(".old-replace-col input", this).val();
-              $13(".old-replace-col input", this).val($13(
+            $16(".replace-row").each(function() {
+              var old_val = $16(".old-replace-col input", this).val();
+              $16(".old-replace-col input", this).val($16(
                 ".replace-right-col input",
                 this
               ).val());
-              $13(".replace-right-col input", this).val(old_val);
+              $16(".replace-right-col input", this).val(old_val);
             });
           }
-          $13("#select-tables").remove();
-          $13(".select-tables-wrap").prepend(pull_select);
-          $13("#select-post-types").remove();
-          $13(".select-post-types-wrap").prepend(pull_post_type_select);
-          $13("#select-backup").remove();
-          $13(".backup-tables-wrap").prepend(pull_select_backup);
+          $16("#select-tables").remove();
+          $16(".select-tables-wrap").prepend(pull_select);
+          $16("#select-post-types").remove();
+          $16(".select-post-types-wrap").prepend(pull_post_type_select);
+          $16("#select-backup").remove();
+          $16(".backup-tables-wrap").prepend(pull_select_backup);
           state.last_replace_switch = "pull";
         }
       }
-      if (($13("#pull").is(":checked") || $13("#push").is(":checked")) && !state.connection_established) {
-        $13(".step-two").hide();
-        $13(".connection-status").show();
+      if (($16("#pull").is(":checked") || $16("#push").is(":checked")) && !state.connection_established) {
+        $16(".step-two").hide();
+        $16(".connection-status").show();
       }
-      $13("body").on("click", ".temp-disabled", function() {
+      $16("body").on("click", ".temp-disabled", function() {
         syncpilot_confirm(syncpilot_i10n.change_connection_info, function() {
-          $13(".ssl-notice").hide();
-          $13(".different-plugin-version-notice").hide();
-          $13(".migrate-db-button").show();
-          $13(".temp-disabled").removeAttr("readonly");
-          $13(".temp-disabled").removeClass("temp-disabled");
-          $13(".connect-button").show();
-          $13(".step-two").hide();
-          $13(".connection-status").show().html(syncpilot_i10n.enter_connection_info);
+          $16(".ssl-notice").hide();
+          $16(".different-plugin-version-notice").hide();
+          $16(".migrate-db-button").show();
+          $16(".temp-disabled").removeAttr("readonly");
+          $16(".temp-disabled").removeClass("temp-disabled");
+          $16(".connect-button").show();
+          $16(".step-two").hide();
+          $16(".connection-status").show().html(syncpilot_i10n.enter_connection_info);
           state.connection_established = false;
         });
       });
-      $13(".migrate-form").submit(function(e) {
+      $16(".migrate-form").submit(function(e) {
         e.preventDefault();
       });
-      $13(".connect-button").click(function(event) {
+      $16(".connect-button").click(function(event) {
         event.preventDefault();
-        $13(this).blur();
+        $16(this).blur();
         connection_box_changed();
       });
-      $13(".pull-push-connection-info").bind("paste", function(e) {
+      $16(".pull-push-connection-info").bind("paste", function(e) {
         var $this = this;
         setTimeout(function() {
           connection_box_changed();
         }, 0);
       });
-      $13("body").on("click", ".try-again", function() {
+      $16("body").on("click", ".try-again", function() {
         connection_box_changed();
       });
-      $13("body").on("click", ".try-http", function() {
-        var connection_info = $13.trim($13(".pull-push-connection-info").val()).split("\n");
+      $16("body").on("click", ".try-http", function() {
+        var connection_info = $16.trim($16(".pull-push-connection-info").val()).split("\n");
         var new_url = connection_info[0].replace("https", "http");
         var new_contents = new_url + "\n" + connection_info[1];
-        $13(".pull-push-connection-info").val(new_contents);
+        $16(".pull-push-connection-info").val(new_contents);
         connection_box_changed();
       });
-      $13(".create-new-profile").change(function() {
+      $16(".create-new-profile").change(function() {
         state.profile_name_edited = true;
       });
-      $13("body").on("click", ".temporarily-disable-ssl", function() {
+      $16("body").on("click", ".temporarily-disable-ssl", function() {
         if (window.location.hash) {
           var hash = window.location.hash.substring(1);
         }
-        $13(this).attr("href", $13(this).attr("href") + "&hash=" + hash);
+        $16(this).attr("href", $16(this).attr("href") + "&hash=" + hash);
       });
       function connection_box_changed(data) {
-        var $this = $13(".pull-push-connection-info");
-        if (state.doing_ajax || $13($this).hasClass("temp-disabled")) {
+        var $this = $16(".pull-push-connection-info");
+        if (state.doing_ajax || $16($this).hasClass("temp-disabled")) {
           return;
         }
-        var data = $13(".pull-push-connection-info").val();
-        var connection_info = $13.trim(data).split("\n");
+        var data = $16(".pull-push-connection-info").val();
+        var connection_info = $16.trim(data).split("\n");
         var error = false;
         var error_message = "";
         if (connection_info == "") {
@@ -1916,8 +1905,8 @@ function syncpilot_parse_json( maybe_json ) {
           error_message = syncpilot_i10n.connection_info_local_key;
         }
         if (error) {
-          $13(".connection-status").html(error_message);
-          $13(".connection-status").addClass(
+          $16(".connection-status").html(error_message);
+          $16(".connection-status").addClass(
             "notification-message error-notice migration-error"
           );
           return;
@@ -1925,30 +1914,30 @@ function syncpilot_parse_json( maybe_json ) {
         if (syncpilot_openssl_available == false) {
           connection_info[0] = connection_info[0].replace("https://", "http://");
           var new_connection_info_contents = connection_info[0] + "\n" + connection_info[1];
-          $13(".pull-push-connection-info").val(new_connection_info_contents);
+          $16(".pull-push-connection-info").val(new_connection_info_contents);
         }
         state.show_prefix_notice = false;
         state.doing_ajax = true;
         disable_export_type_controls();
-        if ($13(".basic-access-auth-wrapper").is(":visible")) {
+        if ($16(".basic-access-auth-wrapper").is(":visible")) {
           connection_info[0] = connection_info[0].replace(/\/\/(.*)@/, "//");
-          connection_info[0] = connection_info[0].replace("//", "//" + encodeURIComponent($13.trim($13(".auth-username").val())) + ":" + encodeURIComponent($13.trim($13(".auth-password").val())) + "@");
+          connection_info[0] = connection_info[0].replace("//", "//" + encodeURIComponent($16.trim($16(".auth-username").val())) + ":" + encodeURIComponent($16.trim($16(".auth-password").val())) + "@");
           var new_connection_info_contents = connection_info[0] + "\n" + connection_info[1];
-          $13(".pull-push-connection-info").val(new_connection_info_contents);
-          $13(".basic-access-auth-wrapper").hide();
+          $16(".pull-push-connection-info").val(new_connection_info_contents);
+          $16(".basic-access-auth-wrapper").hide();
         }
-        $13(".step-two").hide();
-        $13(".ssl-notice").hide();
-        $13(".prefix-notice").hide();
-        $13(".connection-status").show();
-        $13(".connection-status").html(syncpilot_i10n.establishing_remote_connection);
-        $13(".connection-status").removeClass(
+        $16(".step-two").hide();
+        $16(".ssl-notice").hide();
+        $16(".prefix-notice").hide();
+        $16(".connection-status").show();
+        $16(".connection-status").html(syncpilot_i10n.establishing_remote_connection);
+        $16(".connection-status").removeClass(
           "notification-message error-notice migration-error"
         );
-        $13(".connection-status").append('<img src="' + spinner_url + '" alt="" class="ajax-spinner general-spinner" />');
-        var intent = $13("input[name=action]:checked").val();
+        $16(".connection-status").append('<img src="' + spinner_url + '" alt="" class="ajax-spinner general-spinner" />');
+        var intent = $16("input[name=action]:checked").val();
         state.profile_name_edited = false;
-        $13.ajax({
+        $16.ajax({
           url: ajaxurl,
           type: "POST",
           dataType: "json",
@@ -1961,36 +1950,36 @@ function syncpilot_parse_json( maybe_json ) {
             nonce: syncpilot_nonces.verify_connection_to_remote_site
           },
           error: function(jqXHR, textStatus, errorThrown) {
-            $13(".connection-status").html(syncpilot_i10n.connection_local_server_problem + " (#100)");
-            $13(".connection-status").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
-            $13(".connection-status").addClass(
+            $16(".connection-status").html(syncpilot_i10n.connection_local_server_problem + " (#100)");
+            $16(".connection-status").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
+            $16(".connection-status").addClass(
               "notification-message error-notice migration-error"
             );
-            $13(".ajax-spinner").remove();
+            $16(".ajax-spinner").remove();
             state.doing_ajax = false;
             enable_export_type_controls();
           },
           success: function(data2) {
-            $13(".ajax-spinner").remove();
+            $16(".ajax-spinner").remove();
             state.doing_ajax = false;
             enable_export_type_controls();
             if (typeof data2.syncpilot_error != "undefined" && data2.syncpilot_error == 1) {
-              $13(".connection-status").html(syncpilot_sanitize_html(data2.body));
-              $13(".connection-status").addClass(
+              $16(".connection-status").html(syncpilot_sanitize_html(data2.body));
+              $16(".connection-status").addClass(
                 "notification-message error-notice migration-error"
               );
               if (data2.body.indexOf("401 Unauthorized") > -1) {
-                $13(".basic-access-auth-wrapper").show();
+                $16(".basic-access-auth-wrapper").show();
               }
               return;
             }
             var profile_name = get_domain_name(connection_info[0]);
-            $13(".create-new-profile").val(profile_name);
-            $13(".pull-push-connection-info").addClass("temp-disabled");
-            $13(".pull-push-connection-info").attr("readonly", "readonly");
-            $13(".connect-button").hide();
-            $13(".connection-status").hide();
-            $13(".step-two").show();
+            $16(".create-new-profile").val(profile_name);
+            $16(".pull-push-connection-info").addClass("temp-disabled");
+            $16(".pull-push-connection-info").attr("readonly", "readonly");
+            $16(".connect-button").hide();
+            $16(".connection-status").hide();
+            $16(".step-two").show();
             maybe_show_ssl_warning(connection_info[0], connection_info[1], data2.scheme);
             maybe_show_version_warning(data2.plugin_version, connection_info[0]);
             maybe_show_prefix_notice(data2.prefix);
@@ -1998,51 +1987,51 @@ function syncpilot_parse_json( maybe_json ) {
             connection_data = data2;
             move_connection_info_box();
             var table_select = document.createElement("select");
-            $13(table_select).attr({
+            $16(table_select).attr({
               multiple: "multiple",
               name: "select_tables[]",
               id: "select-tables",
               class: "multiselect"
             });
-            $13.each(connection_data.tables, function(index, value) {
-              $13(table_select).append('<option value="' + value + '">' + value + " (" + connection_data.table_sizes_hr[value] + ")</option>");
+            $16.each(connection_data.tables, function(index, value) {
+              $16(table_select).append('<option value="' + value + '">' + value + " (" + connection_data.table_sizes_hr[value] + ")</option>");
             });
             pull_select = table_select;
-            push_select_backup = $13(table_select).clone();
-            $13(push_select_backup).attr({
+            push_select_backup = $16(table_select).clone();
+            $16(push_select_backup).attr({
               name: "select_backup[]",
               id: "select-backup"
             });
             var post_type_select = document.createElement("select");
-            $13(post_type_select).attr({
+            $16(post_type_select).attr({
               multiple: "multiple",
               name: "select_post_types[]",
               id: "select-post-types",
               class: "multiselect"
             });
-            $13.each(connection_data.post_types, function(index, value) {
-              $13(post_type_select).append('<option value="' + value + '">' + value + "</option>");
+            $16.each(connection_data.post_types, function(index, value) {
+              $16(post_type_select).append('<option value="' + value + '">' + value + "</option>");
             });
             pull_post_type_select = post_type_select;
-            if ($13("#pull").is(":checked")) {
-              $13("#new-url").val(remove_protocol(syncpilot_this_url));
-              $13("#new-path").val(syncpilot_this_path);
+            if ($16("#pull").is(":checked")) {
+              $16("#new-url").val(remove_protocol(syncpilot_this_url));
+              $16("#new-path").val(syncpilot_this_path);
               if (syncpilot_is_multisite == true) {
-                $13("#new-domain").val(syncpilot_this_domain);
+                $16("#new-domain").val(syncpilot_this_domain);
               }
-              $13("#old-url").val(remove_protocol(data2.url));
-              $13("#old-path").val(data2.path);
-              $13("#select-tables").remove();
-              $13(".select-tables-wrap").prepend(pull_select);
-              $13("#select-post-types").remove();
-              $13(".select-post-types-wrap").prepend(pull_post_type_select);
-              $13(".table-prefix").text(data2.prefix);
-              $13(".uploads-dir").html(syncpilot_this_uploads_dir);
+              $16("#old-url").val(remove_protocol(data2.url));
+              $16("#old-path").val(data2.path);
+              $16("#select-tables").remove();
+              $16(".select-tables-wrap").prepend(pull_select);
+              $16("#select-post-types").remove();
+              $16(".select-post-types-wrap").prepend(pull_post_type_select);
+              $16(".table-prefix").text(data2.prefix);
+              $16(".uploads-dir").html(syncpilot_this_uploads_dir);
             } else {
-              $13("#select-backup").remove();
-              $13(".backup-tables-wrap").prepend(push_select_backup);
-              $13("#new-url").val(remove_protocol(data2.url));
-              $13("#new-path").val(data2.path);
+              $16("#select-backup").remove();
+              $16(".backup-tables-wrap").prepend(push_select_backup);
+              $16("#new-url").val(remove_protocol(data2.url));
+              $16("#new-path").val(data2.path);
             }
             next_step_in_migration = {
               fn: media_files_connection_verified,
@@ -2052,45 +2041,45 @@ function syncpilot_parse_json( maybe_json ) {
           }
         });
       }
-      $13("body").on("click", ".pause-resume", function() {
+      $16("body").on("click", ".pause-resume", function() {
         if (true == state.migration_paused) {
           state.migration_paused = false;
           state.doing_ajax = true;
-          $13(".progress-title").html(state.previous_progress_title);
-          $13(".progress-text").html(state.previous_progress_text);
-          $13(".migration-progress-ajax-spinner").show();
-          $13(".pause-resume").html(syncpilot_i10n.pause);
+          $16(".progress-title").html(state.previous_progress_title);
+          $16(".progress-text").html(state.previous_progress_text);
+          $16(".migration-progress-ajax-spinner").show();
+          $16(".pause-resume").html(syncpilot_i10n.pause);
           state.elapsed_interval = setInterval(count, 1e3);
           execute_next_step();
         } else {
           state.migration_paused = true;
           state.doing_ajax = false;
-          state.previous_progress_title = $13(".progress-title").html();
-          state.previous_progress_text = $13(".progress-text").html();
-          $13(".progress-title").html(syncpilot_i10n.migration_paused);
-          $13(".pause-resume").html(syncpilot_i10n.resume);
-          $13(".progress-text").html(syncpilot_i10n.completing_current_request);
+          state.previous_progress_title = $16(".progress-title").html();
+          state.previous_progress_text = $16(".progress-text").html();
+          $16(".progress-title").html(syncpilot_i10n.migration_paused);
+          $16(".pause-resume").html(syncpilot_i10n.resume);
+          $16(".progress-text").html(syncpilot_i10n.completing_current_request);
         }
       });
-      $13("body").on("click", ".cancel", function() {
+      $16("body").on("click", ".cancel", function() {
         state.migration_cancelled = true;
         state.migration_paused = false;
-        $13(".progress-text").html(syncpilot_i10n.completing_current_request);
-        $13(".progress-title").html(syncpilot_i10n.cancelling_migration);
-        $13(".migration-controls").fadeOut();
-        $13(".migration-progress-ajax-spinner").show();
+        $16(".progress-text").html(syncpilot_i10n.completing_current_request);
+        $16(".progress-title").html(syncpilot_i10n.cancelling_migration);
+        $16(".migration-controls").fadeOut();
+        $16(".migration-progress-ajax-spinner").show();
         if (false == state.doing_ajax) {
           execute_next_step();
         }
       });
       execute_next_step = function() {
         if (true == state.migration_paused) {
-          $13(".migration-progress-ajax-spinner").hide();
+          $16(".migration-progress-ajax-spinner").hide();
           clearInterval(state.elapsed_interval);
-          $13(".progress-text").html(syncpilot_i10n.paused);
+          $16(".progress-text").html(syncpilot_i10n.paused);
           return;
         } else if (true == state.migration_cancelled) {
-          state.migration_intent = $13("input[name=action]:checked").val();
+          state.migration_intent = $16("input[name=action]:checked").val();
           if ("savefile" == state.migration_intent) {
             progress_msg = syncpilot_i10n.removing_local_sql;
           } else if ("pull" == state.migration_intent) {
@@ -2106,7 +2095,7 @@ function syncpilot_parse_json( maybe_json ) {
               progress_msg = syncpilot_i10n.removing_remote_temp_tables;
             }
           }
-          $13(".progress-text").html(progress_msg);
+          $16(".progress-text").html(progress_msg);
           var request_data = {
             action: "syncpilot_cancel_migration",
             intent: state.migration_intent,
@@ -2117,20 +2106,20 @@ function syncpilot_parse_json( maybe_json ) {
             form_data: state.form_data,
             nonce: syncpilot_nonces.cancel_migration
           };
-          if (typeof connection_data != "undefined") {
+          if (connection_data) {
             request_data.temp_prefix = connection_data.temp_prefix;
           }
-          $13.ajax({
+          $16.ajax({
             url: ajaxurl,
             type: "POST",
             dataType: "text",
             cache: false,
             data: request_data,
             error: function(jqXHR, textStatus, errorThrown) {
-              $13(".progress-title").html(syncpilot_i10n.migration_cancellation_failed);
-              $13(".progress-text").html(syncpilot_i10n.manually_remove_temp_files);
-              $13(".progress-text").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
-              $13(".progress-text").addClass("migration-error");
+              $16(".progress-title").html(syncpilot_i10n.migration_cancellation_failed);
+              $16(".progress-text").html(syncpilot_i10n.manually_remove_temp_files);
+              $16(".progress-text").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
+              $16(".progress-text").addClass("migration-error");
               console.log(jqXHR);
               console.log(textStatus);
               console.log(errorThrown);
@@ -2140,17 +2129,17 @@ function syncpilot_parse_json( maybe_json ) {
             },
             success: function(data) {
               state.doing_ajax = false;
-              data = $13.trim(data);
+              data = $16.trim(data);
               if (data != "") {
-                $13(".progress-title").html(syncpilot_i10n.migration_cancellation_failed);
-                $13(".progress-text").html(syncpilot_sanitize_html(data));
-                $13(".progress-text").addClass("migration-error");
+                $16(".progress-title").html(syncpilot_i10n.migration_cancellation_failed);
+                $16(".progress-text").html(syncpilot_sanitize_html(data));
+                $16(".progress-text").addClass("migration-error");
                 migration_error = true;
                 migration_complete_events();
                 return;
               }
               state.completed_msg = syncpilot_i10n.migration_cancelled;
-              $13(".progress-text").hide();
+              $16(".progress-text").hide();
               migration_complete_events();
             }
           });
