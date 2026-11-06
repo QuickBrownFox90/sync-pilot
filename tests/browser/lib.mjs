@@ -64,7 +64,7 @@ export async function launch() {
     const profile = mkdtempSync( join( tmpdir(), 'syncpilot-chrome-' ) );
 
     // its own process group, so that the processes that Chromium starts end with it
-    const child   = spawn( 'chromium', [ '--headless=new', '--no-sandbox', '--remote-debugging-port=' + port, '--user-data-dir=' + profile, '--window-size=1300,900', 'about:blank' ], { stdio : 'ignore', detached : true } );
+    const child   = spawn( 'chromium', [ '--headless=new', '--no-sandbox', '--ignore-certificate-errors', '--remote-debugging-port=' + port, '--user-data-dir=' + profile, '--window-size=1300,900', 'about:blank' ], { stdio : 'ignore', detached : true } );
 
     let target;
 
@@ -158,13 +158,15 @@ export async function launch() {
         // test, with the site and the path of another installation on that one; the browser can be logged in on both)
         async login( path = config.wp, site = config.site ) {
 
-            const out    = wp( path, '$u = ' + Number( config.user ) + '; $exp = time() + 7200; $t = WP_Session_Tokens::get_instance( $u )->create( $exp ); echo LOGGED_IN_COOKIE, "\\t", wp_generate_auth_cookie( $u, $exp, "logged_in", $t ), "\\n", AUTH_COOKIE, "\\t", wp_generate_auth_cookie( $u, $exp, "auth", $t );' );
+            // a site with https wants the secure cookie for the admin
+            const secure = new URL( site ).protocol === 'https:';
+            const out    = wp( path, '$u = ' + Number( config.user ) + '; $exp = time() + 7200; $t = WP_Session_Tokens::get_instance( $u )->create( $exp ); echo LOGGED_IN_COOKIE, "\\t", wp_generate_auth_cookie( $u, $exp, "logged_in", $t ), "\\n", ' + ( secure ? 'SECURE_AUTH_COOKIE' : 'AUTH_COOKIE' ) + ', "\\t", wp_generate_auth_cookie( $u, $exp, "' + ( secure ? 'secure_auth' : 'auth' ) + '", $t );' );
             const domain = new URL( site ).hostname;
             const cookies = out.split( '\n' ).map( line => {
 
                 const [ name, value ] = line.split( '\t' );
 
-                return { name, value, domain, path : '/' };
+                return { name, value, domain, path : '/', secure };
             } );
 
             await send( 'Network.setCookies', { cookies } );

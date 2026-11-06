@@ -190,6 +190,16 @@ try {
 
     await wait( 1000 );
 
+    // a new profile: when one site is http and the other https, a row sets the scheme after the URL has been replaced
+    const schemeOf  = url => url.startsWith( 'https:' ) ? 'https' : 'http';
+    const fromScheme = schemeOf( pull ? config.remoteSite : config.site );
+    const toScheme   = schemeOf( pull ? config.site : config.remoteSite );
+    const pairs      = await browser.ev( `jQuery('.replace-row:not(.original-repeatable-field)').map( function () { return jQuery('[name="replace_old[]"]', this).val() + ' => ' + jQuery('[name="replace_new[]"]', this).val(); } ).get()` );
+    const wanted     = `${ fromScheme }:// => ${ toScheme }://`;
+
+    check( fromScheme === toScheme ? 'no row for the scheme when both sites use the same one' : `a row sets the scheme (${ fromScheme } to ${ toScheme }) behind the URL and the path`,
+        fromScheme === toScheme ? ! pairs.some( p => /^https?:/.test( p ) ) : pairs.indexOf( wanted ) === 2 && pairs[0].startsWith( '//' ), pairs.join( ' | ' ) );
+
     if ( withMedia ) {
 
         check( 'the media files are available on the other site', await browser.ev( `jQuery('#media-files').attr('data-available') === '1'` ) );

@@ -7,7 +7,7 @@ import { init_plugin_compatibility } from './modules/plugin-compatibility.js';
 import { init_diagnostics } from './modules/diagnostics.js';
 import { init_form_ui } from './modules/form-ui.js';
 import { init_multiselect } from './modules/multiselect.js';
-import { init_replace_rows } from './modules/replace-rows.js';
+import { init_replace_rows, add_scheme_row } from './modules/replace-rows.js';
 import { init_profiles } from './modules/profiles.js';
 import { init_api_key } from './modules/api-key.js';
 import { init_settings } from './modules/settings.js';
@@ -15,13 +15,13 @@ import { init_tabs } from './modules/tabs.js';
 import { tables_are_chosen, form_is_valid } from './modules/form-check.js';
 import { choose_tables, draw_table_chunks, create_overlay, show_progress_box, slide_in_progress_box } from './modules/progress.js';
 import { profile_has_name, is_new_profile, send_profile, add_profile_to_list } from './modules/save-profile.js';
+import { init_migration, initiate_migration } from './modules/migration.js';
 import { get_query_var, get_domain_name, get_default_profile_name, remove_protocol } from './modules/helpers.js';
 
-// These four are global on purpose: media-files.js uses them (common.js and the media files part are plain scripts). In
+// These three are global on purpose (the fourth, migrate_table_recursive, is put on window by modules/migration.js): media-files.js uses them (common.js and the media files part are plain scripts). In
 // the file that esbuild makes they would be local to it, so they are put on window.
 window.migration_complete        = undefined;
 window.migration_complete_events = undefined;
-window.migrate_table_recursive   = undefined;
 window.execute_next_step         = undefined;
 
 ( function ( $ ) {
@@ -306,6 +306,7 @@ window.execute_next_step         = undefined;
         init_api_key();
         init_settings();
         init_tabs();
+        init_migration();
 
         // AJAX migrate button
         $( '.migrate-db-button' ).click( run_migration );
@@ -313,8 +314,8 @@ window.execute_next_step         = undefined;
         /**
          * The whole migration, from the click on "Migrate DB" / "Export" / "Pull" / "Push": checks the form, saves the
          * profile when asked, opens the progress box, decides which tables are migrated and sends the request that starts
-         * the migration. Its answer starts the tables one after the other (migrate_table_recursive); after the last one the
-         * media files, the finalizing and the end follow as steps (execute_next_step, call_stack)
+         * the migration (modules/migration.js: the request, then the tables one after the other); after the last one the media
+         * files, the finalizing and the end follow as steps (execute_next_step, call_stack)
          * @since   0.2.6
          * @param   {Event} event  The click; `this` is the button
          */
@@ -395,266 +396,7 @@ window.execute_next_step         = undefined;
             setup_counter();
             state.currently_migrating = true;
 
-            // a request is under way: Cancel waits for its answer instead of cancelling a migration that has no export file yet
-            state.doing_ajax = true;
-
-            $.ajax( {
-                url      : ajaxurl,
-                type     : 'POST',
-                dataType : 'json',
-                cache    : false,
-                data     : {
-                    action    : 'syncpilot_initiate_migration',
-                    intent    : state.migration_intent,
-                    url       : state.remote_site,
-                    key       : state.secret_key,
-                    form_data : state.form_data,
-                    stage     : state.stage,
-                    nonce     : syncpilot_nonces.initiate_migration,
-                },
-                error : function ( jqXHR, textStatus, errorThrown ) {
-
-                    state.doing_ajax = false;
-
-                    $( '.progress-title' ).html( syncpilot_i10n.migration_failed );
-
-                    $( '.progress-text' ).html( syncpilot_i10n.connection_local_server_problem +
-                        ' (#112)' );
-
-                    $( '.progress-text' ).append( '<br /><br />Status: ' + jqXHR.status +
-                        ' ' + jqXHR.statusText + '<br /><br />Response:<br />' + jqXHR.responseText );
-
-                    $( '.progress-text' ).addClass( 'migration-error' );
-                    console.log( jqXHR );
-                    console.log( textStatus );
-                    console.log( errorThrown );
-                    migration_error = true;
-                    migration_complete_events();
-
-                    return;
-                },
-                success : function ( data ) {
-
-                    state.doing_ajax = false;
-
-                    if ( typeof data.syncpilot_error != 'undefined' && data.syncpilot_error == 1 ) {
-                        migration_error = true;
-                        migration_complete_events();
-                        $( '.progress-title' ).html( syncpilot_i10n.migration_failed );
-                        $( '.progress-text' ).addClass( 'migration-error' );
-                        $( '.progress-text' ).html( syncpilot_sanitize_html( data.body ) );
-
-                        return;
-                    }
-
-                    state.dump_url      = data.dump_url;
-                    state.dump_filename = data.dump_filename;
-
-                    var i             = 0;
-                    var progress_size = 0;
-
-                    state.overall_percent            = 0;
-
-                    var table_progress         = 0;
-                    var temp_progress          = 0;
-                    var last_progress          = 0;
-                    var overall_table_progress = 0;
-
-                    migrate_table_recursive = function ( current_row, primary_keys ) {
-
-                        if ( i >= state.tables_to_migrate.length ) {
-                            if ( state.stage == 'backup' ) {
-                                state.stage   = 'migrate';
-                                i             = 0;
-                                progress_size = 0;
-                                $( '.progress-bar' ).width( '0px' );
-
-                                table_rows = choose_tables( 'migrate' );
-
-                                $( '.progress-tables' ).empty();
-                                $( '.progress-tables-hover-boxes' ).empty();
-
-                                table_details = draw_table_chunks( state.tables_to_migrate, table_rows );
-
-                                table_rows = table_details[0];
-                                total_size = table_details[1];
-                            } else {
-                                // after the last table: the media files if they are chosen, then the end of the migration
-                                call_stack = [];
-
-                                if ( media_files_chosen() ) {
-                                    call_stack.push( determine_media_to_migrate );
-                                }
-
-                                call_stack.push( migration_complete, migration_complete_events );
-
-                                next_step_in_migration = {
-                                    fn : run_next_step
-                                };
-
-                                execute_next_step();
-
-                                return;
-                            }
-                        }
-
-                        if ( state.stage == 'backup' ) {
-                            $( '.progress-text' ).html( state.overall_percent + '% - ' +
-                                syncpilot_i10n.backing_up + ' "' + state.tables_to_migrate[i] + '"' );
-                        } else {
-                            $( '.progress-text' ).html( state.overall_percent + '% - ' +
-                                syncpilot_i10n.migrating + ' "' + state.tables_to_migrate[i] + '"' );
-                        }
-
-                        last_table = 0;
-
-                        if ( i == ( state.tables_to_migrate.length - 1 ) ) {
-                            last_table = 1;
-                        }
-
-                        gzip = 0;
-
-                        if ( state.migration_intent != 'savefile' && parseInt(
-                            connection_data.gzip ) == 1 ) {
-                            gzip = 1;
-                        }
-
-                        var request_data = {
-                            action        : 'syncpilot_migrate_table',
-                            intent        : state.migration_intent,
-                            url           : state.remote_site,
-                            key           : state.secret_key,
-                            table         : state.tables_to_migrate[i],
-                            form_data     : state.form_data,
-                            stage         : state.stage,
-                            current_row   : current_row,
-                            dump_filename : state.dump_filename,
-                            last_table    : last_table,
-                            primary_keys  : primary_keys,
-                            gzip          : gzip,
-                            nonce         : syncpilot_nonces.migrate_table,
-                        };
-
-                        if ( state.migration_intent != 'savefile' ) {
-                            request_data.bottleneck = connection_data.bottleneck;
-                            request_data.prefix     = connection_data.prefix;
-                        }
-
-                        if ( connection_data && connection_data.path_current_site &&
-                            connection_data.domain ) {
-                            request_data.path_current_site   = connection_data.path_current_site;
-                            request_data.domain_current_site = connection_data.domain;
-                        }
-
-                        state.doing_ajax = true;
-
-                        $.ajax( {
-                            url      : ajaxurl,
-                            type     : 'POST',
-                            dataType : 'text',
-                            cache    : false,
-                            timeout  : 0,
-                            data     : request_data,
-                            error    : function ( jqXHR, textStatus, errorThrown ) {
-
-                                $( '.progress-title' ).html( syncpilot_i10n.migration_failed );
-
-                                $( '.progress-text' ).html( syncpilot_i10n.table_process_problem +
-                                    ' ' + state.tables_to_migrate[i] );
-
-                                $( '.progress-text' ).append( '<br /><br />' +
-                                    syncpilot_i10n.status + ': ' + jqXHR.status + ' ' +
-                                    jqXHR.statusText + '<br /><br />' + syncpilot_i10n.response +
-                                    ':<br />' + jqXHR.responseText );
-
-                                $( '.progress-text' ).addClass( 'migration-error' );
-                                state.doing_ajax = false;
-                                console.log( jqXHR );
-                                console.log( textStatus );
-                                console.log( errorThrown );
-                                migration_error = true;
-                                migration_complete_events();
-
-                                return;
-                            },
-                            success : function ( data ) {
-
-                                state.doing_ajax = false;
-                                data             = data.trim();
-
-                                try {
-                                    row_information = JSON.parse( data );
-                                } catch ( variable ) {
-                                    $( '.progress-title' ).html( syncpilot_i10n.migration_failed );
-
-                                    if ( '' == data || null == data ) {
-                                        $( '.progress-text' ).html( syncpilot_i10n.table_process_problem_empty_response +
-                                            ' ' + state.tables_to_migrate[i] );
-                                    } else {
-                                        $( '.progress-text' ).html( syncpilot_sanitize_html( data ) );
-                                    }
-
-                                    $( '.progress-text' ).addClass( 'migration-error' );
-                                    migration_error = true;
-                                    migration_complete_events();
-
-                                    return;
-                                }
-
-                                if ( typeof row_information.syncpilot_error != 'undefined' &&
-                                    row_information.syncpilot_error == 1 ) {
-                                    $( '.progress-title' ).html( syncpilot_i10n.migration_failed );
-                                    $( '.progress-text' ).addClass( 'migration-error' );
-                                    $( '.progress-text' ).html( syncpilot_sanitize_html( row_information.body ) );
-                                    migration_error = true;
-                                    migration_complete_events();
-
-                                    return;
-                                }
-
-                                if ( row_information.current_row == '-1' ) {
-                                    progress_size -= overall_table_progress;
-                                    overall_table_progress = 0;
-                                    last_progress          = 0;
-
-                                    progress_size += parseInt( table_rows[state.tables_to_migrate[i]] );
-
-                                    i++;
-                                    row_information.current_row  = '';
-                                    row_information.primary_keys = '';
-                                } else {
-                                    temp_progress  = parseInt( row_information.current_row );
-                                    table_progress = temp_progress - last_progress;
-                                    last_progress  = temp_progress;
-                                    progress_size += table_progress;
-                                    overall_table_progress += table_progress;
-                                }
-
-                                var percent = 100 * progress_size / total_size;
-
-                                $( '.progress-bar' ).width( percent + '%' );
-                                state.overall_percent = Math.floor( percent );
-
-                                next_step_in_migration = {
-                                    fn   : migrate_table_recursive,
-                                    args : [ row_information.current_row, row_information
-                                        .primary_keys
-                                    ]
-                                };
-
-                                execute_next_step();
-                            }
-                        } );
-                    };
-
-                    next_step_in_migration = {
-                        fn   : migrate_table_recursive,
-                        args : [ '-1', '' ]
-                    };
-
-                    execute_next_step();
-                }
-            } ); // end ajax
+            initiate_migration( table_rows, total_size );
         }
 
         migration_complete_events = function () {
@@ -1365,6 +1107,12 @@ window.execute_next_step         = undefined;
                         $( '.backup-tables-wrap' ).prepend( push_select_backup );
                         $( '#new-url' ).val( remove_protocol( data.url ) );
                         $( '#new-path' ).val( data.path );
+                    }
+
+                    if ( $( '#pull' ).is( ':checked' ) ) {
+                        add_scheme_row( data.url, syncpilot_this_url );
+                    } else {
+                        add_scheme_row( syncpilot_this_url, data.url );
                     }
 
                     next_step_in_migration = {

@@ -45,7 +45,7 @@ On the first load SyncPilot copies the settings of WP Sync DB (API key, pull/pus
 
 ## Status
 
-Version 0.2.6 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged, with fixes for PHP 8.2+ and the first security fixes (see [changelog.txt](changelog.txt)). Pull, push and export were tested on PHP 8.4; Media Files, multisite and WP-CLI are not verified yet. Further hardening is planned, so use it only between sites you control and only on a trusted connection.
+Version 0.2.7 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged, with fixes for PHP 8.2+ and the first security fixes (see [changelog.txt](changelog.txt)). Pull, push and export were tested on PHP 8.4; Media Files, multisite and WP-CLI are not verified yet. Further hardening is planned, so use it only between sites you control and only on a trusted connection.
 
 ## Updates
 

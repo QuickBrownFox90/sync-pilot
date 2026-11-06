@@ -830,6 +830,14 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		return $clean_blogs;
 	}
 
+	/**
+	 * Download a file of the other site into a temporary file. The certificate is checked only when "Enable SSL
+	 * verification" is on in the settings, like for every other request to the other site
+	 * @since   0.2.7
+	 * @param   string $url      The address of the file
+	 * @param   int    $timeout  Seconds
+	 * @return  string|WP_Error  The path of the temporary file, or the error
+	 */
 	function download_url( $url, $timeout = 300 ) {
 		//WARNING: The file is not automatically deleted, The script must unlink() the file.
 		if ( ! $url )
@@ -840,7 +848,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		if ( ! $tmpfname )
 			return new WP_Error( 'http_no_file', __('Could not create Temporary file.') );
 
-		$response = wp_remote_get( $url, array( 'timeout' => $timeout, 'stream' => true, 'filename' => $tmpfname, 'reject_unsafe_urls' => false ) );
+		$response = wp_remote_get( $url, array( 'timeout' => $timeout, 'stream' => true, 'filename' => $tmpfname, 'reject_unsafe_urls' => false, 'sslverify' => $this->verify_ssl() ) );
 
 		if ( is_wp_error( $response ) ) {
 			unlink( $tmpfname );
