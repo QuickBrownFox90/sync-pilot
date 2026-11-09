@@ -227,6 +227,19 @@
 .syncpilot .auth-password {
   width: 207px;
 }
+.syncpilot .field-heading {
+  position: relative;
+  margin-bottom: 6px;
+}
+.syncpilot .field-heading .helper-message p {
+  margin: 0 0 8px;
+}
+.syncpilot .field-heading .helper-message p:last-child {
+  margin-bottom: 0;
+}
+.syncpilot .field-heading .field-title {
+  font-weight: 600;
+}
 .syncpilot .connection-info-wrapper {
   display: none;
   width: 670px;

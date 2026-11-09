@@ -1381,7 +1381,7 @@ class SyncPilot extends SyncPilot_Base {
 		return $result;
 	}
 
-	// AJAX endpoint for when the user pastes into the connection info box (or when they click "connect")
+	// AJAX endpoint for when the user pastes into the connection data box (or when they click "connect")
 	// Responsible for contacting the remote website and retrieving info and testing the verification string
 	function ajax_verify_connection_to_remote_site() {
 
@@ -2753,10 +2753,10 @@ class SyncPilot extends SyncPilot_Base {
 			'remove_profile_problem'				=> __( "An error occurred when trying to delete the profile. Please see the Diagnostics tab for the error log. (#106)", self::TEXT_DOMAIN ),
 			'remove_profile_not_found'				=> __( "The selected migration profile could not be deleted because it was not found.\nPlease refresh this page to see an accurate list of the currently available migration profiles.", self::TEXT_DOMAIN ),
 			'change_connection_info'				=> __( "If you change the connection details, you will lose any replaces and table selections you have made below. Do you wish to continue?", self::TEXT_DOMAIN ),
-			'enter_connection_info'					=> __( "Please enter the connection information above to continue.", self::TEXT_DOMAIN ),
+			'enter_connection_info'					=> __( "Please enter the connection data above to continue.", self::TEXT_DOMAIN ),
 			'save_settings_problem'					=> __( "An error occurred when trying to save the settings. Please try again. If the problem persists, please see the Diagnostics tab for the error log. (#108)", self::TEXT_DOMAIN ),
-			'connection_info_missing'				=> __( "The connection information appears to be missing, please enter it to continue.", self::TEXT_DOMAIN ),
-			'connection_info_incorrect'				=> __( "The connection information appears to be incorrect, it should consist of two lines. The first being the remote server's URL and the second being the secret key.", self::TEXT_DOMAIN ),
+			'connection_info_missing'				=> __( "The connection data appears to be missing, please enter it to continue.", self::TEXT_DOMAIN ),
+			'connection_info_incorrect'				=> __( "The connection data appears to be incorrect, it should consist of two lines. The first being the remote server's URL and the second being the secret key.", self::TEXT_DOMAIN ),
 			'connection_info_url_invalid'			=> __( "The URL on the first line appears to be invalid, please check it and try again.", self::TEXT_DOMAIN ),
 			'connection_info_key_invalid'			=> __( "The secret key on the second line appears to be invalid. It should be a 32 character string that consists of letters, numbers and special characters only.", self::TEXT_DOMAIN ),
 			'connection_info_local_url'				=> __( "It appears you've entered the URL for this website, you need to provide the URL of the remote website instead.", self::TEXT_DOMAIN ),

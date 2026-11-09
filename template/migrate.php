@@ -115,7 +115,16 @@
 			</ul>
 
 			<div class="connection-info-wrapper clearfix">
-				<textarea class="pull-push-connection-info" name="connection_info" placeholder="<?php _e( 'Connection Info - Site URL &amp; Secret Key', self::TEXT_DOMAIN ); ?>"><?php echo ( isset( $loaded_profile['connection_info'] ) ? $loaded_profile['connection_info'] : '' ); ?></textarea>
+				<div class="field-heading">
+					<label for="migrate-connection-info" class="field-title connection-info-title"><?php _e( 'Remote site connection data', self::TEXT_DOMAIN ); ?></label>
+					<a href="#" class="general-helper connection-info-helper js-action-link"></a>
+
+					<div class="connection-info-info helper-message">
+						<p><?php _e( 'Pull and push connect two WordPress sites: this site and one remote site. SyncPilot has to be installed and activated on both.', self::TEXT_DOMAIN ); ?></p>
+						<p><?php _e( 'Paste the connection data of the remote site here. You find it on the Settings tab of SyncPilot on the remote site (Tools > SyncPilot; on multisite in the Network Admin under Settings > SyncPilot). There, pull or push has to be allowed first.', self::TEXT_DOMAIN ); ?></p>
+					</div>
+				</div>
+				<textarea id="migrate-connection-info" class="pull-push-connection-info" name="connection_info" placeholder="<?php _e( 'Connection Data - Site URL &amp; Secret Key', self::TEXT_DOMAIN ); ?>"><?php echo ( isset( $loaded_profile['connection_info'] ) ? $loaded_profile['connection_info'] : '' ); ?></textarea>
 				<br />
 				<div class="basic-access-auth-wrapper clearfix">
 					<input type="text" name="auth_username" class="auth-username auth-credentials" placeholder="<?php esc_attr_e( 'Username', self::TEXT_DOMAIN ); ?>" autocomplete="off" />
@@ -130,7 +139,7 @@
 
 		</div>
 
-		<p class="connection-status"><?php _e( 'Please enter the connection information above to continue.', self::TEXT_DOMAIN ); ?></p>
+		<p class="connection-status"><?php _e( 'Please enter the connection data above to continue.', self::TEXT_DOMAIN ); ?></p>
 
 		<div class="notification-message error-notice different-plugin-version-notice inline-message" style="display: none;">
 			<b><?php _e( 'Version Mismatch', self::TEXT_DOMAIN ); ?></b> &mdash; <?php printf( __( 'We\'ve detected you have version <span class="remote-version"></span> of SyncPilot at <span class="remote-location"></span> but are using %1$s here. Please go to the <a href="%2$s">Plugins page</a> on both installs and check for updates.', self::TEXT_DOMAIN ), $GLOBALS['syncpilot_meta'][$this->plugin_slug]['version'], network_admin_url( 'plugins.php' ) ); ?>
@@ -147,6 +156,15 @@
 		<div class="step-two">
 
 			<div class="option-section">
+				<div class="field-heading">
+					<span class="field-title"><?php _e( 'Replace values in the database tables', self::TEXT_DOMAIN ); ?></span>
+					<a href="#" class="general-helper find-replace-helper js-action-link"></a>
+
+					<div class="find-replace-info helper-message">
+						<?php _e( 'Every match from the Find column is replaced by the value from the Replace column in the migrated tables before they are written to the target database.', self::TEXT_DOMAIN ); ?>
+					</div>
+				</div>
+
 				<div class="header-wrapper clearfix">
 					<div class="option-heading find-heading"><?php _e( 'Find', self::TEXT_DOMAIN ); ?></div>
 					<div class="option-heading replace-heading"><?php _e( 'Replace', self::TEXT_DOMAIN ); ?></div>
@@ -231,8 +249,8 @@
 					</tbody>
 				</table>
 
-				<div id="new-url-missing-warning" class="warning inline-message missing-replace"><?php printf( __( '<strong>New URL Missing</strong> &mdash; Please enter the protocol-relative URL of the remote website in the "New URL" field. If you are unsure of what this URL should be, please consult <a href="%s" target="_blank">our documentation</a> on find and replace fields.', self::TEXT_DOMAIN ), 'https://deliciousbrains.com/wp-sync-db/documentation/#find-and-replace' ); ?></div>
-				<div id="new-path-missing-warning" class="warning inline-message missing-replace"><?php printf( __( '<strong>New File Path Missing</strong> &mdash; Please enter the root file path of the remote website in the "New file path" field. If you are unsure of what the file path should be, please consult <a href="%s" target="_blank">our documentation</a> on find and replace fields.', self::TEXT_DOMAIN ), 'https://deliciousbrains.com/wp-sync-db/documentation/#find-and-replace' ); ?></div>
+				<div id="new-url-missing-warning" class="warning inline-message missing-replace"><?php _e( '<strong>New URL Missing</strong> &mdash; Please enter the protocol-relative URL of the remote site, for example //example.com, in the "New URL" field. The old URL on the left is replaced by it in the migrated tables.', self::TEXT_DOMAIN ); ?></div>
+				<div id="new-path-missing-warning" class="warning inline-message missing-replace"><?php _e( '<strong>New File Path Missing</strong> &mdash; Please enter the root file path of the remote site, the folder of its WordPress installation (for example /var/www/example), in the "New file path" field. The old file path on the left is replaced by it in the migrated tables.', self::TEXT_DOMAIN ); ?></div>
 
 			</div>
 

@@ -86,7 +86,7 @@ class SyncPilot_Base {
 	 */
 	function set_translated_texts() {
 
-		$this->invalid_content_verification_error = __( 'Invalid content verification signature, please verify the connection information on the remote site and try again.', self::TEXT_DOMAIN );
+		$this->invalid_content_verification_error = __( 'Invalid content verification signature, please verify the connection data on the remote site and try again.', self::TEXT_DOMAIN );
 	}
 
 	function template( $template ) {

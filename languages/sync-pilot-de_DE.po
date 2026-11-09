@@ -19,11 +19,11 @@ msgstr ""
 
 #: class/syncpilot-base.php:42
 msgid ""
-"Invalid content verification signature, please verify the connection "
-"information on the remote site and try again."
+"Invalid content verification signature, please verify the connection data "
+"on the remote site and try again."
 msgstr ""
-"Ungültige Signatur zur Inhaltsprüfung. Bitte überprüfe die "
-"Verbindungsinformationen auf der Remote-Website und versuche es erneut."
+"Ungültige Signatur zur Inhaltsprüfung. Bitte überprüfe die Verbindungsdaten "
+"auf der Remote-Website und versuche es erneut."
 
 #: class/syncpilot-base.php:133
 #, php-format
@@ -515,8 +515,8 @@ msgstr ""
 "Ersetzungen und Tabellenauswahlen verloren. Möchtest du fortfahren?"
 
 #: class/syncpilot.php:2492 template/migrate.php:125
-msgid "Please enter the connection information above to continue."
-msgstr "Bitte gib oben die Verbindungsinformationen ein, um fortzufahren."
+msgid "Please enter the connection data above to continue."
+msgstr "Bitte gib oben die Verbindungsdaten ein, um fortzufahren."
 
 #: class/syncpilot.php:2493
 msgid ""
@@ -529,19 +529,19 @@ msgstr ""
 
 #: class/syncpilot.php:2494
 msgid ""
-"The connection information appears to be missing, please enter it to "
+"The connection data appears to be missing, please enter it to "
 "continue."
 msgstr ""
-"Die Verbindungsinformationen fehlen anscheinend, bitte gib sie ein, um "
+"Die Verbindungsdaten fehlen anscheinend, bitte gib sie ein, um "
 "fortzufahren."
 
 #: class/syncpilot.php:2495
 msgid ""
-"The connection information appears to be incorrect, it should consist of two "
+"The connection data appears to be incorrect, it should consist of two "
 "lines. The first being the remote server's URL and the second being the "
 "secret key."
 msgstr ""
-"Die Verbindungsinformationen scheinen nicht korrekt zu sein, sie sollten aus "
+"Die Verbindungsdaten scheinen nicht korrekt zu sein, sie sollten aus "
 "zwei Zeilen bestehen: in der ersten die URL des Remote-Servers, in der "
 "zweiten der Secret Key."
 
@@ -735,8 +735,8 @@ msgid "Replace remote db with this site's db"
 msgstr "Remote-Datenbank durch die Datenbank dieser Website ersetzen"
 
 #: template/migrate.php:110
-msgid "Connection Info - Site URL &amp; Secret Key"
-msgstr "Verbindungsinfo - Website-URL &amp; Secret Key"
+msgid "Connection Data - Site URL &amp; Secret Key"
+msgstr "Verbindungsdaten - Website-URL &amp; Secret Key"
 
 #: template/migrate.php:120
 msgid "SSL Disabled"
@@ -798,31 +798,63 @@ msgstr ""
 "link add-replace\">eine hinzufügen?</a>"
 
 #: template/migrate.php:226
-#, php-format
 msgid ""
 "<strong>New URL Missing</strong> &mdash; Please enter the protocol-relative "
-"URL of the remote website in the \"New URL\" field. If you are unsure of "
-"what this URL should be, please consult <a href=\"%s\" target=\"_blank\">our "
-"documentation</a> on find and replace fields."
+"URL of the remote site, for example //example.com, in the \"New URL\" field. "
+"The old URL on the left is replaced by it in the migrated tables."
 msgstr ""
-"<strong>Neue URL fehlt</strong> &mdash; Bitte gib im Feld „New URL“ die "
-"protokollrelative URL der Remote-Website ein. Wenn du dir nicht sicher bist, "
-"wie diese URL lauten soll, lies <a href=\"%s\" target=\"_blank\">unsere "
-"Dokumentation</a> zu den Suchen-und-Ersetzen-Feldern."
+"<strong>Neue URL fehlt</strong> &mdash; Bitte gib im Feld „Neue URL“ die "
+"protokollrelative URL der Remote-Website ein, zum Beispiel //example.com. "
+"Die alte URL links wird dadurch in den migrierten Tabellen ersetzt."
 
 #: template/migrate.php:227
-#, php-format
 msgid ""
 "<strong>New File Path Missing</strong> &mdash; Please enter the root file "
-"path of the remote website in the \"New file path\" field. If you are unsure "
-"of what the file path should be, please consult <a href=\"%s\" "
-"target=\"_blank\">our documentation</a> on find and replace fields."
+"path of the remote site, the folder of its WordPress installation (for "
+"example /var/www/example), in the \"New file path\" field. The old file path "
+"on the left is replaced by it in the migrated tables."
 msgstr ""
-"<strong>Neuer Dateipfad fehlt</strong> &mdash; Bitte gib im Feld „New file "
-"path“ den Stammdateipfad der Remote-Website ein. Wenn du dir nicht sicher "
-"bist, wie der Dateipfad lauten soll, lies <a href=\"%s\" "
-"target=\"_blank\">unsere Dokumentation</a> zu den Suchen-und-Ersetzen-"
-"Feldern."
+"<strong>Neuer Dateipfad fehlt</strong> &mdash; Bitte gib im Feld „Neuer "
+"Dateipfad“ den Stammdateipfad der Remote-Website ein, den Ordner ihrer "
+"WordPress-Installation (zum Beispiel /var/www/example). Der alte Dateipfad "
+"links wird dadurch in den migrierten Tabellen ersetzt."
+
+#: template/migrate.php:119
+msgid "Remote site connection data"
+msgstr "Verbindungsdaten der Remote-Website"
+
+#: template/migrate.php:123
+msgid ""
+"Pull and push connect two WordPress sites: this site and one remote site. "
+"SyncPilot has to be installed and activated on both."
+msgstr ""
+"Pull und Push verbinden zwei WordPress-Websites: diese Website und eine "
+"Remote-Website. Auf beiden muss SyncPilot installiert und aktiviert sein."
+
+#: template/migrate.php:124
+msgid ""
+"Paste the connection data of the remote site here. You find it on the "
+"Settings tab of SyncPilot on the remote site (Tools > SyncPilot; on "
+"multisite in the Network Admin under Settings > SyncPilot). There, pull or "
+"push has to be allowed first."
+msgstr ""
+"Füge hier die Verbindungsdaten der Remote-Website ein. Du findest sie im Tab "
+"„Einstellungen“ von SyncPilot auf der Remote-Website (Werkzeuge > SyncPilot; "
+"bei Multisite im Netzwerk-Admin unter Einstellungen > SyncPilot). Dort muss "
+"zuerst Pull oder Push erlaubt werden."
+
+#: template/migrate.php:150
+msgid "Replace values in the database tables"
+msgstr "Werte in den Datenbanktabellen ersetzen"
+
+#: template/migrate.php:153
+msgid ""
+"Every match from the Find column is replaced by the value from the Replace "
+"column in the migrated tables before they are written to the target database."
+msgstr ""
+"Jeder Treffer aus der Spalte „Suchen“ wird in den migrierten Tabellen durch "
+"den Wert aus der Spalte „Ersetzen“ ersetzt, bevor sie in die Zieldatenbank "
+"geschrieben werden."
 
 #: template/migrate.php:244
 msgid "Migrate all tables with prefix"
@@ -1049,8 +1081,8 @@ msgstr ""
 "zuerst OpenSSL in der php.ini aktivieren."
 
 #: template/settings.php:41
-msgid "Connection Info"
-msgstr "Verbindungsinfo"
+msgid "Connection Data"
+msgstr "Verbindungsdaten"
 
 #: template/settings.php:43
 msgid "Reset API Key"

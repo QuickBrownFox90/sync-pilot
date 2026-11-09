@@ -51,6 +51,18 @@ try {
     await browser.goto( page + '&syncpilot-profile=-1' );
     await browser.click( 'input[name=action][value=push]' );
 
+    check( 'the field has a label', await browser.ev( `jQuery('label.connection-info-title[for=migrate-connection-info]').is(':visible') && jQuery('#migrate-connection-info').length === 1` ) );
+    check( 'the info icon is there, the explanation is closed', await browser.ev( `jQuery('.connection-info-helper').is(':visible') && ! jQuery('.connection-info-info').is(':visible')` ) );
+
+    await browser.click( '.connection-info-helper', 300 );
+
+    check( 'a click on the icon opens the explanation', await browser.ev( `jQuery('.connection-info-info').is(':visible') && jQuery('.connection-info-info').text().trim().length > 100` ) );
+
+    await browser.click( 'label.connection-info-title', 300 );
+
+    check( 'a click elsewhere closes it', await browser.ev( `! jQuery('.connection-info-info').is(':visible')` ) );
+    check( 'the warnings for a missing URL and path do not link to the documentation of another project', await browser.ev( `jQuery('#new-url-missing-warning a, #new-path-missing-warning a').length === 0` ) );
+
     const own   = await browser.ev( `syncpilot_connection_info` );
     const cases = [
         [ 'nothing', '' ],
@@ -94,6 +106,15 @@ try {
     })` );
 
     check( 'the box is locked and the button is gone', push.locked && ! push.button );
+    check( 'find and replace has a title with an icon, closed', await browser.ev( `jQuery('.find-replace-helper').is(':visible') && ! jQuery('.find-replace-info').is(':visible')` ) );
+
+    await browser.click( '.find-replace-helper', 300 );
+
+    check( 'a click on the icon opens the explanation of the rows', await browser.ev( `jQuery('.find-replace-info').is(':visible') && jQuery('.find-replace-info').text().trim().length > 100` ) );
+
+    await browser.click( '.find-replace-helper', 300 );
+
+    check( 'a second click closes it', await browser.ev( `! jQuery('.find-replace-info').is(':visible')` ) );
     check( 'the name of the profile is the domain of the other site', push.name === new URL( config.remoteSite ).hostname, push.name );
     check( 'the box stands in the list of the push', push.box === 1 );
     check( 'new URL and new path are those of the other site', push.url === '//' + new URL( config.remoteSite ).hostname && push.path.replace( /\/$/, '' ) === config.remoteWp, `${ push.url } ${ push.path }` );
