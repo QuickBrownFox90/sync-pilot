@@ -129,6 +129,9 @@ var media_successfully_determined;
                 remove_local_media = 1;
             }
 
+            // a request is under way: Cancel waits for its answer instead of cancelling twice
+            migration_request_running( true );
+
             $.ajax( {
                 url      : ajaxurl,
                 type     : 'POST',
@@ -160,6 +163,8 @@ var media_successfully_determined;
                     return;
                 },
                 success : function ( data ) {
+
+                    migration_request_running( false );
 
                     original_data = data;
                     data          = JSON.parse( data.trim() );
@@ -273,6 +278,9 @@ var media_successfully_determined;
             var connection_info = $.trim( $( '.pull-push-connection-info' ).val() ).split(
                 '\n' );
 
+            // a request is under way: Cancel waits for its answer instead of cancelling twice
+            migration_request_running( true );
+
             $.ajax( {
                 url      : ajaxurl,
                 type     : 'POST',
@@ -304,6 +312,8 @@ var media_successfully_determined;
                     return;
                 },
                 success : function ( data ) {
+
+                    migration_request_running( false );
 
                     original_data = data;
                     data          = JSON.parse( data.trim() );

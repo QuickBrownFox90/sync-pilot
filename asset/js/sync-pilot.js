@@ -318,57 +318,22 @@ function syncpilot_parse_json( maybe_json ) {
     display_count();
   }
 
-  // asset/src/js/modules/notices.js
-  var $2 = jQuery;
-  function maybe_show_ssl_warning(url, key, remote_scheme) {
-    var scheme = url.substr(0, url.indexOf(":"));
-    if (remote_scheme != scheme && url.indexOf("https") != -1) {
-      $2(".ssl-notice").show();
-      state.show_ssl_notice = true;
-      url = url.replace("https", "http");
-      $2(".pull-push-connection-info").val(url + "\n" + key);
-      return;
-    }
-    state.show_ssl_notice = false;
-    return;
-  }
-  function maybe_show_version_warning(plugin_version, url) {
-    if (typeof plugin_version != "undefined" && plugin_version != syncpilot_plugin_version) {
-      $2(".different-plugin-version-notice").show();
-      $2(".remote-version").text(plugin_version);
-      $2(".remote-location").text(url);
-      $2(".step-two").hide();
-      state.show_version_notice = true;
-    }
-  }
-  function maybe_show_prefix_notice(prefix) {
-    if (prefix != syncpilot_this_prefix) {
-      $2(".remote-prefix").text(prefix);
-      state.show_prefix_notice = true;
-      if ($2("#pull").is(":checked")) {
-        $2(".prefix-notice.pull").show();
-      } else {
-        $2(".prefix-notice.push").show();
-      }
-    }
-  }
-
   // asset/src/js/modules/slider.js
-  var $3 = jQuery;
+  var $2 = jQuery;
   function init_slider() {
-    $3(".slider").slider({
+    $2(".slider").slider({
       range: "min",
       value: syncpilot_max_request / 1024,
       min: 512,
       max: syncpilot_bottleneck / 1024,
       step: 512,
       slide: function(event, ui) {
-        $3(".amount").html(syncpilot_add_commas(ui.value) + " kB");
+        $2(".amount").html(syncpilot_add_commas(ui.value) + " kB");
       },
       change: function(event, ui) {
-        $3(".amount").after('<img src="' + spinner_url + '" alt="" class="slider-spinner general-spinner" />');
-        $3(".slider").slider("disable");
-        $3.ajax({
+        $2(".amount").after('<img src="' + spinner_url + '" alt="" class="slider-spinner general-spinner" />');
+        $2(".slider").slider("disable");
+        $2.ajax({
           url: ajaxurl,
           type: "POST",
           dataType: "text",
@@ -379,29 +344,29 @@ function syncpilot_parse_json( maybe_json ) {
             nonce: syncpilot_nonces.update_max_request_size
           },
           error: function(jqXHR, textStatus, errorThrown) {
-            $3(".slider").slider("enable");
-            $3(".slider-spinner").remove();
+            $2(".slider").slider("enable");
+            $2(".slider-spinner").remove();
             syncpilot_alert(syncpilot_i10n.max_request_size_problem);
           },
           success: function(data) {
-            $3(".slider").slider("enable");
-            $3(".slider-spinner").remove();
-            $3(".slider-success-msg").show();
-            $3(".slider-success-msg").fadeOut(2e3, function() {
-              $3(this).hide();
+            $2(".slider").slider("enable");
+            $2(".slider-spinner").remove();
+            $2(".slider-success-msg").show();
+            $2(".slider-success-msg").fadeOut(2e3, function() {
+              $2(this).hide();
             });
           }
         });
       }
     });
-    $3(".amount").html(syncpilot_add_commas($3(".slider").slider("value")) + " kB");
+    $2(".amount").html(syncpilot_add_commas($2(".slider").slider("value")) + " kB");
   }
 
   // asset/src/js/modules/plugin-compatibility.js
-  var $4 = jQuery;
+  var $3 = jQuery;
   function init_plugin_compatibility() {
-    $4("#plugin-compatibility").change(function(e) {
-      var $box = $4(this);
+    $3("#plugin-compatibility").change(function(e) {
+      var $box = $3(this);
       if ($box.is(":checked")) {
         syncpilot_confirm(syncpilot_i10n.plugin_compatibility_confirm, function() {
           save_plugin_compatibility("1");
@@ -413,11 +378,11 @@ function syncpilot_parse_json( maybe_json ) {
       save_plugin_compatibility("0");
     });
     function save_plugin_compatibility(install) {
-      $4(".plugin-compatibility-wrap").toggle();
-      $4("#plugin-compatibility").parent().append('<img src="' + spinner_url + '" alt="" class="ajax-spinner general-spinner" />');
-      $4("#plugin-compatibility").attr("disabled", "disabled");
-      $4(".plugin-compatibility").addClass("disabled");
-      $4.ajax({
+      $3(".plugin-compatibility-wrap").toggle();
+      $3("#plugin-compatibility").parent().append('<img src="' + spinner_url + '" alt="" class="ajax-spinner general-spinner" />');
+      $3("#plugin-compatibility").attr("disabled", "disabled");
+      $3(".plugin-compatibility").addClass("disabled");
+      $3.ajax({
         url: ajaxurl,
         type: "POST",
         dataType: "text",
@@ -429,77 +394,77 @@ function syncpilot_parse_json( maybe_json ) {
         },
         error: function(jqXHR, textStatus, errorThrown) {
           syncpilot_alert(ajax_problem_text(syncpilot_i10n.plugin_compatibility_problem, jqXHR));
-          $4(".ajax-spinner").remove();
-          $4("#plugin-compatibility").removeAttr("disabled");
-          $4(".plugin-compatibility").removeClass("disabled");
+          $3(".ajax-spinner").remove();
+          $3("#plugin-compatibility").removeAttr("disabled");
+          $3(".plugin-compatibility").removeClass("disabled");
         },
         success: function(data) {
-          if ("" != $4.trim(data)) {
-            syncpilot_alert($4.trim(data));
+          if ("" != $3.trim(data)) {
+            syncpilot_alert($3.trim(data));
           } else {
-            $4(".plugin-compatibility").append(
+            $3(".plugin-compatibility").append(
               '<span class="ajax-success-msg">' + syncpilot_i10n.saved + "</span>"
             );
-            $4(".ajax-success-msg").fadeOut(2e3, function() {
-              $4(this).remove();
+            $3(".ajax-success-msg").fadeOut(2e3, function() {
+              $3(this).remove();
             });
           }
-          $4(".ajax-spinner").remove();
-          $4("#plugin-compatibility").removeAttr("disabled");
-          $4(".plugin-compatibility").removeClass("disabled");
+          $3(".ajax-spinner").remove();
+          $3("#plugin-compatibility").removeAttr("disabled");
+          $3(".plugin-compatibility").removeClass("disabled");
         }
       });
     }
-    if ($4("#plugin-compatibility").is(":checked")) {
-      $4(".plugin-compatibility-wrap").show();
+    if ($3("#plugin-compatibility").is(":checked")) {
+      $3(".plugin-compatibility-wrap").show();
     }
-    $4(".plugin-compatibility-save").click(function() {
+    $3(".plugin-compatibility-save").click(function() {
       if (state.doing_plugin_compatibility_ajax) {
         return;
       }
-      $4(this).addClass("disabled");
-      var select_element = $4("#selected-plugins");
-      $4(select_element).attr("disabled", "disabled");
+      $3(this).addClass("disabled");
+      var select_element = $3("#selected-plugins");
+      $3(select_element).attr("disabled", "disabled");
       state.doing_plugin_compatibility_ajax = true;
-      $4(this).after(
+      $3(this).after(
         '<img src="' + spinner_url + '" alt="" class="plugin-compatibility-spinner general-spinner" />'
       );
-      $4.ajax({
+      $3.ajax({
         url: ajaxurl,
         type: "POST",
         dataType: "text",
         cache: false,
         data: {
           action: "syncpilot_blacklist_plugins",
-          blacklist_plugins: $4(select_element).val(),
+          blacklist_plugins: $3(select_element).val(),
           nonce: syncpilot_nonces.blacklist_plugins
         },
         error: function(jqXHR, textStatus, errorThrown) {
           syncpilot_alert(ajax_problem_text(syncpilot_i10n.blacklist_problem, jqXHR));
-          $4(select_element).removeAttr("disabled");
-          $4(".plugin-compatibility-save").removeClass("disabled");
+          $3(select_element).removeAttr("disabled");
+          $3(".plugin-compatibility-save").removeClass("disabled");
           state.doing_plugin_compatibility_ajax = false;
-          $4(".plugin-compatibility-spinner").remove();
-          $4(".plugin-compatibility-success-msg").show().fadeOut(2e3);
+          $3(".plugin-compatibility-spinner").remove();
+          $3(".plugin-compatibility-success-msg").show().fadeOut(2e3);
         },
         success: function(data) {
-          if ("" != $4.trim(data)) {
-            syncpilot_alert($4.trim(data));
+          if ("" != $3.trim(data)) {
+            syncpilot_alert($3.trim(data));
           }
-          $4(select_element).removeAttr("disabled");
-          $4(".plugin-compatibility-save").removeClass("disabled");
+          $3(select_element).removeAttr("disabled");
+          $3(".plugin-compatibility-save").removeClass("disabled");
           state.doing_plugin_compatibility_ajax = false;
-          $4(".plugin-compatibility-spinner").remove();
-          $4(".plugin-compatibility-success-msg").show().fadeOut(2e3);
+          $3(".plugin-compatibility-spinner").remove();
+          $3(".plugin-compatibility-success-msg").show().fadeOut(2e3);
         }
       });
     });
   }
 
   // asset/src/js/modules/diagnostics.js
-  var $5 = jQuery;
+  var $4 = jQuery;
   function refresh_debug_log() {
-    $5.ajax({
+    $4.ajax({
       url: ajaxurl,
       type: "POST",
       dataType: "text",
@@ -512,14 +477,14 @@ function syncpilot_parse_json( maybe_json ) {
         syncpilot_alert(syncpilot_i10n.update_log_problem);
       },
       success: function(data) {
-        $5(".debug-log-textarea").val(data);
+        $4(".debug-log-textarea").val(data);
       }
     });
   }
   function init_diagnostics() {
-    $5(".clear-log").click(function() {
-      $5(".debug-log-textarea").val("");
-      $5.ajax({
+    $4(".clear-log").click(function() {
+      $4(".debug-log-textarea").val("");
+      $4.ajax({
         url: ajaxurl,
         type: "POST",
         dataType: "text",
@@ -538,69 +503,69 @@ function syncpilot_parse_json( maybe_json ) {
   }
 
   // asset/src/js/modules/form-ui.js
-  var $6 = jQuery;
+  var $5 = jQuery;
   function init_form_ui() {
-    $6(".js-action-link").click(function(e) {
+    $5(".js-action-link").click(function(e) {
       e.preventDefault();
-      $6(this).blur();
+      $5(this).blur();
     });
-    $6(".option-group input[type=radio]").change(function() {
-      var group = $6(this).closest(".option-group");
-      $6("ul", group).hide();
-      var parent = $6(this).closest("li");
-      $6("ul", parent).show();
+    $5(".option-group input[type=radio]").change(function() {
+      var group = $5(this).closest(".option-group");
+      $5("ul", group).hide();
+      var parent = $5(this).closest("li");
+      $5("ul", parent).show();
     });
-    $6(".option-group").each(function() {
-      $6(".option-group input[type=radio]").each(function() {
-        if ($6(this).is(":checked")) {
-          var parent = $6(this).closest("li");
-          $6("ul", parent).show();
+    $5(".option-group").each(function() {
+      $5(".option-group input[type=radio]").each(function() {
+        if ($5(this).is(":checked")) {
+          var parent = $5(this).closest("li");
+          $5("ul", parent).show();
         }
       });
     });
-    $6(".header-expand-collapse").click(function() {
-      if ($6(".expand-collapse-arrow", this).hasClass("collapsed")) {
-        $6(".expand-collapse-arrow", this).removeClass("collapsed");
-        $6(this).next().show();
+    $5(".header-expand-collapse").click(function() {
+      if ($5(".expand-collapse-arrow", this).hasClass("collapsed")) {
+        $5(".expand-collapse-arrow", this).removeClass("collapsed");
+        $5(this).next().show();
       } else {
-        $6(".expand-collapse-arrow", this).addClass("collapsed");
-        $6(this).next().hide();
+        $5(".expand-collapse-arrow", this).addClass("collapsed");
+        $5(this).next().hide();
       }
     });
-    $6(".checkbox-label input[type=checkbox]").change(function() {
-      if ($6(this).is(":checked")) {
-        $6(this).parent().next().show();
+    $5(".checkbox-label input[type=checkbox]").change(function() {
+      if ($5(this).is(":checked")) {
+        $5(this).parent().next().show();
       } else {
-        $6(this).parent().next().hide();
+        $5(this).parent().next().hide();
       }
     });
-    $6("#save-migration-profile").change(function() {
-      if ($6(this).is(":checked")) {
-        $6(".save-settings-button").show();
-        $6(".migrate-db .button-primary").val(syncpilot_i10n.migrate_db_save);
+    $5("#save-migration-profile").change(function() {
+      if ($5(this).is(":checked")) {
+        $5(".save-settings-button").show();
+        $5(".migrate-db .button-primary").val(syncpilot_i10n.migrate_db_save);
       } else {
-        $6(".save-settings-button").hide();
-        $6(".migrate-db .button-primary").val(syncpilot_i10n.migrate_db);
+        $5(".save-settings-button").hide();
+        $5(".migrate-db .button-primary").val(syncpilot_i10n.migrate_db);
       }
     });
-    if ($6("#save-migration-profile").is(":checked")) {
-      $6(".save-settings-button").show();
-      $6(".migrate-db .button-primary").val(syncpilot_i10n.migrate_db_save);
+    if ($5("#save-migration-profile").is(":checked")) {
+      $5(".save-settings-button").show();
+      $5(".migrate-db .button-primary").val(syncpilot_i10n.migrate_db_save);
     }
-    $6(".checkbox-label input[type=checkbox]").each(function() {
-      if ($6(this).is(":checked")) {
-        $6(this).parent().next().show();
+    $5(".checkbox-label input[type=checkbox]").each(function() {
+      if ($5(this).is(":checked")) {
+        $5(this).parent().next().show();
       }
     });
-    $6("#new-url").change(function() {
-      $6("#new-url-missing-warning").hide();
+    $5("#new-url").change(function() {
+      $5("#new-url-missing-warning").hide();
     });
-    $6("#new-path").change(function() {
-      $6("#new-path-missing-warning").hide();
+    $5("#new-path").change(function() {
+      $5("#new-path-missing-warning").hide();
     });
-    $6(".general-helper").click(function(e) {
-      var icon = $6(this), bubble = $6(this).next();
-      $6(".helper-message").not(bubble).hide();
+    $5(".general-helper").click(function(e) {
+      var icon = $5(this), bubble = $5(this).next();
+      $5(".helper-message").not(bubble).hide();
       var position = icon.position();
       if (bubble.hasClass("bottom")) {
         bubble.css({
@@ -616,92 +581,92 @@ function syncpilot_parse_json( maybe_json ) {
       bubble.toggle();
       e.stopPropagation();
     });
-    $6("body").click(function() {
-      $6(".helper-message").hide();
+    $5("body").click(function() {
+      $5(".helper-message").hide();
     });
-    $6(".helper-message").click(function(e) {
+    $5(".helper-message").click(function(e) {
       e.stopPropagation();
     });
   }
 
   // asset/src/js/modules/multiselect.js
-  var $7 = jQuery;
+  var $6 = jQuery;
   function init_multiselect() {
-    $7(".multiselect-select-all").click(function() {
-      var multiselect = $7(this).parents(".select-wrap").children(".multiselect");
-      $7(multiselect).focus();
-      $7("option", multiselect).attr("selected", 1);
+    $6(".multiselect-select-all").click(function() {
+      var multiselect = $6(this).parents(".select-wrap").children(".multiselect");
+      $6(multiselect).focus();
+      $6("option", multiselect).attr("selected", 1);
     });
-    $7(".multiselect-deselect-all").click(function() {
-      var multiselect = $7(this).parents(".select-wrap").children(".multiselect");
-      $7(multiselect).focus();
-      $7("option", multiselect).removeAttr("selected");
+    $6(".multiselect-deselect-all").click(function() {
+      var multiselect = $6(this).parents(".select-wrap").children(".multiselect");
+      $6(multiselect).focus();
+      $6("option", multiselect).removeAttr("selected");
     });
-    $7(".multiselect-invert-selection").click(function() {
-      var multiselect = $7(this).parents(".select-wrap").children(".multiselect");
-      $7(multiselect).focus();
-      $7("option", multiselect).each(function() {
-        $7(this).attr("selected", !$7(this).attr("selected"));
+    $6(".multiselect-invert-selection").click(function() {
+      var multiselect = $6(this).parents(".select-wrap").children(".multiselect");
+      $6(multiselect).focus();
+      $6("option", multiselect).each(function() {
+        $6(this).attr("selected", !$6(this).attr("selected"));
       });
     });
-    $7("input.multiselect-toggle").change(function() {
-      $7(this).parents(".expandable-content").children(".select-wrap").toggle();
+    $6("input.multiselect-toggle").change(function() {
+      $6(this).parents(".expandable-content").children(".select-wrap").toggle();
     });
-    $7(".show-multiselect").each(function() {
-      if ($7(this).is(":checked")) {
-        $7(this).parents(".option-section").children(".header-expand-collapse").children(".expand-collapse-arrow").removeClass("collapsed");
-        $7(this).parents(".expandable-content").show();
-        $7(this).parents(".expandable-content").children(".select-wrap").toggle();
+    $6(".show-multiselect").each(function() {
+      if ($6(this).is(":checked")) {
+        $6(this).parents(".option-section").children(".header-expand-collapse").children(".expand-collapse-arrow").removeClass("collapsed");
+        $6(this).parents(".expandable-content").show();
+        $6(this).parents(".expandable-content").children(".select-wrap").toggle();
       }
     });
-    $7("input[name=backup_option]").change(function() {
-      $7(".backup-tables-wrap").hide();
-      if ($7(this).val() == "backup_manual_select") {
-        $7(".backup-tables-wrap").show();
+    $6("input[name=backup_option]").change(function() {
+      $6(".backup-tables-wrap").hide();
+      if ($6(this).val() == "backup_manual_select") {
+        $6(".backup-tables-wrap").show();
       }
     });
-    if ($7("#backup-manual-select").is(":checked")) {
-      $7(".backup-tables-wrap").show();
+    if ($6("#backup-manual-select").is(":checked")) {
+      $6(".backup-tables-wrap").show();
     }
   }
 
   // asset/src/js/modules/replace-rows.js
-  var $8 = jQuery;
+  var $7 = jQuery;
   function init_replace_rows() {
-    $8("body").on("click", ".add-row", function() {
-      $8(this).parents("tr").before($8(".original-repeatable-field").clone().removeClass("original-repeatable-field"));
+    $7("body").on("click", ".add-row", function() {
+      $7(this).parents("tr").before($7(".original-repeatable-field").clone().removeClass("original-repeatable-field"));
     });
-    $8("body").on("click", ".replace-remove-row", function() {
-      $8(this).parents("tr").remove();
-      if ($8(".replace-row").length < 2) {
-        $8(".no-replaces-message").show();
+    $7("body").on("click", ".replace-remove-row", function() {
+      $7(this).parents("tr").remove();
+      if ($7(".replace-row").length < 2) {
+        $7(".no-replaces-message").show();
       }
     });
-    $8(".add-replace").click(function() {
-      $8(".replace-fields").prepend($8(".original-repeatable-field").clone().removeClass("original-repeatable-field"));
-      $8(".no-replaces-message").hide();
+    $7(".add-replace").click(function() {
+      $7(".replace-fields").prepend($7(".original-repeatable-field").clone().removeClass("original-repeatable-field"));
+      $7(".no-replaces-message").hide();
     });
-    $8("body").on(
+    $7("body").on(
       "mouseenter mouseleave",
       "#find-and-replace-sort tbody tr.replace-row",
       function(event) {
         if (event.type === "mouseenter") {
-          $8(".replace-remove-row", this).show();
+          $7(".replace-remove-row", this).show();
         } else {
-          $8(".replace-remove-row", this).hide();
+          $7(".replace-remove-row", this).hide();
         }
       }
     );
-    $8("#find-and-replace-sort tbody").sortable({
+    $7("#find-and-replace-sort tbody").sortable({
       items: "> tr:not(.pin)",
       handle: "td:first",
       start: function() {
-        $8(".sort-handle").css("cursor", "-webkit-grabbing");
-        $8(".sort-handle").css("cursor", "-moz-grabbing");
+        $7(".sort-handle").css("cursor", "-webkit-grabbing");
+        $7(".sort-handle").css("cursor", "-moz-grabbing");
       },
       stop: function() {
-        $8(".sort-handle").css("cursor", "-webkit-grab");
-        $8(".sort-handle").css("cursor", "-moz-grab");
+        $7(".sort-handle").css("cursor", "-webkit-grab");
+        $7(".sort-handle").css("cursor", "-moz-grab");
       }
     });
   }
@@ -709,40 +674,40 @@ function syncpilot_parse_json( maybe_json ) {
     return /^https:/i.test(url) ? "https" : "http";
   }
   function add_scheme_row(source_url, target_url) {
-    $8(".scheme-row").remove();
+    $7(".scheme-row").remove();
     var from = get_scheme(source_url);
     var to = get_scheme(target_url);
-    if (!$8("#new-url").val() || !$8("#old-path").length || from == to) {
+    if (!$7("#new-url").val() || !$7("#old-path").length || from == to) {
       return;
     }
-    var row = $8(".original-repeatable-field").clone().removeClass("original-repeatable-field").addClass("scheme-row");
-    $8('input[name="replace_old[]"]', row).val(from + "://");
-    $8('input[name="replace_new[]"]', row).val(to + "://");
-    $8("#old-path").parents("tr").after(row);
+    var row = $7(".original-repeatable-field").clone().removeClass("original-repeatable-field").addClass("scheme-row");
+    $7('input[name="replace_old[]"]', row).val(from + "://");
+    $7('input[name="replace_new[]"]', row).val(to + "://");
+    $7("#old-path").parents("tr").after(row);
   }
 
   // asset/src/js/modules/profiles.js
-  var $9 = jQuery;
+  var $8 = jQuery;
   function init_profiles() {
-    $9("body").on("mouseenter mouseleave", ".save-migration-profile-wrap li", function(event) {
+    $8("body").on("mouseenter mouseleave", ".save-migration-profile-wrap li", function(event) {
       if (event.type === "mouseenter") {
-        $9(".delete-profile", this).show();
+        $8(".delete-profile", this).show();
       } else {
-        $9(".delete-profile", this).hide();
+        $8(".delete-profile", this).hide();
       }
     });
-    $9("body").on("click", ".delete-profile", function() {
-      var $name = $9(this).next().clone();
-      $9("input", $name).remove();
-      var name = $9.trim($9($name).text());
-      var $link = $9(this);
+    $8("body").on("click", ".delete-profile", function() {
+      var $name = $8(this).next().clone();
+      $8("input", $name).remove();
+      var name = $8.trim($8($name).text());
+      var $link = $8(this);
       syncpilot_confirm(syncpilot_i10n.remove_profile + ' "' + name + '"', function() {
         delete_profile($link);
       });
     });
     function delete_profile($link) {
       $link.parent().fadeOut(500);
-      $9.ajax({
+      $8.ajax({
         url: ajaxurl,
         type: "POST",
         dataType: "text",
@@ -762,9 +727,9 @@ function syncpilot_parse_json( maybe_json ) {
         }
       });
     }
-    $9(".main-list-delete-profile-link").click(function() {
-      var name = $9(this).prev().text();
-      var $link = $9(this);
+    $8(".main-list-delete-profile-link").click(function() {
+      var name = $8(this).prev().text();
+      var $link = $8(this);
       syncpilot_confirm(syncpilot_i10n.remove_profile + ' "' + name + '"', function() {
         delete_profile($link);
       });
@@ -772,9 +737,9 @@ function syncpilot_parse_json( maybe_json ) {
   }
 
   // asset/src/js/modules/api-key.js
-  var $10 = jQuery;
+  var $9 = jQuery;
   function init_api_key() {
-    $10(".reset-api-key").click(function() {
+    $9(".reset-api-key").click(function() {
       if (state.doing_reset_api_key_ajax) {
         return;
       }
@@ -782,8 +747,8 @@ function syncpilot_parse_json( maybe_json ) {
     });
     function reset_api_key() {
       state.doing_reset_api_key_ajax = true;
-      $10(".reset-api-key").after('<img src="' + spinner_url + '" alt="" class="reset-api-key-ajax-spinner general-spinner" />');
-      $10.ajax({
+      $9(".reset-api-key").after('<img src="' + spinner_url + '" alt="" class="reset-api-key-ajax-spinner general-spinner" />');
+      $9.ajax({
         url: ajaxurl,
         type: "POST",
         dataType: "text",
@@ -794,28 +759,28 @@ function syncpilot_parse_json( maybe_json ) {
         },
         error: function(jqXHR, textStatus, errorThrown) {
           syncpilot_alert(syncpilot_i10n.reset_api_key_problem);
-          $10(".reset-api-key-ajax-spinner").remove();
+          $9(".reset-api-key-ajax-spinner").remove();
           state.doing_reset_api_key_ajax = false;
         },
         success: function(data) {
-          $10(".reset-api-key-ajax-spinner").remove();
+          $9(".reset-api-key-ajax-spinner").remove();
           state.doing_reset_api_key_ajax = false;
-          $10(".connection-info").html(data);
+          $9(".connection-info").html(data);
         }
       });
     }
   }
 
   // asset/src/js/modules/settings.js
-  var $11 = jQuery;
+  var $10 = jQuery;
   function init_settings() {
-    $11(".settings-tab input[type=checkbox]").change(function() {
-      if ("plugin-compatibility" == $11(this).attr("id")) return;
-      var checked = $11(this).is(":checked");
-      var setting = $11(this).attr("id");
-      $11(this).parent().append('<img src="' + spinner_url + '" alt="" class="ajax-spinner general-spinner" />');
-      var $label = $11(this).parent();
-      $11.ajax({
+    $10(".settings-tab input[type=checkbox]").change(function() {
+      if ("plugin-compatibility" == $10(this).attr("id")) return;
+      var checked = $10(this).is(":checked");
+      var setting = $10(this).attr("id");
+      $10(this).parent().append('<img src="' + spinner_url + '" alt="" class="ajax-spinner general-spinner" />');
+      var $label = $10(this).parent();
+      $10.ajax({
         url: ajaxurl,
         type: "POST",
         dataType: "text",
@@ -828,13 +793,13 @@ function syncpilot_parse_json( maybe_json ) {
         },
         error: function(jqXHR, textStatus, errorThrown) {
           syncpilot_alert(syncpilot_i10n.save_settings_problem);
-          $11(".ajax-spinner").remove();
+          $10(".ajax-spinner").remove();
         },
         success: function(data) {
-          $11(".ajax-spinner").remove();
-          $11($label).append('<span class="ajax-success-msg">' + syncpilot_i10n.saved + "</span>");
-          $11(".ajax-success-msg").fadeOut(2e3, function() {
-            $11(this).remove();
+          $10(".ajax-spinner").remove();
+          $10($label).append('<span class="ajax-success-msg">' + syncpilot_i10n.saved + "</span>");
+          $10(".ajax-success-msg").fadeOut(2e3, function() {
+            $10(this).remove();
           });
         }
       });
@@ -842,17 +807,17 @@ function syncpilot_parse_json( maybe_json ) {
   }
 
   // asset/src/js/modules/tabs.js
-  var $12 = jQuery;
+  var $11 = jQuery;
   function init_tabs() {
-    $12(".nav-tab").click(function() {
-      $12(".nav-tab").removeClass("nav-tab-active");
-      $12(this).addClass("nav-tab-active");
-      $12(".content-tab").hide();
-      $12("." + $12(this).attr("data-div-name")).show();
-      var hash2 = $12(this).attr("data-div-name");
+    $11(".nav-tab").click(function() {
+      $11(".nav-tab").removeClass("nav-tab-active");
+      $11(this).addClass("nav-tab-active");
+      $11(".content-tab").hide();
+      $11("." + $11(this).attr("data-div-name")).show();
+      var hash2 = $11(this).attr("data-div-name");
       hash2 = hash2.replace("-tab", "");
       window.location.hash = hash2;
-      if ($12(this).hasClass("diagnostics")) {
+      if ($11(this).hasClass("diagnostics")) {
         refresh_debug_log();
       }
     });
@@ -865,10 +830,10 @@ function syncpilot_parse_json( maybe_json ) {
       switch_to_plugin_tab(hash, true);
     }
     function switch_to_plugin_tab(hash2, skip_addons_check) {
-      $12(".nav-tab").removeClass("nav-tab-active");
-      $12(".nav-tab." + hash2).addClass("nav-tab-active");
-      $12(".content-tab").hide();
-      $12("." + hash2 + "-tab").show();
+      $11(".nav-tab").removeClass("nav-tab-active");
+      $11(".nav-tab." + hash2).addClass("nav-tab-active");
+      $11(".content-tab").hide();
+      $11("." + hash2 + "-tab").show();
       if (hash2 == "diagnostics") {
         refresh_debug_log();
       }
@@ -876,9 +841,9 @@ function syncpilot_parse_json( maybe_json ) {
   }
 
   // asset/src/js/modules/form-check.js
-  var $13 = jQuery;
+  var $12 = jQuery;
   function tables_are_chosen() {
-    if ($13("#migrate-selected").is(":checked") && !($13("#select-tables").val() || []).length) {
+    if ($12("#migrate-selected").is(":checked") && !($12("#select-tables").val() || []).length) {
       syncpilot_alert(syncpilot_i10n.please_select_one_table);
       return false;
     }
@@ -890,17 +855,17 @@ function syncpilot_parse_json( maybe_json ) {
     }
     var new_url_missing = false;
     var new_file_path_missing = false;
-    if ($13("#new-url").length && !$13("#new-url").val()) {
-      $13("#new-url-missing-warning").show();
-      $13("#new-url").focus();
-      $13("html,body").scrollTop(0);
+    if ($12("#new-url").length && !$12("#new-url").val()) {
+      $12("#new-url-missing-warning").show();
+      $12("#new-url").focus();
+      $12("html,body").scrollTop(0);
       new_url_missing = true;
     }
-    if ($13("#new-path").length && !$13("#new-path").val()) {
-      $13("#new-path-missing-warning").show();
+    if ($12("#new-path").length && !$12("#new-path").val()) {
+      $12("#new-path-missing-warning").show();
       if (false == new_url_missing) {
-        $13("#new-path").focus();
-        $13("html,body").scrollTop(0);
+        $12("#new-path").focus();
+        $12("html,body").scrollTop(0);
       }
       new_file_path_missing = true;
     }
@@ -908,12 +873,12 @@ function syncpilot_parse_json( maybe_json ) {
   }
 
   // asset/src/js/modules/progress.js
-  var $14 = jQuery;
+  var $13 = jQuery;
   function choose_tables(stage) {
     var table_rows = "";
     if (stage == "backup") {
-      var backup_option = $14("input[name=backup_option]:checked").val();
-      var table_option = $14("input[name=table_migrate_option]:checked").val();
+      var backup_option = $13("input[name=backup_option]:checked").val();
+      var table_option = $13("input[name=table_migrate_option]:checked").val();
       if (table_option == "migrate_only_with_prefix" && backup_option == "backup_selected") {
         backup_option = "backup_only_with_prefix";
       }
@@ -922,25 +887,25 @@ function syncpilot_parse_json( maybe_json ) {
         if (backup_option == "backup_only_with_prefix") {
           state.tables_to_migrate = connection_data.prefixed_tables;
         } else if (backup_option == "backup_selected") {
-          state.tables_to_migrate = get_intersect($14("#select-tables").val(), connection_data.tables);
+          state.tables_to_migrate = get_intersect($13("#select-tables").val(), connection_data.tables);
         } else if (backup_option == "backup_manual_select") {
-          state.tables_to_migrate = $14("#select-backup").val();
+          state.tables_to_migrate = $13("#select-backup").val();
         }
       } else {
         table_rows = syncpilot_this_table_rows;
         if (backup_option == "backup_only_with_prefix") {
           state.tables_to_migrate = syncpilot_this_prefixed_tables;
         } else if (backup_option == "backup_selected") {
-          state.tables_to_migrate = get_intersect($14("#select-tables").val(), syncpilot_this_tables);
+          state.tables_to_migrate = get_intersect($13("#select-tables").val(), syncpilot_this_tables);
         } else if (backup_option == "backup_manual_select") {
-          state.tables_to_migrate = $14("#select-backup").val();
+          state.tables_to_migrate = $13("#select-backup").val();
         }
       }
       return table_rows;
     }
     var sends_from_here = state.migration_intent == "push" || state.migration_intent == "savefile";
-    if ($14("input[name=table_migrate_option]:checked").val() == "migrate_select") {
-      state.tables_to_migrate = $14("#select-tables").val();
+    if ($13("input[name=table_migrate_option]:checked").val() == "migrate_select") {
+      state.tables_to_migrate = $13("#select-tables").val();
       table_rows = sends_from_here ? syncpilot_this_table_rows : connection_data.table_rows;
     } else if (sends_from_here) {
       state.tables_to_migrate = syncpilot_this_prefixed_tables;
@@ -953,26 +918,26 @@ function syncpilot_parse_json( maybe_json ) {
   }
   function draw_table_chunks(tables_to_migrate, table_rows) {
     var total_size = 0;
-    $14.each(tables_to_migrate, function(index, value) {
+    $13.each(tables_to_migrate, function(index, value) {
       total_size += parseInt(table_rows[value]);
     });
     var last_element = "";
-    $14.each(tables_to_migrate, function(index, value) {
+    $13.each(tables_to_migrate, function(index, value) {
       var percent2 = table_rows[value] / total_size * 100;
       var percent_rounded2 = Math.round(percent2 * 1e3) / 1e3;
-      $14(".progress-tables").append('<div class="progress-chunk ' + value + '_chunk" style="width: ' + percent_rounded2 + '%;" title="' + value + '"><span>' + value + "</span></div>");
-      $14(".progress-tables-hover-boxes").append(
+      $13(".progress-tables").append('<div class="progress-chunk ' + value + '_chunk" style="width: ' + percent_rounded2 + '%;" title="' + value + '"><span>' + value + "</span></div>");
+      $13(".progress-tables-hover-boxes").append(
         '<div class="progress-chunk-hover" data-table="' + value + '" style="width: ' + percent_rounded2 + '%;"></div>'
       );
-      var label2 = $14(".progress-tables .progress-chunk:last span");
+      var label2 = $13(".progress-tables .progress-chunk:last span");
       last_element = value;
     });
-    var box_style = { display: $14(".progress-content")[0].style.display, visibility: $14(".progress-content")[0].style.visibility };
-    $14(".progress-content").css({ display: "block", visibility: "hidden" });
-    $14(".progress-chunk").each(function(index) {
-      if ($14(this).width() < 1 && tables_to_migrate[index] != last_element) {
-        $14(this).hide();
-        $14(".progress-chunk-hover[data-table=" + tables_to_migrate[index] + "]").hide();
+    var box_style = { display: $13(".progress-content")[0].style.display, visibility: $13(".progress-content")[0].style.visibility };
+    $13(".progress-content").css({ display: "block", visibility: "hidden" });
+    $13(".progress-chunk").each(function(index) {
+      if ($13(this).width() < 1 && tables_to_migrate[index] != last_element) {
+        $13(this).hide();
+        $13(".progress-chunk-hover[data-table=" + tables_to_migrate[index] + "]").hide();
         table_rows[last_element] = Number(table_rows[last_element]);
         table_rows[last_element] += Number(table_rows[tables_to_migrate[index]]);
         table_rows[tables_to_migrate[index]] = 0;
@@ -982,29 +947,29 @@ function syncpilot_parse_json( maybe_json ) {
         hide_overflowing_elements(element);
       }, 0);
       function hide_overflowing_elements(element2) {
-        if ($14("span", element2).innerWidth() > $14(element2).width()) {
-          $14("span", element2).hide();
+        if ($13("span", element2).innerWidth() > $13(element2).width()) {
+          $13("span", element2).hide();
         }
       }
     });
-    $14(".progress-content").css(box_style);
+    $13(".progress-content").css(box_style);
     var percent_rounded = 0;
     if (table_rows[last_element] != 0) {
       var percent = table_rows[last_element] / total_size * 100;
       percent_rounded = Math.round(percent * 1e3) / 1e3;
     }
-    $14(".progress-tables .progress-chunk:last").css(
+    $13(".progress-tables .progress-chunk:last").css(
       "width",
       percent_rounded + "%"
     );
-    $14(".progress-chunk-hover:last").css("width", percent_rounded + "%");
+    $13(".progress-chunk-hover:last").css("width", percent_rounded + "%");
     var return_vals = [table_rows, total_size];
     return return_vals;
   }
   function create_overlay() {
-    var doc_height = $14(document).height();
-    $14("body").append('<div id="overlay"></div>');
-    $14("#overlay").height(doc_height).css({
+    var doc_height = $13(document).height();
+    $13("body").append('<div id="overlay"></div>');
+    $13("#overlay").height(doc_height).css({
       "position": "fixed",
       "top": 0,
       "left": 0,
@@ -1014,42 +979,42 @@ function syncpilot_parse_json( maybe_json ) {
     });
   }
   function show_progress_box(template, title) {
-    $14("#overlay").after(template.clone());
-    $14(".progress-title").html(title);
-    $14("#overlay").show();
+    $13("#overlay").after(template.clone());
+    $13(".progress-title").html(title);
+    $13("#overlay").show();
   }
   function slide_in_progress_box() {
-    $14(".progress-title").after(
+    $13(".progress-title").after(
       '<img src="' + spinner_url + '" alt="" class="migration-progress-ajax-spinner general-spinner" />'
     );
-    var height = $14(".progress-content").outerHeight();
-    $14(".progress-content").css("top", "-" + height + "px").show().animate({
+    var height = $13(".progress-content").outerHeight();
+    $13(".progress-content").css("top", "-" + height + "px").show().animate({
       "top": "0px"
     });
   }
 
   // asset/src/js/modules/save-profile.js
-  var $15 = jQuery;
+  var $14 = jQuery;
   function profile_has_name() {
-    if ($15.trim($15(".create-new-profile").val()) == "" && $15("#create_new").is(":checked")) {
+    if ($14.trim($14(".create-new-profile").val()) == "" && $14("#create_new").is(":checked")) {
       syncpilot_alert(syncpilot_i10n.enter_name_for_profile);
-      $15(".create-new-profile").focus();
+      $14(".create-new-profile").focus();
       return false;
     }
     return true;
   }
   function is_new_profile() {
-    return $15("#create_new").is(":checked");
+    return $14("#create_new").is(":checked");
   }
   function send_profile(on_success, on_error) {
-    $15.ajax({
+    $14.ajax({
       url: ajaxurl,
       type: "POST",
       dataType: "text",
       cache: false,
       data: {
         action: "syncpilot_save_profile",
-        profile: $15("#migrate-form").serialize(),
+        profile: $14("#migrate-form").serialize(),
         nonce: syncpilot_nonces.save_profile
       },
       error: function(jqXHR, textStatus, errorThrown) {
@@ -1065,12 +1030,520 @@ function syncpilot_parse_json( maybe_json ) {
     var new_profile_key = parseInt(data, 10);
     var new_profile_id = new_profile_key + 1;
     var new_li = '<li><span style="display: none;" class="delete-profile" data-profile-id="' + new_profile_id + '"></span><label for="profile-' + new_profile_id + '"><input id="profile-' + new_profile_id + '" value="' + new_profile_key + '" name="save_migration_profile_option" type="radio"> ' + name + "</label></li>";
-    $15("#create_new").parents("li").before(new_li);
-    $15("#profile-" + new_profile_id).attr("checked", "checked");
+    $14("#create_new").parents("li").before(new_li);
+    $14("#profile-" + new_profile_id).attr("checked", "checked");
+  }
+
+  // asset/src/js/modules/notices.js
+  var $15 = jQuery;
+  function maybe_show_ssl_warning(url, key, remote_scheme) {
+    var scheme = url.substr(0, url.indexOf(":"));
+    if (remote_scheme != scheme && url.indexOf("https") != -1) {
+      $15(".ssl-notice").show();
+      state.show_ssl_notice = true;
+      url = url.replace("https", "http");
+      $15(".pull-push-connection-info").val(url + "\n" + key);
+      return;
+    }
+    state.show_ssl_notice = false;
+    return;
+  }
+  function maybe_show_version_warning(plugin_version, url) {
+    if (typeof plugin_version != "undefined" && plugin_version != syncpilot_plugin_version) {
+      $15(".different-plugin-version-notice").show();
+      $15(".remote-version").text(plugin_version);
+      $15(".remote-location").text(url);
+      $15(".step-two").hide();
+      state.show_version_notice = true;
+    }
+  }
+  function maybe_show_prefix_notice(prefix) {
+    if (prefix != syncpilot_this_prefix) {
+      $15(".remote-prefix").text(prefix);
+      state.show_prefix_notice = true;
+      if ($15("#pull").is(":checked")) {
+        $15(".prefix-notice.pull").show();
+      } else {
+        $15(".prefix-notice.push").show();
+      }
+    }
+  }
+
+  // asset/src/js/modules/connection.js
+  var $16 = jQuery;
+  var push_select;
+  var pull_select;
+  var push_post_type_select;
+  var pull_post_type_select;
+  var push_select_backup;
+  var pull_select_backup;
+  var connection_info_box;
+  function prepare_connection() {
+    push_select = $16("#select-tables").clone();
+    pull_select = $16("#select-tables").clone();
+    push_post_type_select = $16("#select-post-types").clone();
+    pull_post_type_select = $16("#select-post-types").clone();
+    push_select_backup = $16("#select-backup").clone();
+    pull_select_backup = $16("#select-backup").clone();
+    $16(".backup-options").show();
+    $16(".keep-active-plugins").show();
+    if ($16("#savefile").is(":checked")) {
+      $16(".backup-options").hide();
+      $16(".keep-active-plugins").hide();
+    }
+    establish_remote_connection_from_saved_profile();
+  }
+  function disable_export_type_controls() {
+    $16(".option-group").each(function(index) {
+      $16("input", this).attr("disabled", "disabled");
+      $16("label", this).css("cursor", "default");
+    });
+  }
+  function enable_export_type_controls() {
+    $16(".option-group").each(function(index) {
+      $16("input", this).removeAttr("disabled");
+      $16("label", this).css("cursor", "pointer");
+    });
+  }
+  function establish_remote_connection_from_saved_profile() {
+    var action = $16("input[name=action]:checked").val();
+    var connection_info = $16.trim($16(".pull-push-connection-info").val()).split("\n");
+    if (typeof syncpilot_default_profile == "undefined" || syncpilot_default_profile == true || action == "savefile" || state.doing_ajax)
+      return;
+    state.last_replace_switch = action;
+    state.doing_ajax = true;
+    disable_export_type_controls();
+    show_establishing_status();
+    $16.ajax({
+      url: ajaxurl,
+      type: "POST",
+      dataType: "json",
+      cache: false,
+      data: {
+        action: "syncpilot_verify_connection_to_remote_site",
+        url: connection_info[0],
+        key: connection_info[1],
+        intent: action,
+        nonce: syncpilot_nonces.verify_connection_to_remote_site,
+        convert_post_type_selection: syncpilot_convert_post_type_selection,
+        profile: syncpilot_profile
+      },
+      error: function(jqXHR) {
+        connection_request_failed(jqXHR, "#102");
+      },
+      success: function(data) {
+        if (connection_answer_is_error(data)) {
+          return;
+        }
+        show_connection(connection_info, data);
+        fill_lists_from_profile(data);
+        media_files_connection_verified(connection_data);
+      }
+    });
+  }
+  function fill_lists_from_profile(data) {
+    var loaded_tables = "";
+    var loaded_post_types = "";
+    var loaded_tables_backup = "";
+    if (syncpilot_default_profile == false && typeof syncpilot_loaded_tables != "undefined")
+      loaded_tables = syncpilot_loaded_tables;
+    if (syncpilot_default_profile == false && typeof syncpilot_loaded_post_types != "undefined") {
+      if (typeof data.select_post_types != "undefined") {
+        $16("#exclude-post-types").attr("checked", "checked");
+        $16(".post-type-select-wrap").show();
+        loaded_post_types = data.select_post_types;
+      } else
+        loaded_post_types = syncpilot_loaded_post_types;
+    }
+    if (syncpilot_default_profile == false && typeof syncpilot_loaded_tables_backup != "undefined")
+      loaded_tables_backup = syncpilot_loaded_tables_backup;
+    pull_select = build_select("select_tables[]", "select-tables", connection_data.tables, table_label, in_list(loaded_tables));
+    pull_post_type_select = build_select("select_post_types[]", "select-post-types", connection_data.post_types, post_type_label, function(value) {
+      return $16.inArray(value, loaded_post_types) != -1 || syncpilot_convert_exclude_revisions == true && value != "revision";
+    });
+    push_select_backup = build_select("select_backup[]", "select-backup", connection_data.tables, table_label, in_list(loaded_tables_backup));
+    if ($16("#pull").is(":checked")) {
+      $16("#select-tables").remove();
+      $16(".select-tables-wrap").prepend(pull_select);
+      $16("#select-post-types").remove();
+      $16(".select-post-types-wrap").prepend(pull_post_type_select);
+      $16("#select-backup").remove();
+      $16(".backup-tables-wrap").prepend(pull_select_backup);
+      $16(".table-prefix").text(data.prefix);
+      $16(".uploads-dir").html(syncpilot_this_uploads_dir);
+    } else {
+      $16("#select-backup").remove();
+      $16(".backup-tables-wrap").prepend(push_select_backup);
+    }
+  }
+  function build_select(name, id, values, label_for, is_selected) {
+    var select = document.createElement("select");
+    $16(select).attr({
+      multiple: "multiple",
+      name,
+      id,
+      class: "multiselect"
+    });
+    $16.each(values, function(index, value) {
+      var selected = is_selected(value) ? ' selected="selected" ' : " ";
+      $16(select).append("<option" + selected + 'value="' + value + '">' + label_for(value) + "</option>");
+    });
+    return select;
+  }
+  function table_label(value) {
+    return value + " (" + connection_data.table_sizes_hr[value] + ")";
+  }
+  function post_type_label(value) {
+    return value;
+  }
+  function in_list(list) {
+    return function(value) {
+      return $16.inArray(value, list) != -1;
+    };
+  }
+  function nothing_selected() {
+    return false;
+  }
+  function show_establishing_status() {
+    $16(".connection-status").html(syncpilot_i10n.establishing_remote_connection);
+    $16(".connection-status").removeClass("notification-message error-notice migration-error");
+    $16(".connection-status").append('<img src="' + spinner_url + '" alt="" class="ajax-spinner general-spinner" />');
+  }
+  function connection_request_failed(jqXHR, code) {
+    $16(".connection-status").html(syncpilot_i10n.connection_local_server_problem + " (" + code + ")");
+    $16(".connection-status").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
+    $16(".connection-status").addClass("notification-message error-notice migration-error");
+    $16(".ajax-spinner").remove();
+    state.doing_ajax = false;
+    enable_export_type_controls();
+  }
+  function connection_answer_is_error(data) {
+    $16(".ajax-spinner").remove();
+    state.doing_ajax = false;
+    enable_export_type_controls();
+    if (typeof data.syncpilot_error == "undefined" || data.syncpilot_error != 1)
+      return false;
+    $16(".connection-status").html(syncpilot_sanitize_html(data.body));
+    $16(".connection-status").addClass("notification-message error-notice migration-error");
+    if (data.body.indexOf("401 Unauthorized") > -1)
+      $16(".basic-access-auth-wrapper").show();
+    return true;
+  }
+  function show_connection(connection_info, data) {
+    maybe_show_ssl_warning(connection_info[0], connection_info[1], data.scheme);
+    maybe_show_version_warning(data.plugin_version, connection_info[0]);
+    maybe_show_prefix_notice(data.prefix);
+    $16(".pull-push-connection-info").addClass("temp-disabled");
+    $16(".pull-push-connection-info").attr("readonly", "readonly");
+    $16(".connect-button").hide();
+    $16(".connection-status").hide();
+    $16(".step-two").show();
+    state.connection_established = true;
+    connection_data = data;
+    move_connection_info_box();
+  }
+  function init_connection() {
+    connection_info_box = $16(".connection-info-wrapper");
+    move_connection_info_box();
+    $16(".migrate-selection.option-group input[type=radio]").change(function() {
+      move_connection_info_box();
+      if (state.connection_established) {
+        change_replace_values();
+      }
+    });
+    if (($16("#pull").is(":checked") || $16("#push").is(":checked")) && !state.connection_established) {
+      $16(".step-two").hide();
+      $16(".connection-status").show();
+    }
+    $16("body").on("click", ".temp-disabled", function() {
+      syncpilot_confirm(syncpilot_i10n.change_connection_info, function() {
+        $16(".ssl-notice").hide();
+        $16(".different-plugin-version-notice").hide();
+        $16(".migrate-db-button").show();
+        $16(".temp-disabled").removeAttr("readonly");
+        $16(".temp-disabled").removeClass("temp-disabled");
+        $16(".connect-button").show();
+        $16(".step-two").hide();
+        $16(".connection-status").show().html(syncpilot_i10n.enter_connection_info);
+        state.connection_established = false;
+      });
+    });
+    $16(".migrate-form").submit(function(e) {
+      e.preventDefault();
+    });
+    $16(".connect-button").click(function(event) {
+      event.preventDefault();
+      $16(this).blur();
+      connection_box_changed();
+    });
+    $16(".pull-push-connection-info").bind("paste", function(e) {
+      var $this = this;
+      setTimeout(function() {
+        connection_box_changed();
+      }, 0);
+    });
+    $16("body").on("click", ".try-again", function() {
+      connection_box_changed();
+    });
+    $16("body").on("click", ".try-http", function() {
+      var connection_info = $16.trim($16(".pull-push-connection-info").val()).split("\n");
+      var new_url = connection_info[0].replace("https", "http");
+      var new_contents = new_url + "\n" + connection_info[1];
+      $16(".pull-push-connection-info").val(new_contents);
+      connection_box_changed();
+    });
+    $16(".create-new-profile").change(function() {
+      state.profile_name_edited = true;
+    });
+    $16("body").on("click", ".temporarily-disable-ssl", function() {
+      if (window.location.hash)
+        var hash = window.location.hash.substring(1);
+      $16(this).attr("href", $16(this).attr("href") + "&hash=" + hash);
+    });
+  }
+  function move_connection_info_box() {
+    $16(".connection-status").hide();
+    $16(".prefix-notice").hide();
+    $16(".ssl-notice").hide();
+    $16(".different-plugin-version-notice").hide();
+    $16(".step-two").show();
+    $16(".backup-options").show();
+    $16(".keep-active-plugins").show();
+    $16(".directory-permission-notice").hide();
+    $16("#create-backup").removeAttr("disabled");
+    $16("#create-backup-label").removeClass("disabled");
+    $16(".backup-option-disabled").hide();
+    var connection_info = $16.trim($16(".pull-push-connection-info").val()).split("\n");
+    if ($16("#pull").is(":checked")) {
+      $16(".pull-list li").append(connection_info_box);
+      connection_info_box.show();
+      if (state.connection_established) {
+        $16(".connection-status").hide();
+        $16(".step-two").show();
+        $16(".table-prefix").text(connection_data.prefix);
+        $16(".uploads-dir").html(syncpilot_this_uploads_dir);
+        if (state.profile_name_edited == false) {
+          var profile_name = get_domain_name(connection_info[0]);
+          $16(".create-new-profile").val(profile_name);
+        }
+        if (state.show_prefix_notice == true)
+          $16(".prefix-notice.pull").show();
+        if (state.show_ssl_notice == true)
+          $16(".ssl-notice").show();
+        if (state.show_version_notice == true) {
+          $16(".different-plugin-version-notice").show();
+          $16(".step-two").hide();
+        }
+        $16(".directory-scope").text(syncpilot_i10n.scope_local);
+        if (false == syncpilot_write_permission) {
+          $16("#create-backup").prop("checked", false);
+          $16("#create-backup").attr("disabled", "disabled");
+          $16("#create-backup-label").addClass("disabled");
+          $16(".backup-option-disabled").show();
+          $16(".upload-directory-location").html(syncpilot_this_upload_dir_long);
+        }
+      } else {
+        $16(".connection-status").show();
+        $16(".step-two").hide();
+      }
+    } else if ($16("#push").is(":checked")) {
+      $16(".push-list li").append(connection_info_box);
+      connection_info_box.show();
+      if (state.connection_established) {
+        $16(".connection-status").hide();
+        $16(".step-two").show();
+        $16(".table-prefix").html(syncpilot_this_prefix);
+        $16(".uploads-dir").text(connection_data.uploads_dir);
+        if (state.profile_name_edited == false) {
+          var profile_name = get_domain_name(connection_info[0]);
+          $16(".create-new-profile").val(profile_name);
+        }
+        if (state.show_prefix_notice == true)
+          $16(".prefix-notice.push").show();
+        if (state.show_ssl_notice == true)
+          $16(".ssl-notice").show();
+        if (state.show_version_notice == true) {
+          $16(".different-plugin-version-notice").show();
+          $16(".step-two").hide();
+        }
+        $16(".directory-scope").text(syncpilot_i10n.scope_remote);
+        if ("0" == connection_data.write_permissions) {
+          $16("#create-backup").prop("checked", false);
+          $16("#create-backup").attr("disabled", "disabled");
+          $16("#create-backup-label").addClass("disabled");
+          $16(".backup-option-disabled").show();
+          $16(".upload-directory-location").text(connection_data.upload_dir_long);
+        }
+      } else {
+        $16(".connection-status").show();
+        $16(".step-two").hide();
+      }
+    } else if ($16("#savefile").is(":checked")) {
+      $16(".connection-status").hide();
+      $16(".step-two").show();
+      $16(".table-prefix").html(syncpilot_this_prefix);
+      if (state.profile_name_edited == false)
+        $16(".create-new-profile").val("");
+      $16(".backup-options").hide();
+      $16(".keep-active-plugins").hide();
+      if (false == syncpilot_write_permission) {
+        $16(".directory-permission-notice").show();
+        $16(".step-two").hide();
+      }
+    }
+    media_files_connection_box_moved();
+  }
+  function change_replace_values() {
+    if ($16("#push").is(":checked") || $16("#savefile").is(":checked")) {
+      if (state.last_replace_switch == "" || state.last_replace_switch == "pull") {
+        $16(".replace-row").each(function() {
+          var old_val = $16(".old-replace-col input", this).val();
+          $16(".old-replace-col input", this).val($16(
+            ".replace-right-col input",
+            this
+          ).val());
+          $16(".replace-right-col input", this).val(old_val);
+        });
+      }
+      $16("#select-tables").remove();
+      $16(".select-tables-wrap").prepend(push_select);
+      $16("#select-post-types").remove();
+      $16(".select-post-types-wrap").prepend(push_post_type_select);
+      $16("#select-backup").remove();
+      $16(".backup-tables-wrap").prepend(push_select_backup);
+      state.last_replace_switch = "push";
+    } else if ($16("#pull").is(":checked")) {
+      if (state.last_replace_switch == "" || state.last_replace_switch == "push") {
+        $16(".replace-row").each(function() {
+          var old_val = $16(".old-replace-col input", this).val();
+          $16(".old-replace-col input", this).val($16(
+            ".replace-right-col input",
+            this
+          ).val());
+          $16(".replace-right-col input", this).val(old_val);
+        });
+      }
+      $16("#select-tables").remove();
+      $16(".select-tables-wrap").prepend(pull_select);
+      $16("#select-post-types").remove();
+      $16(".select-post-types-wrap").prepend(pull_post_type_select);
+      $16("#select-backup").remove();
+      $16(".backup-tables-wrap").prepend(pull_select_backup);
+      state.last_replace_switch = "pull";
+    }
+  }
+  function connection_box_changed() {
+    var $this = $16(".pull-push-connection-info");
+    if (state.doing_ajax || $16($this).hasClass("temp-disabled"))
+      return;
+    var connection_info = $16.trim($this.val()).split("\n");
+    var error_message = connection_info_error(connection_info);
+    if (error_message) {
+      $16(".connection-status").html(error_message);
+      $16(".connection-status").addClass("notification-message error-notice migration-error");
+      return;
+    }
+    if (syncpilot_openssl_available == false) {
+      connection_info[0] = connection_info[0].replace("https://", "http://");
+      $this.val(connection_info[0] + "\n" + connection_info[1]);
+    }
+    state.show_prefix_notice = false;
+    state.doing_ajax = true;
+    disable_export_type_controls();
+    if ($16(".basic-access-auth-wrapper").is(":visible")) {
+      connection_info[0] = connection_info[0].replace(/\/\/(.*)@/, "//");
+      connection_info[0] = connection_info[0].replace("//", "//" + encodeURIComponent($16.trim($16(".auth-username").val())) + ":" + encodeURIComponent($16.trim($16(".auth-password").val())) + "@");
+      $this.val(connection_info[0] + "\n" + connection_info[1]);
+      $16(".basic-access-auth-wrapper").hide();
+    }
+    $16(".step-two").hide();
+    $16(".ssl-notice").hide();
+    $16(".prefix-notice").hide();
+    $16(".connection-status").show();
+    show_establishing_status();
+    state.profile_name_edited = false;
+    $16.ajax({
+      url: ajaxurl,
+      type: "POST",
+      dataType: "json",
+      cache: false,
+      data: {
+        action: "syncpilot_verify_connection_to_remote_site",
+        url: connection_info[0],
+        key: connection_info[1],
+        intent: $16("input[name=action]:checked").val(),
+        nonce: syncpilot_nonces.verify_connection_to_remote_site
+      },
+      error: function(jqXHR) {
+        connection_request_failed(jqXHR, "#100");
+      },
+      success: function(data) {
+        if (connection_answer_is_error(data))
+          return;
+        $16(".create-new-profile").val(get_domain_name(connection_info[0]));
+        show_connection(connection_info, data);
+        fill_lists(data);
+        fill_replace_rows(data);
+        next_step_in_migration = {
+          fn: media_files_connection_verified,
+          args: [connection_data]
+        };
+        execute_next_step();
+      }
+    });
+  }
+  function connection_info_error(connection_info) {
+    if (connection_info == "")
+      return syncpilot_i10n.connection_info_missing;
+    if (connection_info.length != 2)
+      return syncpilot_i10n.connection_info_incorrect;
+    if (!validate_url(connection_info[0]))
+      return syncpilot_i10n.connection_info_url_invalid;
+    if (connection_info[1].length != 32)
+      return syncpilot_i10n.connection_info_key_invalid;
+    if (connection_info[0] == syncpilot_connection_info[0])
+      return syncpilot_i10n.connection_info_local_url;
+    if (connection_info[1] == syncpilot_connection_info[1])
+      return syncpilot_i10n.connection_info_local_key;
+    return "";
+  }
+  function fill_lists(data) {
+    pull_select = build_select("select_tables[]", "select-tables", connection_data.tables, table_label, nothing_selected);
+    push_select_backup = build_select("select_backup[]", "select-backup", connection_data.tables, table_label, nothing_selected);
+    pull_post_type_select = build_select("select_post_types[]", "select-post-types", connection_data.post_types, post_type_label, nothing_selected);
+    if ($16("#pull").is(":checked")) {
+      $16("#select-tables").remove();
+      $16(".select-tables-wrap").prepend(pull_select);
+      $16("#select-post-types").remove();
+      $16(".select-post-types-wrap").prepend(pull_post_type_select);
+      $16(".table-prefix").text(data.prefix);
+      $16(".uploads-dir").html(syncpilot_this_uploads_dir);
+    } else {
+      $16("#select-backup").remove();
+      $16(".backup-tables-wrap").prepend(push_select_backup);
+    }
+  }
+  function fill_replace_rows(data) {
+    if ($16("#pull").is(":checked")) {
+      $16("#new-url").val(remove_protocol(syncpilot_this_url));
+      $16("#new-path").val(syncpilot_this_path);
+      if (syncpilot_is_multisite == true)
+        $16("#new-domain").val(syncpilot_this_domain);
+      $16("#old-url").val(remove_protocol(data.url));
+      $16("#old-path").val(data.path);
+      add_scheme_row(data.url, syncpilot_this_url);
+    } else {
+      $16("#new-url").val(remove_protocol(data.url));
+      $16("#new-path").val(data.path);
+      add_scheme_row(syncpilot_this_url, data.url);
+    }
+  }
+  function validate_url(url) {
+    return /^([a-z]([a-z]|\d|\+|-|\.)*):(\/\/(((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:)*@)?((\[(|(v[\da-f]{1,}\.(([a-z]|\d|-|\.|_|~)|[!\$&'\(\)\*\+,;=]|:)+))\])|((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5]))|(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=])*)(:\d*)?)(\/(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*|(\/((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)+(\/(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*)?)|((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)+(\/(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*)|((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)){0})(\?((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)|[\uE000-\uF8FF]|\/|\?)*)?(\#((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)|\/|\?)*)?$/i.test(url);
   }
 
   // asset/src/js/modules/migration.js
-  var $16 = jQuery;
+  var $17 = jQuery;
   var run = {
     table_rows: {},
     total_size: 0,
@@ -1082,10 +1555,10 @@ function syncpilot_parse_json( maybe_json ) {
   function init_migration() {
     window.migrate_table_recursive = migrate_table_recursive;
   }
-  function migration_failed(text) {
-    $16(".progress-title").html(syncpilot_i10n.migration_failed);
-    $16(".progress-text").html(text);
-    $16(".progress-text").addClass("migration-error");
+  function migration_failed(text, title) {
+    $17(".progress-title").html(title || syncpilot_i10n.migration_failed);
+    $17(".progress-text").html(text);
+    $17(".progress-text").addClass("migration-error");
     migration_error = true;
     migration_complete_events();
   }
@@ -1097,7 +1570,7 @@ function syncpilot_parse_json( maybe_json ) {
   }
   function initiate_migration(table_rows, total_size) {
     state.doing_ajax = true;
-    $16.ajax({
+    $17.ajax({
       url: ajaxurl,
       type: "POST",
       dataType: "json",
@@ -1157,10 +1630,10 @@ function syncpilot_parse_json( maybe_json ) {
     state.stage = "migrate";
     run.index = 0;
     run.progress_size = 0;
-    $16(".progress-bar").width("0px");
+    $17(".progress-bar").width("0px");
     run.table_rows = choose_tables("migrate");
-    $16(".progress-tables").empty();
-    $16(".progress-tables-hover-boxes").empty();
+    $17(".progress-tables").empty();
+    $17(".progress-tables-hover-boxes").empty();
     var table_details = draw_table_chunks(state.tables_to_migrate, run.table_rows);
     run.table_rows = table_details[0];
     run.total_size = table_details[1];
@@ -1178,7 +1651,7 @@ function syncpilot_parse_json( maybe_json ) {
   }
   function show_table_text() {
     var label2 = state.stage == "backup" ? syncpilot_i10n.backing_up : syncpilot_i10n.migrating;
-    $16(".progress-text").html(state.overall_percent + "% - " + label2 + ' "' + state.tables_to_migrate[run.index] + '"');
+    $17(".progress-text").html(state.overall_percent + "% - " + label2 + ' "' + state.tables_to_migrate[run.index] + '"');
   }
   function table_request_data(current_row, primary_keys) {
     var last_table = run.index == state.tables_to_migrate.length - 1 ? 1 : 0;
@@ -1213,7 +1686,7 @@ function syncpilot_parse_json( maybe_json ) {
   }
   function send_table_request(current_row, primary_keys) {
     state.doing_ajax = true;
-    $16.ajax({
+    $17.ajax({
       url: ajaxurl,
       type: "POST",
       dataType: "text",
@@ -1269,15 +1742,232 @@ function syncpilot_parse_json( maybe_json ) {
       run.overall_table_progress += table_progress;
     }
     var percent = 100 * run.progress_size / run.total_size;
-    $16(".progress-bar").width(percent + "%");
+    $17(".progress-bar").width(percent + "%");
     state.overall_percent = Math.floor(percent);
   }
 
+  // asset/src/js/modules/migration-end.js
+  var $18 = jQuery;
+  function init_migration_end() {
+    window.migration_complete = migration_complete2;
+    window.migration_complete_events = migration_complete_events2;
+    $18("body").on("click", ".close-progress-content-button", function() {
+      hide_overlay();
+    });
+    $18("body").on("click", "#overlay", function() {
+      if (state.migration_completed == true) {
+        hide_overlay();
+      }
+    });
+  }
+  function migration_complete_events2() {
+    if (false == migration_error) {
+      if (non_fatal_errors == "") {
+        if ("savefile" != state.migration_intent && true == $18("#save_computer").is(":checked"))
+          $18(".progress-text").css("visibility", "hidden");
+        $18(".progress-title").html(state.completed_msg).append('<div class="dashicons dashicons-yes"></div>');
+      } else {
+        $18(".progress-text").html(syncpilot_sanitize_html(non_fatal_errors));
+        $18(".progress-text").addClass("migration-error");
+        $18(".progress-title").html(syncpilot_i10n.completed_with_some_errors);
+      }
+      $18(".progress-bar-wrapper").hide();
+    }
+    $18(".migration-controls").hide();
+    call_stack = [];
+    migration_error = false;
+    state.currently_migrating = false;
+    state.migration_completed = true;
+    state.migration_paused = false;
+    state.migration_cancelled = false;
+    state.doing_ajax = false;
+    non_fatal_errors = "";
+    $18(".progress-label").remove();
+    $18(".migration-progress-ajax-spinner").remove();
+    $18(".close-progress-content").show();
+    $18("#overlay").css("cursor", "pointer");
+    clearInterval(state.elapsed_interval);
+  }
+  function migration_complete2() {
+    $18(".migration-controls").fadeOut();
+    if (state.migration_intent == "savefile")
+      finish_export();
+    else
+      finalize_tables();
+  }
+  function finish_export() {
+    state.currently_migrating = false;
+    var migrate_complete_text = syncpilot_i10n.migration_complete;
+    if ($18("#save_computer").is(":checked")) {
+      var url = syncpilot_this_download_url + encodeURIComponent(state.dump_filename);
+      if ($18("#gzip_file").is(":checked"))
+        url += "&gzip=1";
+      window.location = url;
+    } else {
+      migrate_complete_text = syncpilot_i10n.completed_dump_located_at + ' <a href="' + state.dump_url + '">' + state.dump_url + "</a>.";
+    }
+    if (migration_error == false) {
+      $18(".progress-text").html(migrate_complete_text);
+      migration_complete_events2();
+      $18(".progress-title").html(state.completed_msg);
+    }
+  }
+  function finalize_tables() {
+    $18(".progress-text").html(syncpilot_i10n.finalizing_migration);
+    state.doing_ajax = true;
+    $18.ajax({
+      url: ajaxurl,
+      type: "POST",
+      dataType: "text",
+      cache: false,
+      data: {
+        action: "syncpilot_finalize_migration",
+        intent: state.migration_intent,
+        url: state.remote_site,
+        key: state.secret_key,
+        form_data: state.form_data,
+        prefix: connection_data.prefix,
+        temp_prefix: connection_data.temp_prefix,
+        tables: state.tables_to_migrate.join(","),
+        nonce: syncpilot_nonces.finalize_migration
+      },
+      error: function(jqXHR, textStatus, errorThrown) {
+        state.doing_ajax = false;
+        if (window.console && console.log) {
+          console.log("SyncPilot: finalize", textStatus, errorThrown, jqXHR.responseText);
+        }
+        migration_failed(syncpilot_i10n.finalize_tables_problem);
+      },
+      success: function(data) {
+        state.doing_ajax = false;
+        if ($18.trim(data) != "") {
+          migration_failed(syncpilot_sanitize_html(data));
+          return;
+        }
+        next_step_in_migration = {
+          fn: run_next_step
+        };
+        execute_next_step();
+      }
+    });
+  }
+  function hide_overlay() {
+    var height = $18(".progress-content").outerHeight();
+    $18(".progress-content").animate({ "top": "-" + height + "px" }, 400, "swing", function() {
+      $18("#overlay").remove();
+      $18(".progress-content").remove();
+    });
+    state.migration_completed = false;
+  }
+
+  // asset/src/js/modules/migration-control.js
+  var $19 = jQuery;
+  function init_migration_control() {
+    window.execute_next_step = execute_next_step2;
+    window.migration_request_running = function(running) {
+      state.doing_ajax = running;
+    };
+    $19("body").on("click", ".pause-resume", toggle_pause);
+    $19("body").on("click", ".cancel", cancel_clicked);
+  }
+  function toggle_pause() {
+    if (true == state.migration_paused) {
+      state.migration_paused = false;
+      state.doing_ajax = true;
+      $19(".progress-title").html(state.previous_progress_title);
+      $19(".progress-text").html(state.previous_progress_text);
+      $19(".migration-progress-ajax-spinner").show();
+      $19(".pause-resume").html(syncpilot_i10n.pause);
+      state.elapsed_interval = setInterval(count, 1e3);
+      execute_next_step2();
+    } else {
+      state.migration_paused = true;
+      state.doing_ajax = false;
+      state.previous_progress_title = $19(".progress-title").html();
+      state.previous_progress_text = $19(".progress-text").html();
+      $19(".progress-title").html(syncpilot_i10n.migration_paused);
+      $19(".pause-resume").html(syncpilot_i10n.resume);
+      $19(".progress-text").html(syncpilot_i10n.completing_current_request);
+    }
+  }
+  function cancel_clicked() {
+    state.migration_cancelled = true;
+    state.migration_paused = false;
+    $19(".progress-text").html(syncpilot_i10n.completing_current_request);
+    $19(".progress-title").html(syncpilot_i10n.cancelling_migration);
+    $19(".migration-controls").fadeOut();
+    $19(".migration-progress-ajax-spinner").show();
+    if (false == state.doing_ajax)
+      execute_next_step2();
+  }
+  function execute_next_step2() {
+    if (true == state.migration_paused) {
+      $19(".migration-progress-ajax-spinner").hide();
+      clearInterval(state.elapsed_interval);
+      $19(".progress-text").html(syncpilot_i10n.paused);
+    } else if (true == state.migration_cancelled) {
+      cancel_on_server();
+    } else {
+      next_step_in_migration.fn.apply(null, next_step_in_migration.args);
+    }
+  }
+  function removing_text() {
+    var progress_msg;
+    if ("savefile" == state.migration_intent) {
+      progress_msg = syncpilot_i10n.removing_local_sql;
+    } else if ("pull" == state.migration_intent) {
+      if ("backup" == state.stage)
+        progress_msg = syncpilot_i10n.removing_local_backup;
+      else
+        progress_msg = syncpilot_i10n.removing_local_temp_tables;
+    } else if ("push" == state.migration_intent) {
+      if ("backup" == state.stage)
+        progress_msg = syncpilot_i10n.removing_remote_sql;
+      else
+        progress_msg = syncpilot_i10n.removing_remote_temp_tables;
+    }
+    return progress_msg;
+  }
+  function cancel_on_server() {
+    state.migration_intent = $19("input[name=action]:checked").val();
+    $19(".progress-text").html(removing_text());
+    var request_data = {
+      action: "syncpilot_cancel_migration",
+      intent: state.migration_intent,
+      url: state.remote_site,
+      key: state.secret_key,
+      stage: state.stage,
+      dump_filename: state.dump_filename,
+      form_data: state.form_data,
+      nonce: syncpilot_nonces.cancel_migration
+    };
+    if (connection_data)
+      request_data.temp_prefix = connection_data.temp_prefix;
+    $19.ajax({
+      url: ajaxurl,
+      type: "POST",
+      dataType: "text",
+      cache: false,
+      data: request_data,
+      error: function(jqXHR, textStatus, errorThrown) {
+        migration_failed(syncpilot_i10n.manually_remove_temp_files + request_problem(jqXHR, textStatus, errorThrown, "Status", "Response"), syncpilot_i10n.migration_cancellation_failed);
+      },
+      success: function(data) {
+        state.doing_ajax = false;
+        data = $19.trim(data);
+        if (data != "") {
+          migration_failed(syncpilot_sanitize_html(data), syncpilot_i10n.migration_cancellation_failed);
+          return;
+        }
+        state.completed_msg = syncpilot_i10n.migration_cancelled;
+        $19(".progress-text").hide();
+        migration_complete_events();
+      }
+    });
+  }
+
   // asset/src/js/script.js
-  window.migration_complete = void 0;
-  window.migration_complete_events = void 0;
-  window.execute_next_step = void 0;
-  (function($17) {
+  (function($20) {
     window.onbeforeunload = function(e) {
       if (state.currently_migrating) {
         e = e || window.event;
@@ -1287,188 +1977,12 @@ function syncpilot_parse_json( maybe_json ) {
         return "Sure?";
       }
     };
-    $17(document).ready(function() {
+    $20(document).ready(function() {
       init_plugin_compatibility();
       init_slider();
-      var progress_content_original = $17(".progress-content").clone();
-      $17(".progress-content").remove();
-      var push_select = $17("#select-tables").clone();
-      var pull_select = $17("#select-tables").clone();
-      var push_post_type_select = $17("#select-post-types").clone();
-      var pull_post_type_select = $17("#select-post-types").clone();
-      var push_select_backup = $17("#select-backup").clone();
-      var pull_select_backup = $17("#select-backup").clone();
-      $17(".backup-options").show();
-      $17(".keep-active-plugins").show();
-      if ($17("#savefile").is(":checked")) {
-        $17(".backup-options").hide();
-        $17(".keep-active-plugins").hide();
-      }
-      function disable_export_type_controls() {
-        $17(".option-group").each(function(index) {
-          $17("input", this).attr("disabled", "disabled");
-          $17("label", this).css("cursor", "default");
-        });
-      }
-      function enable_export_type_controls() {
-        $17(".option-group").each(function(index) {
-          $17("input", this).removeAttr("disabled");
-          $17("label", this).css("cursor", "pointer");
-        });
-      }
-      establish_remote_connection_from_saved_profile();
-      function establish_remote_connection_from_saved_profile() {
-        var action = $17("input[name=action]:checked").val();
-        var connection_info = $17.trim($17(".pull-push-connection-info").val()).split(
-          "\n"
-        );
-        if (typeof syncpilot_default_profile == "undefined" || syncpilot_default_profile == true || action == "savefile" || state.doing_ajax) {
-          return;
-        }
-        state.last_replace_switch = action;
-        state.doing_ajax = true;
-        disable_export_type_controls();
-        $17(".connection-status").html(syncpilot_i10n.establishing_remote_connection);
-        $17(".connection-status").removeClass(
-          "notification-message error-notice migration-error"
-        );
-        $17(".connection-status").append('<img src="' + spinner_url + '" alt="" class="ajax-spinner general-spinner" />');
-        var intent = $17("input[name=action]:checked").val();
-        $17.ajax({
-          url: ajaxurl,
-          type: "POST",
-          dataType: "json",
-          cache: false,
-          data: {
-            action: "syncpilot_verify_connection_to_remote_site",
-            url: connection_info[0],
-            key: connection_info[1],
-            intent,
-            nonce: syncpilot_nonces.verify_connection_to_remote_site,
-            convert_post_type_selection: syncpilot_convert_post_type_selection,
-            profile: syncpilot_profile
-          },
-          error: function(jqXHR, textStatus, errorThrown) {
-            $17(".connection-status").html(syncpilot_i10n.connection_local_server_problem + " (#102)");
-            $17(".connection-status").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
-            $17(".connection-status").addClass(
-              "notification-message error-notice migration-error"
-            );
-            $17(".ajax-spinner").remove();
-            state.doing_ajax = false;
-            enable_export_type_controls();
-          },
-          success: function(data) {
-            $17(".ajax-spinner").remove();
-            state.doing_ajax = false;
-            enable_export_type_controls();
-            if (typeof data.syncpilot_error != "undefined" && data.syncpilot_error == 1) {
-              $17(".connection-status").html(syncpilot_sanitize_html(data.body));
-              $17(".connection-status").addClass(
-                "notification-message error-notice migration-error"
-              );
-              if (data.body.indexOf("401 Unauthorized") > -1) {
-                $17(".basic-access-auth-wrapper").show();
-              }
-              return;
-            }
-            maybe_show_ssl_warning(connection_info[0], connection_info[1], data.scheme);
-            maybe_show_version_warning(data.plugin_version, connection_info[0]);
-            maybe_show_prefix_notice(data.prefix);
-            $17(".pull-push-connection-info").addClass("temp-disabled");
-            $17(".pull-push-connection-info").attr("readonly", "readonly");
-            $17(".connect-button").hide();
-            $17(".connection-status").hide();
-            $17(".step-two").show();
-            state.connection_established = true;
-            connection_data = data;
-            move_connection_info_box();
-            var loaded_tables = "";
-            if (syncpilot_default_profile == false && typeof syncpilot_loaded_tables != "undefined") {
-              loaded_tables = syncpilot_loaded_tables;
-            }
-            var table_select = document.createElement("select");
-            $17(table_select).attr({
-              multiple: "multiple",
-              name: "select_tables[]",
-              id: "select-tables",
-              class: "multiselect"
-            });
-            $17.each(connection_data.tables, function(index, value) {
-              var selected = $17.inArray(value, loaded_tables);
-              if (selected != -1) {
-                selected = ' selected="selected" ';
-              } else {
-                selected = " ";
-              }
-              $17(table_select).append("<option" + selected + 'value="' + value + '">' + value + " (" + connection_data.table_sizes_hr[value] + ")</option>");
-            });
-            pull_select = table_select;
-            var loaded_post_types = "";
-            if (syncpilot_default_profile == false && typeof syncpilot_loaded_post_types != "undefined") {
-              if (typeof data.select_post_types != "undefined") {
-                $17("#exclude-post-types").attr("checked", "checked");
-                $17(".post-type-select-wrap").show();
-                loaded_post_types = data.select_post_types;
-              } else {
-                loaded_post_types = syncpilot_loaded_post_types;
-              }
-            }
-            var post_type_select = document.createElement("select");
-            $17(post_type_select).attr({
-              multiple: "multiple",
-              name: "select_post_types[]",
-              id: "select-post-types",
-              class: "multiselect"
-            });
-            $17.each(connection_data.post_types, function(index, value) {
-              var selected = $17.inArray(value, loaded_post_types);
-              if (selected != -1 || syncpilot_convert_exclude_revisions == true && value != "revision") {
-                selected = ' selected="selected" ';
-              } else {
-                selected = " ";
-              }
-              $17(post_type_select).append("<option" + selected + 'value="' + value + '">' + value + "</option>");
-            });
-            pull_post_type_select = post_type_select;
-            var loaded_tables_backup = "";
-            if (syncpilot_default_profile == false && typeof syncpilot_loaded_tables_backup != "undefined") {
-              loaded_tables_backup = syncpilot_loaded_tables_backup;
-            }
-            var table_select_backup = document.createElement("select");
-            $17(table_select_backup).attr({
-              multiple: "multiple",
-              name: "select_backup[]",
-              id: "select-backup",
-              class: "multiselect"
-            });
-            $17.each(connection_data.tables, function(index, value) {
-              var selected = $17.inArray(value, loaded_tables_backup);
-              if (selected != -1) {
-                selected = ' selected="selected" ';
-              } else {
-                selected = " ";
-              }
-              $17(table_select_backup).append("<option" + selected + 'value="' + value + '">' + value + " (" + connection_data.table_sizes_hr[value] + ")</option>");
-            });
-            push_select_backup = table_select_backup;
-            if ($17("#pull").is(":checked")) {
-              $17("#select-tables").remove();
-              $17(".select-tables-wrap").prepend(pull_select);
-              $17("#select-post-types").remove();
-              $17(".select-post-types-wrap").prepend(pull_post_type_select);
-              $17("#select-backup").remove();
-              $17(".backup-tables-wrap").prepend(pull_select_backup);
-              $17(".table-prefix").text(data.prefix);
-              $17(".uploads-dir").html(syncpilot_this_uploads_dir);
-            } else {
-              $17("#select-backup").remove();
-              $17(".backup-tables-wrap").prepend(push_select_backup);
-            }
-            media_files_connection_verified(connection_data);
-          }
-        });
-      }
+      var progress_content_original = $20(".progress-content").clone();
+      $20(".progress-content").remove();
+      prepare_connection();
       init_diagnostics();
       init_form_ui();
       init_multiselect();
@@ -1478,37 +1992,39 @@ function syncpilot_parse_json( maybe_json ) {
       init_settings();
       init_tabs();
       init_migration();
-      $17(".migrate-db-button").click(run_migration);
+      init_migration_end();
+      init_migration_control();
+      $20(".migrate-db-button").click(run_migration);
       function run_migration(event) {
-        $17(this).blur();
+        $20(this).blur();
         event.preventDefault();
         if (!form_is_valid()) {
           return;
         }
-        if ($17("#save-migration-profile").is(":checked")) {
+        if ($20("#save-migration-profile").is(":checked")) {
           if (!profile_has_name()) {
             return;
           }
           var create_new_profile = is_new_profile();
-          var profile_name = $17(".create-new-profile").val();
+          var profile_name = $20(".create-new-profile").val();
           send_profile(function(data) {
             if (create_new_profile) {
               add_profile_to_list(data, profile_name);
-              $17(".create-new-profile").val("");
+              $20(".create-new-profile").val("");
             }
           });
         }
-        state.form_data = $17("#migrate-form").serialize();
+        state.form_data = $20("#migrate-form").serialize();
         create_overlay();
-        state.migration_intent = $17("input[name=action]:checked").val();
+        state.migration_intent = $20("input[name=action]:checked").val();
         state.stage = "backup";
         if (state.migration_intent == "savefile") {
           state.stage = "migrate";
         }
-        if ($17("#create-backup").is(":checked") == false) {
+        if ($20("#create-backup").is(":checked") == false) {
           state.stage = "migrate";
         }
-        var connection_info = $17.trim($17(".pull-push-connection-info").val()).split("\n");
+        var connection_info = $20.trim($20(".pull-push-connection-info").val()).split("\n");
         state.remote_site = connection_info[0];
         state.secret_key = connection_info[1];
         var static_migration_label = "";
@@ -1537,124 +2053,8 @@ function syncpilot_parse_json( maybe_json ) {
         state.currently_migrating = true;
         initiate_migration(table_rows, total_size);
       }
-      migration_complete_events = function() {
-        if (false == migration_error) {
-          if (non_fatal_errors == "") {
-            if ("savefile" != state.migration_intent && true == $17("#save_computer").is(":checked")) {
-              $17(".progress-text").css("visibility", "hidden");
-            }
-            $17(".progress-title").html(state.completed_msg).append(
-              '<div class="dashicons dashicons-yes"></div>'
-            );
-          } else {
-            $17(".progress-text").html(syncpilot_sanitize_html(non_fatal_errors));
-            $17(".progress-text").addClass("migration-error");
-            $17(".progress-title").html(syncpilot_i10n.completed_with_some_errors);
-          }
-          $17(".progress-bar-wrapper").hide();
-        }
-        $17(".migration-controls").hide();
-        call_stack = [];
-        migration_error = false;
-        state.currently_migrating = false;
-        state.migration_completed = true;
-        state.migration_paused = false;
-        state.migration_cancelled = false;
-        state.doing_ajax = false;
-        non_fatal_errors = "";
-        $17(".progress-label").remove();
-        $17(".migration-progress-ajax-spinner").remove();
-        $17(".close-progress-content").show();
-        $17("#overlay").css("cursor", "pointer");
-        clearInterval(state.elapsed_interval);
-      };
-      migration_complete = function() {
-        $17(".migration-controls").fadeOut();
-        if (state.migration_intent == "savefile") {
-          state.currently_migrating = false;
-          var migrate_complete_text = syncpilot_i10n.migration_complete;
-          if ($17("#save_computer").is(":checked")) {
-            var url = syncpilot_this_download_url + encodeURIComponent(state.dump_filename);
-            if ($17("#gzip_file").is(":checked")) {
-              url += "&gzip=1";
-            }
-            window.location = url;
-          } else {
-            migrate_complete_text = syncpilot_i10n.completed_dump_located_at + ' <a href="' + state.dump_url + '">' + state.dump_url + "</a>.";
-          }
-          if (migration_error == false) {
-            $17(".progress-text").html(migrate_complete_text);
-            migration_complete_events();
-            $17(".progress-title").html(state.completed_msg);
-          }
-        } else {
-          $17(".progress-text").html(syncpilot_i10n.finalizing_migration);
-          state.doing_ajax = true;
-          $17.ajax({
-            url: ajaxurl,
-            type: "POST",
-            dataType: "text",
-            cache: false,
-            data: {
-              action: "syncpilot_finalize_migration",
-              intent: state.migration_intent,
-              url: state.remote_site,
-              key: state.secret_key,
-              form_data: state.form_data,
-              prefix: connection_data.prefix,
-              temp_prefix: connection_data.temp_prefix,
-              tables: state.tables_to_migrate.join(","),
-              nonce: syncpilot_nonces.finalize_migration
-            },
-            error: function(jqXHR, textStatus, errorThrown) {
-              state.doing_ajax = false;
-              $17(".progress-title").html(syncpilot_i10n.migration_failed);
-              $17(".progress-text").html(syncpilot_i10n.finalize_tables_problem);
-              $17(".progress-text").addClass("migration-error");
-              if (window.console && console.log)
-                console.log("SyncPilot: finalize", textStatus, errorThrown, jqXHR.responseText);
-              migration_error = true;
-              migration_complete_events();
-              return;
-            },
-            success: function(data) {
-              state.doing_ajax = false;
-              if ($17.trim(data) != "") {
-                $17(".progress-title").html(syncpilot_i10n.migration_failed);
-                $17(".progress-text").html(syncpilot_sanitize_html(data));
-                $17(".progress-text").addClass("migration-error");
-                migration_error = true;
-                migration_complete_events();
-                return;
-              }
-              next_step_in_migration = {
-                fn: run_next_step
-              };
-              execute_next_step();
-            }
-          });
-        }
-      };
-      $17("body").on("click", ".close-progress-content-button", function(e) {
-        hide_overlay();
-      });
-      $17("body").on("click", "#overlay", function() {
-        if (state.migration_completed == true) {
-          hide_overlay();
-        }
-      });
-      function hide_overlay() {
-        var height = $17(".progress-content").outerHeight();
-        $17(".progress-content").animate({
-          "top": "-" + height + "px"
-        }, 400, "swing", function() {
-          $17("#overlay").remove();
-          $17(".progress-content").remove();
-        });
-        state.migration_completed = false;
-      }
-      $17(".save-settings-button").click(function(event) {
-        var $button = $17(this);
+      $20(".save-settings-button").click(function(event) {
+        var $button = $20(this);
         $button.blur();
         event.preventDefault();
         if (state.doing_save_profile) {
@@ -1664,526 +2064,47 @@ function syncpilot_parse_json( maybe_json ) {
           return;
         }
         var create_new_profile = is_new_profile();
-        var profile_name = $17(".create-new-profile").val();
+        var profile_name = $20(".create-new-profile").val();
         state.doing_save_profile = true;
         $button.after('<img src="' + spinner_url + '" alt="" class="save-profile-ajax-spinner general-spinner" />');
         $button.attr("disabled", "disabled");
         function profile_request_ended() {
           $button.removeAttr("disabled");
-          $17(".save-profile-ajax-spinner").remove();
+          $20(".save-profile-ajax-spinner").remove();
           $button.after(
             '<span class="ajax-success-msg">' + syncpilot_i10n.saved + "</span>"
           );
-          $17(".ajax-success-msg").fadeOut(2e3, function() {
-            $17(this).remove();
+          $20(".ajax-success-msg").fadeOut(2e3, function() {
+            $20(this).remove();
           });
           state.doing_save_profile = false;
         }
         send_profile(function(data) {
           profile_request_ended();
-          $17(".create-new-profile").val("");
+          $20(".create-new-profile").val("");
           if (create_new_profile) {
             add_profile_to_list(data, profile_name);
           }
         }, profile_request_ended);
       });
-      $17("body").on("mousemove", ".progress-chunk-hover", function(e) {
+      $20("body").on("mousemove", ".progress-chunk-hover", function(e) {
         mX = e.pageX;
-        offset = $17(".progress-bar-wrapper").offset();
-        label_offset = $17(".progress-label").outerWidth() / 2;
+        offset = $20(".progress-bar-wrapper").offset();
+        label_offset = $20(".progress-label").outerWidth() / 2;
         mX = mX - offset.left - label_offset;
-        $17(".progress-label").css("left", mX + "px");
-        $17(".progress-label").html($17(this).attr("data-table"));
+        $20(".progress-label").css("left", mX + "px");
+        $20(".progress-label").html($20(this).attr("data-table"));
       });
-      $17("body").on("mouseenter mouseleave", ".progress-chunk-hover", function(event) {
+      $20("body").on("mouseenter mouseleave", ".progress-chunk-hover", function(event) {
         if (event.type === "mouseenter") {
-          $17(".progress-label").addClass("label-visible");
+          $20(".progress-label").addClass("label-visible");
         } else {
-          $17(".progress-label").removeClass("label-visible");
+          $20(".progress-label").removeClass("label-visible");
         }
       });
-      connection_info_box = $17(".connection-info-wrapper");
-      move_connection_info_box();
-      $17(".migrate-selection.option-group input[type=radio]").change(function() {
-        move_connection_info_box();
-        if (state.connection_established) {
-          change_replace_values();
-        }
-      });
-      function move_connection_info_box() {
-        $17(".connection-status").hide();
-        $17(".prefix-notice").hide();
-        $17(".ssl-notice").hide();
-        $17(".different-plugin-version-notice").hide();
-        $17(".step-two").show();
-        $17(".backup-options").show();
-        $17(".keep-active-plugins").show();
-        $17(".directory-permission-notice").hide();
-        $17("#create-backup").removeAttr("disabled");
-        $17("#create-backup-label").removeClass("disabled");
-        $17(".backup-option-disabled").hide();
-        var connection_info = $17.trim($17(".pull-push-connection-info").val()).split(
-          "\n"
-        );
-        if ($17("#pull").is(":checked")) {
-          $17(".pull-list li").append(connection_info_box);
-          connection_info_box.show();
-          if (state.connection_established) {
-            $17(".connection-status").hide();
-            $17(".step-two").show();
-            $17(".table-prefix").text(connection_data.prefix);
-            $17(".uploads-dir").html(syncpilot_this_uploads_dir);
-            if (state.profile_name_edited == false) {
-              var profile_name = get_domain_name(connection_info[0]);
-              $17(".create-new-profile").val(profile_name);
-            }
-            if (state.show_prefix_notice == true) {
-              $17(".prefix-notice.pull").show();
-            }
-            if (state.show_ssl_notice == true) {
-              $17(".ssl-notice").show();
-            }
-            if (state.show_version_notice == true) {
-              $17(".different-plugin-version-notice").show();
-              $17(".step-two").hide();
-            }
-            $17(".directory-scope").text(syncpilot_i10n.scope_local);
-            if (false == syncpilot_write_permission) {
-              $17("#create-backup").prop("checked", false);
-              $17("#create-backup").attr("disabled", "disabled");
-              $17("#create-backup-label").addClass("disabled");
-              $17(".backup-option-disabled").show();
-              $17(".upload-directory-location").html(syncpilot_this_upload_dir_long);
-            }
-          } else {
-            $17(".connection-status").show();
-            $17(".step-two").hide();
-          }
-        } else if ($17("#push").is(":checked")) {
-          $17(".push-list li").append(connection_info_box);
-          connection_info_box.show();
-          if (state.connection_established) {
-            $17(".connection-status").hide();
-            $17(".step-two").show();
-            $17(".table-prefix").html(syncpilot_this_prefix);
-            $17(".uploads-dir").text(connection_data.uploads_dir);
-            if (state.profile_name_edited == false) {
-              var profile_name = get_domain_name(connection_info[0]);
-              $17(".create-new-profile").val(profile_name);
-            }
-            if (state.show_prefix_notice == true) {
-              $17(".prefix-notice.push").show();
-            }
-            if (state.show_ssl_notice == true) {
-              $17(".ssl-notice").show();
-            }
-            if (state.show_version_notice == true) {
-              $17(".different-plugin-version-notice").show();
-              $17(".step-two").hide();
-            }
-            $17(".directory-scope").text(syncpilot_i10n.scope_remote);
-            if ("0" == connection_data.write_permissions) {
-              $17("#create-backup").prop("checked", false);
-              $17("#create-backup").attr("disabled", "disabled");
-              $17("#create-backup-label").addClass("disabled");
-              $17(".backup-option-disabled").show();
-              $17(".upload-directory-location").text(connection_data.upload_dir_long);
-            }
-          } else {
-            $17(".connection-status").show();
-            $17(".step-two").hide();
-          }
-        } else if ($17("#savefile").is(":checked")) {
-          $17(".connection-status").hide();
-          $17(".step-two").show();
-          $17(".table-prefix").html(syncpilot_this_prefix);
-          if (state.profile_name_edited == false) {
-            $17(".create-new-profile").val("");
-          }
-          $17(".backup-options").hide();
-          $17(".keep-active-plugins").hide();
-          if (false == syncpilot_write_permission) {
-            $17(".directory-permission-notice").show();
-            $17(".step-two").hide();
-          }
-        }
-        media_files_connection_box_moved();
-      }
-      function change_replace_values() {
-        if ($17("#push").is(":checked") || $17("#savefile").is(":checked")) {
-          if (state.last_replace_switch == "" || state.last_replace_switch == "pull") {
-            $17(".replace-row").each(function() {
-              var old_val = $17(".old-replace-col input", this).val();
-              $17(".old-replace-col input", this).val($17(
-                ".replace-right-col input",
-                this
-              ).val());
-              $17(".replace-right-col input", this).val(old_val);
-            });
-          }
-          $17("#select-tables").remove();
-          $17(".select-tables-wrap").prepend(push_select);
-          $17("#select-post-types").remove();
-          $17(".select-post-types-wrap").prepend(push_post_type_select);
-          $17("#select-backup").remove();
-          $17(".backup-tables-wrap").prepend(push_select_backup);
-          state.last_replace_switch = "push";
-        } else if ($17("#pull").is(":checked")) {
-          if (state.last_replace_switch == "" || state.last_replace_switch == "push") {
-            $17(".replace-row").each(function() {
-              var old_val = $17(".old-replace-col input", this).val();
-              $17(".old-replace-col input", this).val($17(
-                ".replace-right-col input",
-                this
-              ).val());
-              $17(".replace-right-col input", this).val(old_val);
-            });
-          }
-          $17("#select-tables").remove();
-          $17(".select-tables-wrap").prepend(pull_select);
-          $17("#select-post-types").remove();
-          $17(".select-post-types-wrap").prepend(pull_post_type_select);
-          $17("#select-backup").remove();
-          $17(".backup-tables-wrap").prepend(pull_select_backup);
-          state.last_replace_switch = "pull";
-        }
-      }
-      if (($17("#pull").is(":checked") || $17("#push").is(":checked")) && !state.connection_established) {
-        $17(".step-two").hide();
-        $17(".connection-status").show();
-      }
-      $17("body").on("click", ".temp-disabled", function() {
-        syncpilot_confirm(syncpilot_i10n.change_connection_info, function() {
-          $17(".ssl-notice").hide();
-          $17(".different-plugin-version-notice").hide();
-          $17(".migrate-db-button").show();
-          $17(".temp-disabled").removeAttr("readonly");
-          $17(".temp-disabled").removeClass("temp-disabled");
-          $17(".connect-button").show();
-          $17(".step-two").hide();
-          $17(".connection-status").show().html(syncpilot_i10n.enter_connection_info);
-          state.connection_established = false;
-        });
-      });
-      $17(".migrate-form").submit(function(e) {
-        e.preventDefault();
-      });
-      $17(".connect-button").click(function(event) {
-        event.preventDefault();
-        $17(this).blur();
-        connection_box_changed();
-      });
-      $17(".pull-push-connection-info").bind("paste", function(e) {
-        var $this = this;
-        setTimeout(function() {
-          connection_box_changed();
-        }, 0);
-      });
-      $17("body").on("click", ".try-again", function() {
-        connection_box_changed();
-      });
-      $17("body").on("click", ".try-http", function() {
-        var connection_info = $17.trim($17(".pull-push-connection-info").val()).split("\n");
-        var new_url = connection_info[0].replace("https", "http");
-        var new_contents = new_url + "\n" + connection_info[1];
-        $17(".pull-push-connection-info").val(new_contents);
-        connection_box_changed();
-      });
-      $17(".create-new-profile").change(function() {
-        state.profile_name_edited = true;
-      });
-      $17("body").on("click", ".temporarily-disable-ssl", function() {
-        if (window.location.hash) {
-          var hash = window.location.hash.substring(1);
-        }
-        $17(this).attr("href", $17(this).attr("href") + "&hash=" + hash);
-      });
-      function connection_box_changed(data) {
-        var $this = $17(".pull-push-connection-info");
-        if (state.doing_ajax || $17($this).hasClass("temp-disabled")) {
-          return;
-        }
-        var data = $17(".pull-push-connection-info").val();
-        var connection_info = $17.trim(data).split("\n");
-        var error = false;
-        var error_message = "";
-        if (connection_info == "") {
-          error = true;
-          error_message = syncpilot_i10n.connection_info_missing;
-        }
-        if (connection_info.length != 2 && !error) {
-          error = true;
-          error_message = syncpilot_i10n.connection_info_incorrect;
-        }
-        if (!error && !validate_url(connection_info[0])) {
-          error = true;
-          error_message = syncpilot_i10n.connection_info_url_invalid;
-        }
-        if (!error && connection_info[1].length != 32) {
-          error = true;
-          error_message = syncpilot_i10n.connection_info_key_invalid;
-        }
-        if (!error && connection_info[0] == syncpilot_connection_info[0]) {
-          error = true;
-          error_message = syncpilot_i10n.connection_info_local_url;
-        }
-        if (!error && connection_info[1] == syncpilot_connection_info[1]) {
-          error = true;
-          error_message = syncpilot_i10n.connection_info_local_key;
-        }
-        if (error) {
-          $17(".connection-status").html(error_message);
-          $17(".connection-status").addClass(
-            "notification-message error-notice migration-error"
-          );
-          return;
-        }
-        if (syncpilot_openssl_available == false) {
-          connection_info[0] = connection_info[0].replace("https://", "http://");
-          var new_connection_info_contents = connection_info[0] + "\n" + connection_info[1];
-          $17(".pull-push-connection-info").val(new_connection_info_contents);
-        }
-        state.show_prefix_notice = false;
-        state.doing_ajax = true;
-        disable_export_type_controls();
-        if ($17(".basic-access-auth-wrapper").is(":visible")) {
-          connection_info[0] = connection_info[0].replace(/\/\/(.*)@/, "//");
-          connection_info[0] = connection_info[0].replace("//", "//" + encodeURIComponent($17.trim($17(".auth-username").val())) + ":" + encodeURIComponent($17.trim($17(".auth-password").val())) + "@");
-          var new_connection_info_contents = connection_info[0] + "\n" + connection_info[1];
-          $17(".pull-push-connection-info").val(new_connection_info_contents);
-          $17(".basic-access-auth-wrapper").hide();
-        }
-        $17(".step-two").hide();
-        $17(".ssl-notice").hide();
-        $17(".prefix-notice").hide();
-        $17(".connection-status").show();
-        $17(".connection-status").html(syncpilot_i10n.establishing_remote_connection);
-        $17(".connection-status").removeClass(
-          "notification-message error-notice migration-error"
-        );
-        $17(".connection-status").append('<img src="' + spinner_url + '" alt="" class="ajax-spinner general-spinner" />');
-        var intent = $17("input[name=action]:checked").val();
-        state.profile_name_edited = false;
-        $17.ajax({
-          url: ajaxurl,
-          type: "POST",
-          dataType: "json",
-          cache: false,
-          data: {
-            action: "syncpilot_verify_connection_to_remote_site",
-            url: connection_info[0],
-            key: connection_info[1],
-            intent,
-            nonce: syncpilot_nonces.verify_connection_to_remote_site
-          },
-          error: function(jqXHR, textStatus, errorThrown) {
-            $17(".connection-status").html(syncpilot_i10n.connection_local_server_problem + " (#100)");
-            $17(".connection-status").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
-            $17(".connection-status").addClass(
-              "notification-message error-notice migration-error"
-            );
-            $17(".ajax-spinner").remove();
-            state.doing_ajax = false;
-            enable_export_type_controls();
-          },
-          success: function(data2) {
-            $17(".ajax-spinner").remove();
-            state.doing_ajax = false;
-            enable_export_type_controls();
-            if (typeof data2.syncpilot_error != "undefined" && data2.syncpilot_error == 1) {
-              $17(".connection-status").html(syncpilot_sanitize_html(data2.body));
-              $17(".connection-status").addClass(
-                "notification-message error-notice migration-error"
-              );
-              if (data2.body.indexOf("401 Unauthorized") > -1) {
-                $17(".basic-access-auth-wrapper").show();
-              }
-              return;
-            }
-            var profile_name = get_domain_name(connection_info[0]);
-            $17(".create-new-profile").val(profile_name);
-            $17(".pull-push-connection-info").addClass("temp-disabled");
-            $17(".pull-push-connection-info").attr("readonly", "readonly");
-            $17(".connect-button").hide();
-            $17(".connection-status").hide();
-            $17(".step-two").show();
-            maybe_show_ssl_warning(connection_info[0], connection_info[1], data2.scheme);
-            maybe_show_version_warning(data2.plugin_version, connection_info[0]);
-            maybe_show_prefix_notice(data2.prefix);
-            state.connection_established = true;
-            connection_data = data2;
-            move_connection_info_box();
-            var table_select = document.createElement("select");
-            $17(table_select).attr({
-              multiple: "multiple",
-              name: "select_tables[]",
-              id: "select-tables",
-              class: "multiselect"
-            });
-            $17.each(connection_data.tables, function(index, value) {
-              $17(table_select).append('<option value="' + value + '">' + value + " (" + connection_data.table_sizes_hr[value] + ")</option>");
-            });
-            pull_select = table_select;
-            push_select_backup = $17(table_select).clone();
-            $17(push_select_backup).attr({
-              name: "select_backup[]",
-              id: "select-backup"
-            });
-            var post_type_select = document.createElement("select");
-            $17(post_type_select).attr({
-              multiple: "multiple",
-              name: "select_post_types[]",
-              id: "select-post-types",
-              class: "multiselect"
-            });
-            $17.each(connection_data.post_types, function(index, value) {
-              $17(post_type_select).append('<option value="' + value + '">' + value + "</option>");
-            });
-            pull_post_type_select = post_type_select;
-            if ($17("#pull").is(":checked")) {
-              $17("#new-url").val(remove_protocol(syncpilot_this_url));
-              $17("#new-path").val(syncpilot_this_path);
-              if (syncpilot_is_multisite == true) {
-                $17("#new-domain").val(syncpilot_this_domain);
-              }
-              $17("#old-url").val(remove_protocol(data2.url));
-              $17("#old-path").val(data2.path);
-              $17("#select-tables").remove();
-              $17(".select-tables-wrap").prepend(pull_select);
-              $17("#select-post-types").remove();
-              $17(".select-post-types-wrap").prepend(pull_post_type_select);
-              $17(".table-prefix").text(data2.prefix);
-              $17(".uploads-dir").html(syncpilot_this_uploads_dir);
-            } else {
-              $17("#select-backup").remove();
-              $17(".backup-tables-wrap").prepend(push_select_backup);
-              $17("#new-url").val(remove_protocol(data2.url));
-              $17("#new-path").val(data2.path);
-            }
-            if ($17("#pull").is(":checked")) {
-              add_scheme_row(data2.url, syncpilot_this_url);
-            } else {
-              add_scheme_row(syncpilot_this_url, data2.url);
-            }
-            next_step_in_migration = {
-              fn: media_files_connection_verified,
-              args: [connection_data]
-            };
-            execute_next_step();
-          }
-        });
-      }
-      $17("body").on("click", ".pause-resume", function() {
-        if (true == state.migration_paused) {
-          state.migration_paused = false;
-          state.doing_ajax = true;
-          $17(".progress-title").html(state.previous_progress_title);
-          $17(".progress-text").html(state.previous_progress_text);
-          $17(".migration-progress-ajax-spinner").show();
-          $17(".pause-resume").html(syncpilot_i10n.pause);
-          state.elapsed_interval = setInterval(count, 1e3);
-          execute_next_step();
-        } else {
-          state.migration_paused = true;
-          state.doing_ajax = false;
-          state.previous_progress_title = $17(".progress-title").html();
-          state.previous_progress_text = $17(".progress-text").html();
-          $17(".progress-title").html(syncpilot_i10n.migration_paused);
-          $17(".pause-resume").html(syncpilot_i10n.resume);
-          $17(".progress-text").html(syncpilot_i10n.completing_current_request);
-        }
-      });
-      $17("body").on("click", ".cancel", function() {
-        state.migration_cancelled = true;
-        state.migration_paused = false;
-        $17(".progress-text").html(syncpilot_i10n.completing_current_request);
-        $17(".progress-title").html(syncpilot_i10n.cancelling_migration);
-        $17(".migration-controls").fadeOut();
-        $17(".migration-progress-ajax-spinner").show();
-        if (false == state.doing_ajax) {
-          execute_next_step();
-        }
-      });
-      execute_next_step = function() {
-        if (true == state.migration_paused) {
-          $17(".migration-progress-ajax-spinner").hide();
-          clearInterval(state.elapsed_interval);
-          $17(".progress-text").html(syncpilot_i10n.paused);
-          return;
-        } else if (true == state.migration_cancelled) {
-          state.migration_intent = $17("input[name=action]:checked").val();
-          if ("savefile" == state.migration_intent) {
-            progress_msg = syncpilot_i10n.removing_local_sql;
-          } else if ("pull" == state.migration_intent) {
-            if ("backup" == state.stage) {
-              progress_msg = syncpilot_i10n.removing_local_backup;
-            } else {
-              progress_msg = syncpilot_i10n.removing_local_temp_tables;
-            }
-          } else if ("push" == state.migration_intent) {
-            if ("backup" == state.stage) {
-              progress_msg = syncpilot_i10n.removing_remote_sql;
-            } else {
-              progress_msg = syncpilot_i10n.removing_remote_temp_tables;
-            }
-          }
-          $17(".progress-text").html(progress_msg);
-          var request_data = {
-            action: "syncpilot_cancel_migration",
-            intent: state.migration_intent,
-            url: state.remote_site,
-            key: state.secret_key,
-            stage: state.stage,
-            dump_filename: state.dump_filename,
-            form_data: state.form_data,
-            nonce: syncpilot_nonces.cancel_migration
-          };
-          if (connection_data) {
-            request_data.temp_prefix = connection_data.temp_prefix;
-          }
-          $17.ajax({
-            url: ajaxurl,
-            type: "POST",
-            dataType: "text",
-            cache: false,
-            data: request_data,
-            error: function(jqXHR, textStatus, errorThrown) {
-              $17(".progress-title").html(syncpilot_i10n.migration_cancellation_failed);
-              $17(".progress-text").html(syncpilot_i10n.manually_remove_temp_files);
-              $17(".progress-text").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
-              $17(".progress-text").addClass("migration-error");
-              console.log(jqXHR);
-              console.log(textStatus);
-              console.log(errorThrown);
-              migration_error = true;
-              migration_complete_events();
-              return;
-            },
-            success: function(data) {
-              state.doing_ajax = false;
-              data = $17.trim(data);
-              if (data != "") {
-                $17(".progress-title").html(syncpilot_i10n.migration_cancellation_failed);
-                $17(".progress-text").html(syncpilot_sanitize_html(data));
-                $17(".progress-text").addClass("migration-error");
-                migration_error = true;
-                migration_complete_events();
-                return;
-              }
-              state.completed_msg = syncpilot_i10n.migration_cancelled;
-              $17(".progress-text").hide();
-              migration_complete_events();
-            }
-          });
-        } else {
-          next_step_in_migration.fn.apply(null, next_step_in_migration.args);
-        }
-      };
+      init_connection();
     });
   })(jQuery);
-  function validate_url(url) {
-    return /^([a-z]([a-z]|\d|\+|-|\.)*):(\/\/(((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:)*@)?((\[(|(v[\da-f]{1,}\.(([a-z]|\d|-|\.|_|~)|[!\$&'\(\)\*\+,;=]|:)+))\])|((\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5]))|(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=])*)(:\d*)?)(\/(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*|(\/((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)+(\/(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*)?)|((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)+(\/(([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)*)*)|((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)){0})(\?((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)|[\uE000-\uF8FF]|\/|\?)*)?(\#((([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(%[\da-f]{2})|[!\$&'\(\)\*\+,;=]|:|@)|\/|\?)*)?$/i.test(url);
-  }
 })();
 
 // The media files part of the admin page: it decides whether media files belong to a migration and copies them after the
@@ -2317,6 +2238,9 @@ var media_successfully_determined;
                 remove_local_media = 1;
             }
 
+            // a request is under way: Cancel waits for its answer instead of cancelling twice
+            migration_request_running( true );
+
             $.ajax( {
                 url      : ajaxurl,
                 type     : 'POST',
@@ -2348,6 +2272,8 @@ var media_successfully_determined;
                     return;
                 },
                 success : function ( data ) {
+
+                    migration_request_running( false );
 
                     original_data = data;
                     data          = JSON.parse( data.trim() );
@@ -2461,6 +2387,9 @@ var media_successfully_determined;
             var connection_info = $.trim( $( '.pull-push-connection-info' ).val() ).split(
                 '\n' );
 
+            // a request is under way: Cancel waits for its answer instead of cancelling twice
+            migration_request_running( true );
+
             $.ajax( {
                 url      : ajaxurl,
                 type     : 'POST',
@@ -2492,6 +2421,8 @@ var media_successfully_determined;
                     return;
                 },
                 success : function ( data ) {
+
+                    migration_request_running( false );
 
                     original_data = data;
                     data          = JSON.parse( data.trim() );

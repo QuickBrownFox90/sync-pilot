@@ -40,6 +40,7 @@ if ( ! process.argv.includes( '--yes' ) ) {
 const withMedia = process.argv.includes( '--media' );
 const pull      = process.argv.includes( '--pull' );
 const backup    = process.argv.includes( '--backup' );
+const cancel    = process.argv.includes( '--cancel' );
 
 // the site that receives the data, and the one it comes from (the names of the sides in the checksums: source is config.wp)
 const receiver = pull ? config.wp : config.remoteWp;
@@ -106,6 +107,14 @@ const loadTables = ( path, file, tables ) => {
 // put a site back to the reference: the tables that differ (the options are written by wp-cli itself and do not count),
 // or everything
 const putBack = ( path, file, side ) => {
+
+    // tables that are not in the reference (the temporary tables of a migration that was cancelled or failed, the table for
+    // the ALTER statements) are not in the backup either and would stay
+    const wantedTables = existsSync( reference ) ? Object.keys( JSON.parse( readFileSync( reference, 'utf8' ) )[side] ) : null;
+    const extra        = execFileSync( 'wp', [ '--path=' + path, 'db', 'tables', '--all-tables' ], { encoding : 'utf8', stdio : [ 'ignore', 'pipe', 'ignore' ] } ).trim().split( '\n' ).filter( t => wantedTables ? ! wantedTables.includes( t ) : /^_(mig|old)_/.test( t ) );
+
+    if ( extra.length )
+        execFileSync( 'wp', [ '--path=' + path, 'db', 'query', 'DROP TABLE ' + extra.map( t => '`' + t + '`' ).join( ', ' ) ], { stdio : 'ignore' } );
 
     const wanted = existsSync( reference ) ? JSON.parse( readFileSync( reference, 'utf8' ) )[side] : null;
     const now    = wanted && ! full ? sums( path ) : null;
@@ -221,97 +230,145 @@ try {
         await browser.chooseTables( chosen );
 
     await browser.shot( 'push-ready' );
-    await browser.watchProgress();
-    await browser.click( '.migrate-db-button', 800 );
 
-    const end    = Date.now() + ( full ? 540000 : 150000 );
-    let finished = false, failed = false, text = '';
+    if ( cancel ) {
 
-    while ( Date.now() < end ) {
+        // the requests are slowed down so that there is time to click; the cancellation is a request of this site to the
+        // other one, signed with the key, and it has to be accepted there
+        const network = latency => browser.send( 'Network.emulateNetworkConditions', { offline : false, latency, downloadThroughput : -1, uploadThroughput : -1 } );
 
-        const s = await browser.ev( `({ done : jQuery('.close-progress-content').is(':visible'), error : jQuery('.progress-text').hasClass('migration-error'), text : jQuery('.progress-title').text().trim() + ' | ' + jQuery('.progress-text').text().trim().slice(0, 100) })` );
+        await network( 700 );
+        await browser.click( '.migrate-db-button', 300 );
 
-        text = s.text;
+        check( 'the migration runs, the controls are shown', await browser.waitFor( `jQuery('.migration-controls').is(':visible') && jQuery('.progress-title').text().trim() !== '' && ! jQuery('.progress-content').is(':animated') && Math.round( jQuery('.progress-content')[0].getBoundingClientRect().top ) >= 0`, 30000, 100 ) );
 
-        if ( s.error ) { failed = true; break; }
+        // with the media files: Cancel is clicked while the request for the files is under way
+        if ( withMedia )
+            check( 'the media files are being sent', await browser.waitFor( `jQuery('.media-migration-current-image').length > 0`, 90000, 50 ) );
+        else
+            await wait( 3000 );
 
-        if ( s.done ) { finished = true; break; }
+        const mark = browser.requests.length;
 
-        await wait( 1000 );
-    }
+        await browser.click( '.cancel', 300 );
 
-    // when it did not end: what the box looks like (the part with the closing button)
-    if ( ! finished && ! failed )
-        console.log( 'the box at the end: ' + await browser.ev( `(() => { const c = jQuery('.close-progress-content'); return JSON.stringify({ closeButtons : c.length, display : c.css('display'), visible : c.is(':visible'), parentVisible : c.parent().is(':visible'), controls : jQuery('.migration-controls').is(':visible'), overlay : jQuery('#overlay').length, boxTop : jQuery('.progress-content').css('top'), title : jQuery('.progress-title').html(), doingAjax : null, html : (jQuery('.progress-content')[0] || {}).outerHTML.replace(/\\s+/g, ' ').slice(0, 900) }); })()` ) );
+        const ended  = await browser.waitFor( `jQuery('.close-progress-content').is(':visible')`, 90000, 200 );
+        const result = await browser.ev( `({ error : jQuery('.progress-text').hasClass('migration-error'), title : jQuery('.progress-title').text().trim(), text : jQuery('.progress-text').text().trim().slice( 0, 200 ) })` );
 
-    await browser.shot( 'push-done' );
+        await network( 0 );
 
-    const widths = await browser.progressWidths();
+        const cancellations = browser.requests.slice( mark ).filter( r => /syncpilot_cancel_migration/.test( r ) ).length;
 
-    check( `the ${ pull ? 'pull' : 'push' } runs to the end without an error message`, finished && ! failed, text );
+        check( 'the cancellation is sent once', cancellations === 1, `${ cancellations } requests` );
+        check( 'the cancellation ends without an error message', ended && ! result.error, `${ result.title } | ${ result.text }` );
 
-    // with media files the bar starts again at 0 for the files, so it only has to rise within each part
-    check( 'the progress bar moves', widths.some( w => w > 0 && w < 100 ) && ( withMedia || backup || widths.every( ( w, i ) => i === 0 || w >= widths[i - 1] ) ), `${ widths.length } samples, highest ${ Math.max( ...widths ) }%` );
-    check( 'no error in the page', browser.takeProblems().length === 0, browser.takeProblems().join( ' | ' ) );
+        const tables = Object.keys( counts( receiver ) ).filter( t => t.startsWith( '_mig_' ) || t.startsWith( '_old_' ) );
 
-    section( 'the other site afterwards' );
+        check( 'no temporary tables are left on the receiving site', tables.length === 0, tables.join( ', ' ) );
+        check( 'the marker row of the receiving site is still there (nothing was replaced)', marked() === '1' );
 
-    if ( backup ) {
+        if ( backup ) {
 
-        const made = backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) );
+            const left = backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) );
 
-        check( 'one backup was made, with content', made.length === 1 && statSync( join( backupDir( receiver ), made[0] ) ).size > 1000, made.map( f => f + ' ' + statSync( join( backupDir( receiver ), made[0] ) ).size + ' bytes' ).join( ', ' ) );
+            check( 'the backup file of the cancelled migration is removed', left.length === 0, left.join( ', ' ) );
+        }
 
-        // the backup belongs to the web server (the folder is not writable for this user): the plugin of that site removes it
-        // the way it removes the backup of a cancelled migration
-        const site = pull ? config.site : config.remoteSite;
-
-        if ( ! pull )
-            await browser.login( config.remoteWp, config.remoteSite );
-
-        await browser.goto( `${ site }/wp-admin/tools.php?page=sync-pilot` );
-
-        for ( const file of made )
-            await browser.ev( `fetch( ajaxurl, { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams( { action : 'syncpilot_cancel_migration', intent : 'pull', stage : 'backup', dump_filename : ${ JSON.stringify( file.replace( /\.sql(\.gz)?$/, '' ) ) }, form_data : '', temp_prefix : '_mig_', nonce : syncpilot_nonces.cancel_migration } ) } ).then( r => r.text() )` );
-
-        check( 'the backup is removed again', backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) ).length === 0, backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) ).join( ', ' ) );
-    }
-
-    if ( withMedia ) {
-
-        const onTarget = new Set( files( receiver ) );
-        const missing  = takenAway.filter( f => ! onTarget.has( f ) );
-
-        check( 'the files that were taken away are back on the other site', takenAway.length > 0 && missing.length === 0, `${ takenAway.length } files taken away, ${ missing.length } not back${ missing.length ? ': ' + missing.slice( 0, 3 ).join( ', ' ) : '' }` );
-    }
-
-    const rowsSource = counts( sender ), rowsTarget = counts( receiver );
-    const left       = Object.keys( rowsTarget ).filter( t => t.startsWith( '_mig_' ) || t.startsWith( '_old_' ) );
-    const differ     = Object.keys( rowsSource ).filter( t => rowsSource[t] !== rowsTarget[t] );
-
-    check( 'the data of the sending site replaced the table on the receiving site (its marker row is gone)', marked() === '0' );
-    check( 'no temporary or old tables are left', left.length === 0, left.join( ', ' ) );
-
-    if ( chosen ) {
-
-        // the other tables were not sent: the sites may differ there (and must not have changed on the other site)
-        const wrong = chosen.filter( t => rowsSource[t] !== rowsTarget[t] );
-
-        check( 'the pushed tables have the same number of rows on both sites', wrong.length === 0 && chosen.every( t => t in rowsTarget ), wrong.join( ', ' ) );
-
-        const nowTarget = sums( receiver );
-
-        // the options are written by WordPress itself; the users' meta (sessions) of a site that is logged in change as well
-        // (the pull is received by the site of the test, and the backup is removed through the receiving site)
-        const changed   = Object.keys( before[received] ).filter( t => ! chosen.includes( t ) && before[received][t] !== nowTarget[t] && ! t.endsWith( 'options' ) && ! t.endsWith( 'usermeta' ) );
-
-        check( 'the other tables of the receiving site were not touched', changed.length === 0, changed.join( ', ' ) );
+        check( 'no error in the page', browser.takeProblems().length === 0, browser.takeProblems().join( ' | ' ) );
     } else {
 
-        check( 'same tables, same number of rows (except the options, whose transients are not sent)', Object.keys( rowsSource ).length === Object.keys( rowsTarget ).length && differ.every( t => t.endsWith( 'options' ) ), 'different: ' + differ.join( ', ' ) );
-    }
+        await browser.watchProgress();
+        await browser.click( '.migrate-db-button', 800 );
 
-    check( 'the receiving site kept its address and its key', wp( receiver, 'echo get_option( "home" );' ) === ( pull ? config.site : config.remoteSite ) && wp( receiver, 'echo get_option( "syncpilot_settings" )["key"];' ) === ( pull ? wp( config.wp, 'echo get_option( "syncpilot_settings" )["key"];' ) : key ) );
+        const end    = Date.now() + ( full ? 540000 : 150000 );
+        let finished = false, failed = false, text = '';
+
+        while ( Date.now() < end ) {
+
+            const s = await browser.ev( `({ done : jQuery('.close-progress-content').is(':visible'), error : jQuery('.progress-text').hasClass('migration-error'), text : jQuery('.progress-title').text().trim() + ' | ' + jQuery('.progress-text').text().trim().slice(0, 100) })` );
+
+            text = s.text;
+
+            if ( s.error ) { failed = true; break; }
+
+            if ( s.done ) { finished = true; break; }
+
+            await wait( 1000 );
+        }
+
+        // when it did not end: what the box looks like (the part with the closing button)
+        if ( ! finished && ! failed )
+            console.log( 'the box at the end: ' + await browser.ev( `(() => { const c = jQuery('.close-progress-content'); return JSON.stringify({ closeButtons : c.length, display : c.css('display'), visible : c.is(':visible'), parentVisible : c.parent().is(':visible'), controls : jQuery('.migration-controls').is(':visible'), overlay : jQuery('#overlay').length, boxTop : jQuery('.progress-content').css('top'), title : jQuery('.progress-title').html(), doingAjax : null, html : (jQuery('.progress-content')[0] || {}).outerHTML.replace(/\\s+/g, ' ').slice(0, 900) }); })()` ) );
+
+        await browser.shot( 'push-done' );
+
+        const widths = await browser.progressWidths();
+
+        check( `the ${ pull ? 'pull' : 'push' } runs to the end without an error message`, finished && ! failed, text );
+
+        // with media files the bar starts again at 0 for the files, so it only has to rise within each part
+        check( 'the progress bar moves', widths.some( w => w > 0 && w < 100 ) && ( withMedia || backup || widths.every( ( w, i ) => i === 0 || w >= widths[i - 1] ) ), `${ widths.length } samples, highest ${ Math.max( ...widths ) }%` );
+        check( 'no error in the page', browser.takeProblems().length === 0, browser.takeProblems().join( ' | ' ) );
+
+        section( 'the other site afterwards' );
+
+        if ( backup ) {
+
+            const made = backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) );
+
+            check( 'one backup was made, with content', made.length === 1 && statSync( join( backupDir( receiver ), made[0] ) ).size > 1000, made.map( f => f + ' ' + statSync( join( backupDir( receiver ), made[0] ) ).size + ' bytes' ).join( ', ' ) );
+
+            // the backup belongs to the web server (the folder is not writable for this user): the plugin of that site removes it
+            // the way it removes the backup of a cancelled migration
+            const site = pull ? config.site : config.remoteSite;
+
+            if ( ! pull )
+                await browser.login( config.remoteWp, config.remoteSite );
+
+            await browser.goto( `${ site }/wp-admin/tools.php?page=sync-pilot` );
+
+            for ( const file of made )
+                await browser.ev( `fetch( ajaxurl, { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams( { action : 'syncpilot_cancel_migration', intent : 'pull', stage : 'backup', dump_filename : ${ JSON.stringify( file.replace( /\.sql(\.gz)?$/, '' ) ) }, form_data : '', temp_prefix : '_mig_', nonce : syncpilot_nonces.cancel_migration } ) } ).then( r => r.text() )` );
+
+            check( 'the backup is removed again', backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) ).length === 0, backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) ).join( ', ' ) );
+        }
+
+        if ( withMedia ) {
+
+            const onTarget = new Set( files( receiver ) );
+            const missing  = takenAway.filter( f => ! onTarget.has( f ) );
+
+            check( 'the files that were taken away are back on the other site', takenAway.length > 0 && missing.length === 0, `${ takenAway.length } files taken away, ${ missing.length } not back${ missing.length ? ': ' + missing.slice( 0, 3 ).join( ', ' ) : '' }` );
+        }
+
+        const rowsSource = counts( sender ), rowsTarget = counts( receiver );
+        const left       = Object.keys( rowsTarget ).filter( t => t.startsWith( '_mig_' ) || t.startsWith( '_old_' ) );
+        const differ     = Object.keys( rowsSource ).filter( t => rowsSource[t] !== rowsTarget[t] );
+
+        check( 'the data of the sending site replaced the table on the receiving site (its marker row is gone)', marked() === '0' );
+        check( 'no temporary or old tables are left', left.length === 0, left.join( ', ' ) );
+
+        if ( chosen ) {
+
+            // the other tables were not sent: the sites may differ there (and must not have changed on the other site)
+            const wrong = chosen.filter( t => rowsSource[t] !== rowsTarget[t] );
+
+            check( 'the pushed tables have the same number of rows on both sites', wrong.length === 0 && chosen.every( t => t in rowsTarget ), wrong.join( ', ' ) );
+
+            const nowTarget = sums( receiver );
+
+            // the options are written by WordPress itself; the users' meta (sessions) of a site that is logged in change as well
+            // (the pull is received by the site of the test, and the backup is removed through the receiving site)
+            const changed   = Object.keys( before[received] ).filter( t => ! chosen.includes( t ) && before[received][t] !== nowTarget[t] && ! t.endsWith( 'options' ) && ! t.endsWith( 'usermeta' ) );
+
+            check( 'the other tables of the receiving site were not touched', changed.length === 0, changed.join( ', ' ) );
+        } else {
+
+            check( 'same tables, same number of rows (except the options, whose transients are not sent)', Object.keys( rowsSource ).length === Object.keys( rowsTarget ).length && differ.every( t => t.endsWith( 'options' ) ), 'different: ' + differ.join( ', ' ) );
+        }
+
+        check( 'the receiving site kept its address and its key', wp( receiver, 'echo get_option( "home" );' ) === ( pull ? config.site : config.remoteSite ) && wp( receiver, 'echo get_option( "syncpilot_settings" )["key"];' ) === ( pull ? wp( config.wp, 'echo get_option( "syncpilot_settings" )["key"];' ) : key ) );
+    }
 } catch ( error ) {
 
     check( 'the test itself ran through', false, error.message );

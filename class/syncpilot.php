@@ -2967,6 +2967,11 @@ class SyncPilot extends SyncPilot_Base {
 		echo ( isset( $option ) && $option == '1' ) ? ' checked="checked"' : '';
 	}
 
+	/**
+	 * Cancel a migration: remove what it made so far. An export deletes its file; a push asks the other site to delete its
+	 * backup or temporary tables (a signed request); a pull deletes the backup or the temporary tables of this site
+	 * @since   0.2.8
+	 */
 	function ajax_cancel_migration() {
 
 		$this->check_ajax_referer( 'cancel-migration' );
@@ -2979,7 +2984,12 @@ class SyncPilot extends SyncPilot_Base {
 			break;
 
 			case 'push' :
-				$data                = $this->get_post_data_filtered();
+				$data = $this->get_post_data_filtered();
+
+				// the other site does not get the nonce and does not count it when it checks the signature
+				if ( isset( $data['nonce'] ) )
+					unset( $data['nonce'] );
+
 				$data['action'] 	 = 'syncpilot_process_push_migration_cancellation';
 				$data['temp_prefix'] = $this->temp_prefix;
 				$ajax_url            = trailingslashit( $data['url'] ) . 'wp-admin/admin-ajax.php';
@@ -3049,6 +3059,12 @@ class SyncPilot extends SyncPilot_Base {
 		}
 	}
 
+	/**
+	 * Remove what a cancelled push or pull left on this site: the temporary tables (they start with the temp prefix) and
+	 * the table with the ALTER statements, which the end of a finished import removes itself
+	 * @since   0.2.8
+	 * @param   string $prefix  The prefix of the temporary tables (_mig_)
+	 */
 	function delete_temporary_tables( $prefix ) {
 
 		global $wpdb;
@@ -3071,6 +3087,8 @@ class SyncPilot extends SyncPilot_Base {
 		}
 
 		$this->process_chunk( $delete_queries );
+
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . $this->backquote( $this->get_alter_table_name() ) );
 	}
 
 	function empty_current_chunk() {

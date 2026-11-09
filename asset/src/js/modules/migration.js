@@ -32,11 +32,12 @@ export function init_migration() {
  * The migration cannot go on: the title says so, the text is the reason, and the end of the migration is run, which
  * shows the button to close the box
  * @since   0.2.7
- * @param   {string} text  The reason, as HTML (sanitized by the caller where it comes from the other site)
+ * @param   {string} text   The reason, as HTML (sanitized by the caller where it comes from the other site)
+ * @param   {string} title  The title; the one for a failed migration when it is left out
  */
-function migration_failed( text ) {
+export function migration_failed( text, title ) {
 
-    $( '.progress-title' ).html( syncpilot_i10n.migration_failed );
+    $( '.progress-title' ).html( title || syncpilot_i10n.migration_failed );
     $( '.progress-text' ).html( text );
     $( '.progress-text' ).addClass( 'migration-error' );
 
@@ -54,7 +55,7 @@ function migration_failed( text ) {
  * @param   {string} response_label  The word before the response
  * @return  {string}               The HTML below the first line of the message
  */
-function request_problem( jqXHR, textStatus, errorThrown, status_label, response_label ) {
+export function request_problem( jqXHR, textStatus, errorThrown, status_label, response_label ) {
 
     console.log( jqXHR );
     console.log( textStatus );
