@@ -23,6 +23,7 @@ export const state = {
 
     // the migration
     migration_intent        : undefined,
+    migration_id            : '',
     stage                   : undefined,
     form_data               : undefined,
     tables_to_migrate       : '',

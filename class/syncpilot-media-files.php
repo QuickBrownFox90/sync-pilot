@@ -272,6 +272,11 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		return $result;
 	}
 
+	/**
+	 * Download the media files that the user chose from the other site (pull)
+	 * @since   0.0.1
+	 * @since   0.3.0  Every file that fails is logged with its path and the reason (MediaPathInvalid, MediaDownloadFailed, MediaPathOutside, MediaMoveFailed, MediaFolderFailed)
+	 */
 	function process_pull_request() {
 
 		$files_to_download  = ( isset( $_POST['file_chunk'] ) && is_array( $_POST['file_chunk'] ) ) ? $_POST['file_chunk'] : array();
@@ -292,6 +297,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 			if ( ! $this->is_safe_media_path( $file_to_download ) ) {
 				$errors[] = sprintf( __( 'The path of the media file is not valid: %s', self::TEXT_DOMAIN ), esc_html( (string) $file_to_download ) ) . ' (#111mf)';
 
+				$this->log_error( SyncPilot_HelpCode::MediaPathInvalid, array( 'path' => (string) $file_to_download ), site: 1 );
+
 				continue;
 			}
 
@@ -300,6 +307,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 			if ( is_wp_error( $temp_file_path ) ) {
 				$download_error = $temp_file_path->get_error_message();
 				$errors[]       = __( sprintf( 'Could not download file: %1$s - %2$s', $remote_uploads_url . $file_to_download, $download_error ), self::TEXT_DOMAIN );
+
+				$this->log_error( SyncPilot_HelpCode::MediaDownloadFailed, array( 'path' => (string) $file_to_download, 'reason' => $download_error ), site: 1 );
 
 				continue;
 			}
@@ -312,8 +321,12 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 
 				$errors[] = sprintf( __( 'The media file would end up outside the uploads folder: %s', self::TEXT_DOMAIN ), esc_html( $file_to_download ) ) . ' (#113mf)';
 
+				$this->log_error( SyncPilot_HelpCode::MediaPathOutside, array( 'path' => (string) $file_to_download ), site: 1 );
+
 				continue;
 			}
+
+			error_clear_last();
 
 			$move_result = @rename( $temp_file_path, $new_path );
 
@@ -323,18 +336,29 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 
 				if ( @file_exists( $folder ) ) {
 					$errors[] =  __( sprintf( 'Error attempting to move downloaded file. Temp path: %1$s - New Path: %2$s', $temp_file_path, $new_path ), self::TEXT_DOMAIN ) . ' (#103mf)';
+
+					$this->log_error( SyncPilot_HelpCode::MediaMoveFailed, $this->folder_facts( $folder, array( 'path' => (string) $file_to_download ) ), site: 1 );
 				}
 
 				else {
+					error_clear_last();
+
 					if ( false === @mkdir( $folder, 0755, true ) ) {
 						$errors[] =  __( sprintf( 'Error attempting to create required directory: %s', $folder ), self::TEXT_DOMAIN ) . ' (#104mf)';
+
+						$this->log_error( SyncPilot_HelpCode::MediaFolderFailed, $this->folder_facts( dirname( $folder ), array( 'folder' => $folder ) ), site: 1 );
 					}
 
 					else {
+						error_clear_last();
+
 						$move_result = @rename( $temp_file_path, $new_path );
 
-						if ( false === $move_result )
+						if ( false === $move_result ) {
 							$errors[] =  __( sprintf( 'Error attempting to move downloaded file. Temp path: %1$s - New Path: %2$s', $temp_file_path, $new_path ), self::TEXT_DOMAIN ) . ' (#105mf)';
+
+							$this->log_error( SyncPilot_HelpCode::MediaMoveFailed, $this->folder_facts( $folder, array( 'path' => (string) $file_to_download ) ), site: 2 );
+						}
 					}
 				}
 			}
@@ -359,6 +383,11 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		return $result;
 	}
 
+	/**
+	 * Send a chunk of media files to the other site (push)
+	 * @since   0.0.1
+	 * @since   0.3.0  A path that is not valid is logged (MediaPathInvalid, site 2)
+	 */
 	function process_push_request() {
 
 		$files_to_migrate = ( isset( $_POST['file_chunk'] ) && is_array( $_POST['file_chunk'] ) ) ? array_values( $_POST['file_chunk'] ) : array();
@@ -373,6 +402,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 					'syncpilot_error' => 1,
 					'body'            => sprintf( __( 'The path of the media file is not valid: %s', self::TEXT_DOMAIN ), esc_html( (string) $file_to_migrate ) ) . ' (#111mf)',
 				);
+
+				$this->log_error( SyncPilot_HelpCode::MediaPathInvalid, array( 'path' => (string) $file_to_migrate ), site: 2 );
 
 				$result = $this->end_ajax( json_encode( $return ) );
 
@@ -399,6 +430,11 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		return $result;
 	}
 
+	/**
+	 * Public endpoint: receive media files of a push (signed) and write them to the uploads folder
+	 * @since   0.0.1
+	 * @since   0.3.0  Every refusal and every failed file is logged (InvalidSignature, site 8; PushNotAllowed, site 5; MediaUploadEmpty, MediaListMismatch, MediaPathInvalid, MediaPathOutside, MediaFolderFailed, MediaUploadMoveFailed)
+	 */
 	function respond_to_push_request() {
 
 		$filtered_post          = $this->filter_post_elements( $_POST, array( 'action', 'files' ) );
@@ -410,6 +446,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 				'syncpilot_error' 	=> 1,
 				'body'			=> $this->invalid_content_verification_error . ' (#101mf)',
 			);
+
+			$this->log_error( SyncPilot_HelpCode::InvalidSignature, array( 'request' => $filtered_post ), site: 8 );
 
 			$result = $this->end_ajax( serialize( $return ) );
 
@@ -423,6 +461,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 				'body'            => sprintf( __( 'The connection succeeded but the remote site is configured to reject %s connections. You can change this in the "settings" tab on the remote site. (#110)', self::TEXT_DOMAIN ), __( 'push', self::TEXT_DOMAIN ) ),
 			);
 
+			$this->log_error( SyncPilot_HelpCode::PushNotAllowed, array(), site: 5 );
+
 			$result = $this->end_ajax( serialize( $return ) );
 
 			return $result;
@@ -434,6 +474,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 				'syncpilot_error' 	=> 1,
 				'body'			=> __( '$_FILES is empty, the upload appears to have failed', self::TEXT_DOMAIN ) . ' (#106mf)',
 			);
+
+			$this->log_error( SyncPilot_HelpCode::MediaUploadEmpty, array( 'request_bytes' => (int) ( $_SERVER['CONTENT_LENGTH'] ?? 0 ) ), site: 1 );
 
 			$result = $this->end_ajax( serialize( $return ) );
 
@@ -454,6 +496,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 				'body'            => __( 'The list of media files does not match the uploaded files.', self::TEXT_DOMAIN ) . ' (#112mf)',
 			);
 
+			$this->log_error( SyncPilot_HelpCode::MediaListMismatch, array( 'paths' => is_array( $file_paths ) ? count( $file_paths ) : 'not a list', 'files' => count( $files ) ), site: 1 );
+
 			$result = $this->end_ajax( serialize( $return ) );
 
 			return $result;
@@ -470,6 +514,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 					'body'            => sprintf( __( 'The path of the media file is not valid: %s', self::TEXT_DOMAIN ), esc_html( (string) $file_path ) ) . ' (#111mf)',
 				);
 
+				$this->log_error( SyncPilot_HelpCode::MediaPathInvalid, array( 'path' => (string) $file_path ), site: 3 );
+
 				$result = $this->end_ajax( serialize( $return ) );
 
 				return $result;
@@ -483,20 +529,30 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 
 			if ( ! $this->is_inside_uploads( $destination ) ) {
 				$errors[] = sprintf( __( 'The media file would end up outside the uploads folder: %s', self::TEXT_DOMAIN ), esc_html( $file_paths[$i] ) ) . ' (#113mf)';
+
+				$this->log_error( SyncPilot_HelpCode::MediaPathOutside, array( 'path' => (string) $file_paths[$i] ), site: 2 );
 				++$i;
 
 				continue;
 			}
+
+			error_clear_last();
 
 			if ( false === @file_exists( $folder ) && false === @mkdir( $folder, 0755, true ) ) {
 				$errors[] = __( sprintf( 'Error attempting to create required directory: %s', $folder ), self::TEXT_DOMAIN ) . ' (#108mf)';
+
+				$this->log_error( SyncPilot_HelpCode::MediaFolderFailed, $this->folder_facts( dirname( $folder ), array( 'folder' => $folder ) ), site: 2 );
 				++$i;
 
 				continue;
 			}
 
+			error_clear_last();
+
 			if ( false === @move_uploaded_file( $file['tmp_name'], $destination ) ) {
 				$errors[] = __( sprintf( 'A problem occurred when attempting to move the temp file "%1$s" to "%2$s"', $file['tmp_name'], $destination ), self::TEXT_DOMAIN ) . ' (#107mf)';
+
+				$this->log_error( SyncPilot_HelpCode::MediaUploadMoveFailed, $this->folder_facts( $folder, array( 'path' => (string) $file_paths[$i], 'bytes' => (int) ( $file['size'] ?? 0 ) ) ), site: 1 );
 			}
 
 			++$i;
@@ -573,6 +629,11 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		return $result;
 	}
 
+	/**
+	 * Public endpoint: remove the media files of this site that the other site does not have (signed)
+	 * @since   0.0.1
+	 * @since   0.3.0  A refusal is logged (InvalidSignature, site 9; PushNotAllowed, site 6; MediaDataUnreadable)
+	 */
 	function respond_to_remove_local_attachments() {
 
 		$filtered_post                       = $this->filter_post_elements( $_POST, array( 'action', 'remote_attachments' ) );
@@ -584,6 +645,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 				'syncpilot_error' 	=> 1,
 				'body'			=> $this->invalid_content_verification_error . ' (#109mf)',
 			);
+
+			$this->log_error( SyncPilot_HelpCode::InvalidSignature, array( 'request' => $filtered_post ), site: 9 );
 
 			$result = $this->end_ajax( serialize( $return ) );
 
@@ -597,6 +660,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 				'body'            => sprintf( __( 'The connection succeeded but the remote site is configured to reject %s connections. You can change this in the "settings" tab on the remote site. (#110)', self::TEXT_DOMAIN ), __( 'push', self::TEXT_DOMAIN ) ),
 			);
 
+			$this->log_error( SyncPilot_HelpCode::PushNotAllowed, array(), site: 6 );
+
 			$result = $this->end_ajax( serialize( $return ) );
 
 			return $result;
@@ -609,6 +674,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 				'syncpilot_error' 	=> 1,
 				'body'			=> __( 'Error attempting to unserialize the remote attachment data', self::TEXT_DOMAIN ) . ' (#110mf)',
 			);
+
+			$this->log_error( SyncPilot_HelpCode::MediaDataUnreadable, array( 'bytes' => strlen( (string) $filtered_post['remote_attachments'] ) ), site: 1 );
 
 			$result = $this->end_ajax( serialize( $return ) );
 
@@ -705,6 +772,11 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		}
 	}
 
+	/**
+	 * Public endpoint: list the media files of this site for the other site (signed)
+	 * @since   0.0.1
+	 * @since   0.3.0  A refusal is logged (InvalidSignature, site 10; PullNotAllowed / PushNotAllowed, site 4)
+	 */
 	function respond_to_get_remote_media_listing() {
 
 		$filtered_post = $this->filter_post_elements( $_POST, array( 'action', 'temp_prefix', 'intent' ) );
@@ -715,6 +787,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 				'syncpilot_error' => 1,
 				'body'			  => $this->invalid_content_verification_error . ' (#100mf)',
 			);
+
+			$this->log_error( SyncPilot_HelpCode::InvalidSignature, array( 'request' => $filtered_post ), site: 10 );
 
 			$result = $this->end_ajax( serialize( $return ) );
 
@@ -727,6 +801,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 				'syncpilot_error' => 1,
 				'body'            => sprintf( __( 'The connection succeeded but the remote site is configured to reject %s connections. You can change this in the "settings" tab on the remote site. (#110)', self::TEXT_DOMAIN ), 'pull' === ( $filtered_post['intent'] ?? '' ) ? __( 'pull', self::TEXT_DOMAIN ) : __( 'push', self::TEXT_DOMAIN ) ),
 			);
+
+			$this->log_error( 'pull' === ( $filtered_post['intent'] ?? '' ) ? SyncPilot_HelpCode::PullNotAllowed : SyncPilot_HelpCode::PushNotAllowed, array(), site: 4 );
 
 			$result = $this->end_ajax( serialize( $return ) );
 

@@ -656,8 +656,28 @@ msgid "Could not delete the MySQL export file."
 msgstr "Die MySQL-Exportdatei konnte nicht gelöscht werden."
 
 #: template/diagnostics.php:3
-msgid "Diagnostic Info &amp; Error Log"
-msgstr "Diagnoseinformationen &amp; Fehlerprotokoll"
+msgid "Diagnostic Info"
+msgstr "Diagnoseinformationen"
+
+#: template/diagnostics.php
+msgid "Error Log"
+msgstr "Fehlerprotokoll"
+
+#: template/diagnostics.php
+msgid "Log level"
+msgstr "Protokollstufe"
+
+#: template/diagnostics.php
+msgid "Off"
+msgstr "Aus"
+
+#: template/diagnostics.php
+msgid "Errors (default)"
+msgstr "Fehler (Standard)"
+
+#: template/diagnostics.php
+msgid "Verbose (for troubleshooting)"
+msgstr "Ausführlich (zur Fehlersuche)"
 
 #: template/diagnostics.php:5
 msgid "Clear Error Log"

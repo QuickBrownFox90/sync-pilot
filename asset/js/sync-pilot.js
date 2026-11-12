@@ -217,6 +217,7 @@ function syncpilot_parse_json( maybe_json ) {
     doing_plugin_compatibility_ajax: false,
     // the migration
     migration_intent: void 0,
+    migration_id: "",
     stage: void 0,
     form_data: void 0,
     tables_to_migrate: "",
@@ -470,18 +471,71 @@ function syncpilot_parse_json( maybe_json ) {
       dataType: "text",
       cache: false,
       data: {
-        action: "syncpilot_get_log",
-        nonce: syncpilot_nonces.get_log
+        action: "syncpilot_get_diagnostics",
+        nonce: syncpilot_nonces.get_diagnostics
       },
-      error: function(jqXHR, textStatus, errorThrown) {
+      error: function() {
         syncpilot_alert(syncpilot_i10n.update_log_problem);
       },
       success: function(data) {
-        $4(".debug-log-textarea").val(data);
+        $4(".debug-info-textarea").val(data);
+      }
+    });
+    $4.ajax({
+      url: ajaxurl,
+      type: "POST",
+      dataType: "json",
+      cache: false,
+      data: {
+        action: "syncpilot_get_log",
+        nonce: syncpilot_nonces.get_log
+      },
+      error: function() {
+        syncpilot_alert(syncpilot_i10n.update_log_problem);
+      },
+      success: function(data) {
+        if (typeof data.syncpilot_error != "undefined" && data.syncpilot_error == 1) {
+          syncpilot_alert(syncpilot_i10n.update_log_problem);
+          return;
+        }
+        $4(".debug-log-textarea").val(data.entries.map((entry) => JSON.stringify(entry)).join("\n"));
       }
     });
   }
+  function init_log_level() {
+    $4(".log-level-select").change(function() {
+      const $select = $4(this);
+      $select.after('<img src="' + spinner_url + '" alt="" class="ajax-spinner general-spinner" />');
+      $4.ajax({
+        url: ajaxurl,
+        type: "POST",
+        dataType: "json",
+        cache: false,
+        data: {
+          action: "syncpilot_save_log_level",
+          level: $select.val(),
+          nonce: syncpilot_nonces.save_log_level
+        },
+        error: function() {
+          $4(".log-level .ajax-spinner").remove();
+          syncpilot_alert(syncpilot_i10n.save_settings_problem);
+        },
+        success: function(data) {
+          $4(".log-level .ajax-spinner").remove();
+          if (typeof data.syncpilot_error != "undefined" && data.syncpilot_error == 1) {
+            syncpilot_alert(syncpilot_i10n.save_settings_problem);
+            return;
+          }
+          $select.after('<span class="ajax-success-msg">' + syncpilot_i10n.saved + "</span>");
+          $4(".log-level .ajax-success-msg").fadeOut(2e3, function() {
+            $4(this).remove();
+          });
+        }
+      });
+    });
+  }
   function init_diagnostics() {
+    init_log_level();
     $4(".clear-log").click(function() {
       $4(".debug-log-textarea").val("");
       $4.ajax({
@@ -1554,6 +1608,10 @@ function syncpilot_parse_json( maybe_json ) {
   };
   function init_migration() {
     window.migrate_table_recursive = migrate_table_recursive;
+    $17.ajaxPrefilter(function(options) {
+      if (state.migration_id && "string" === typeof options.data && options.data.indexOf("action=syncpilot_") !== -1)
+        options.data += "&migration_id=" + encodeURIComponent(state.migration_id);
+    });
   }
   function migration_failed(text, title) {
     $17(".progress-title").html(title || syncpilot_i10n.migration_failed);
@@ -1596,6 +1654,7 @@ function syncpilot_parse_json( maybe_json ) {
         }
         state.dump_url = data.dump_url;
         state.dump_filename = data.dump_filename;
+        state.migration_id = data.migration_id || "";
         start_tables(table_rows, total_size);
       }
     });
@@ -1781,6 +1840,7 @@ function syncpilot_parse_json( maybe_json ) {
     state.migration_paused = false;
     state.migration_cancelled = false;
     state.doing_ajax = false;
+    state.migration_id = "";
     non_fatal_errors = "";
     $18(".progress-label").remove();
     $18(".migration-progress-ajax-spinner").remove();

@@ -20,12 +20,21 @@ const run = {
 
 /**
  * Put the loop over the tables where the steps of a migration (execute_next_step) and the media files can call it
- * by name: it is `next_step_in_migration.fn`
+ * by name: it is `next_step_in_migration.fn`, and send the ID of the migration with every request of SyncPilot
  * @since   0.2.7
+ * @since   0.3.0  Adds the ID of the migration to the requests of the plugin while a migration runs
  */
 export function init_migration() {
 
     window.migrate_table_recursive = migrate_table_recursive;
+
+    // The server makes the ID when the migration starts and both sites write it in their logs. The requests of the plugin
+    // (also those of media-files.js, which cannot reach the state) get it here, so that no request has to know about it.
+    $.ajaxPrefilter( function ( options ) {
+
+        if ( state.migration_id && 'string' === typeof options.data && options.data.indexOf( 'action=syncpilot_' ) !== -1 )
+            options.data += '&migration_id=' + encodeURIComponent( state.migration_id );
+    } );
 }
 
 /**
@@ -110,6 +119,7 @@ export function initiate_migration( table_rows, total_size ) {
 
             state.dump_url      = data.dump_url;
             state.dump_filename = data.dump_filename;
+            state.migration_id  = data.migration_id || '';
 
             start_tables( table_rows, total_size );
         }

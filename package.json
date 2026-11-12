@@ -8,6 +8,8 @@
     "test:browser": "node tests/browser/smoke.mjs",
     "test:controls": "node tests/browser/controls.mjs",
     "test:connection": "node tests/browser/connection.mjs",
+    "test:guard": "node tests/guard.mjs",
+    "test:faults": "node tests/browser/remote-faults.mjs",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "release:check": "node tests/release-check.mjs"

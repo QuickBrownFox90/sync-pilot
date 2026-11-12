@@ -21,6 +21,18 @@
     margin-bottom: 5px;
 }
 
+.syncpilot .diagnostics-tab .log-level {
+    margin: 0 0 10px 0;
+}
+
+.syncpilot .diagnostics-tab .log-level label {
+    margin-right: 6px;
+}
+
+.syncpilot .diagnostics-tab .log-level .ajax-success-msg {
+    margin-left: 8px;
+}
+
 .syncpilot .diagnostics-tab h4 {
     margin: 0 0 0.2em 0;
 }

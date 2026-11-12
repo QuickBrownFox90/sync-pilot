@@ -60,6 +60,7 @@ function migration_complete_events() {
     state.migration_paused    = false;
     state.migration_cancelled = false;
     state.doing_ajax          = false;
+    state.migration_id        = '';
     non_fatal_errors          = '';
 
     $( '.progress-label' ).remove();

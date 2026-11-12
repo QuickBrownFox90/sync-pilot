@@ -116,7 +116,7 @@ export async function launch() {
             problems.push( 'HTTP ' + p.response.status + ' ' + p.response.url.replace( /^https?:\/\/[^/]+/, '' ).slice( 0, 100 ) );
 
         else if ( 'Network.requestWillBeSent' === data.method && /admin-ajax\.php/.test( p.request.url ) )
-            requests.push( ( p.request.postData || '' ).replace( /nonce=[^&]*/, '' ).replace( /&?(profile|form_data|key)=[^&]*/g, '' ).slice( 0, 120 ) );
+            requests.push( ( p.request.postData || '' ).replace( /nonce=[^&]*/, '' ).replace( /&?(profile|form_data|key)=[^&]*/g, '' ).slice( 0, 120 ) + ( ( p.request.postData || '' ).match( /&migration_id=[^&]*/ ) || [ '' ] )[0] );
 
         // a native pop-up is a failure of the plugin (they were replaced by dialogs); close it so that the page does not hang
         else if ( 'Page.javascriptDialogOpening' === data.method ) {

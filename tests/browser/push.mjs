@@ -367,6 +367,34 @@ try {
             check( 'same tables, same number of rows (except the options, whose transients are not sent)', Object.keys( rowsSource ).length === Object.keys( rowsTarget ).length && differ.every( t => t.endsWith( 'options' ) ), 'different: ' + differ.join( ', ' ) );
         }
 
+        section( 'the log of the migration' );
+
+        const entries = path => JSON.parse( wp( path, 'echo json_encode( array_map( "json_decode", SyncPilot_Logger::lines() ) );' ) );
+        const last    = ( list, message ) => list.filter( e => e.message === message ).pop();
+
+        // the site whose admin page was clicked is config.wp, in a push and in a pull
+        const own       = entries( config.wp );
+        const other     = entries( config.remoteWp );
+        const started   = last( own, 'Migration started' );
+        const agreed    = last( own, 'Remote site agreed' );
+        const requested = last( other, 'Migration requested by remote site' );
+        const id        = started?.migration;
+        const needed    = [ 'plugin', 'wordpress', 'php', 'memory_limit', 'max_execution_time', 'post_max_size', 'db', 'db_charset', 'sql_mode', 'max_allowed_packet', 'free_disk_bytes' ];
+        const missing   = env => needed.filter( key => ! env || ! ( key in env ) );
+
+        check( 'this site wrote "Migration started" with an ID', /^\d{6}-\d{6}-[0-9a-f]{6}$/.test( id || '' ) && 'event' === started.level, id );
+        check( 'the entry has the environment of this site and the intent', missing( started?.context?.environment ).length === 0 && started.context.intent === ( pull ? 'pull' : 'push' ), missing( started?.context?.environment ).join( ', ' ) );
+        check( 'the other site wrote "Migration requested by remote site" with the same ID', requested?.migration === id && 'remote' === requested.src, requested?.migration );
+        check( 'its entry has the environment of the other site', missing( requested?.context?.environment ).length === 0, missing( requested?.context?.environment ).join( ', ' ) );
+        check( 'this site wrote the environment of the other site as well ("Remote site agreed", the same ID)', agreed?.migration === id && missing( agreed?.context?.environment ).length === 0 && agreed.context.environment.php === requested?.context?.environment?.php, agreed?.migration );
+        check( 'no key, no address and no path in the entries of the migration', ! JSON.stringify( [ started, agreed, requested ] ).match( new RegExp( [ key, '/www/', config.site.replace( /^https?:\/\//, '' ), config.remoteSite.replace( /^https?:\/\//, '' ) ].map( t => t.replace( /[.*+?^${}()|[\]\\]/g, '\\$&' ) ).join( '|' ) ) ) );
+
+        const tables = browser.requests.filter( r => /action=syncpilot_migrate_table/.test( r ) );
+        const first  = browser.requests.findIndex( r => /action=syncpilot_initiate_migration/.test( r ) );
+
+        check( 'the browser sends the ID with every request after the start (tables)', tables.length > 0 && tables.every( r => r.endsWith( '&migration_id=' + id ) ), tables.length + ' requests' );
+        check( 'and not before it (the start itself and the connection)', browser.requests.slice( 0, first + 1 ).every( r => ! /migration_id=/.test( r ) ) );
+
         check( 'the receiving site kept its address and its key', wp( receiver, 'echo get_option( "home" );' ) === ( pull ? config.site : config.remoteSite ) && wp( receiver, 'echo get_option( "syncpilot_settings" )["key"];' ) === ( pull ? wp( config.wp, 'echo get_option( "syncpilot_settings" )["key"];' ) : key ) );
     }
 } catch ( error ) {

@@ -1,4 +1,5 @@
 .sass-cache
+.vscode
 .composer
 .claude
 _helper/

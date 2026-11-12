@@ -51,6 +51,45 @@ try {
     } else
         console.log( 'skip  no saved profile on this site' );
 
+    section( 'the diagnostics tab' );
+
+    wp( config.wp, 'SyncPilot_Logger::event( "Test entry for the diagnostics tab", array( "n" => 1 ) );' );
+
+    await browser.goto( page + '#diagnostics' );
+    await browser.waitFor( `document.querySelector('.debug-info-textarea').value.length > 0 && document.querySelector('.debug-log-textarea').value.length > 0`, 10000, 100 );
+
+    const boxes = await browser.ev( `({ info : document.querySelector('.debug-info-textarea').value, log : document.querySelector('.debug-log-textarea').value })` );
+    const rows  = boxes.log.split( '\n' );
+
+    check( 'the diagnostic info is in its own field, as text', /site_url\(\):/.test( boxes.info ) && /PHP: /.test( boxes.info ) && ! /"message"/.test( boxes.info ), boxes.info.slice( 0, 60 ) );
+    check( 'the log is in the other field: one JSON object per line, no diagnostic info in it', rows.every( row => { try { return 'object' === typeof JSON.parse( row ); } catch { return false; } } ) && ! /site_url\(\)/.test( boxes.log ), rows.length + ' lines' );
+    check( 'an entry that was written is in the log', rows.some( row => row.includes( 'Test entry for the diagnostics tab' ) ) );
+
+    const level    = () => wp( config.wp, 'echo get_option( "syncpilot_settings" )["log_level"] ?? "errors";' );
+    const original = level();
+
+    check( 'the selection of the log level is under the title of the log and above its field, with the three levels', await browser.ev( `(() => { const box = document.querySelector('.debug-log-textarea').closest('.debug'); const s = box.querySelector('.log-level-select'); const after = ( a, b ) => !!( a.compareDocumentPosition( b ) & Node.DOCUMENT_POSITION_FOLLOWING ); return !!s && after( box.querySelector('h3'), s ) && after( s, box.querySelector('.debug-log-textarea') ) && Array.from( s.options ).map( o => o.value ).join() === 'off,errors,verbose'; })()` ) );
+    check( 'it shows the level of the site', original === await browser.ev( `document.querySelector('.log-level-select').value` ), original );
+
+    for ( const next of [ 'verbose', 'off', original ] ) {
+
+        await browser.ev( `jQuery('.log-level-select').val(${ JSON.stringify( next ) }).trigger('change')` );
+        await browser.waitFor( `!!document.querySelector('.log-level .ajax-success-msg')`, 5000, 50 );
+
+        check( 'level ' + next + ': saved, and "saved" appears behind the selection', next === level(), level() );
+
+        await browser.waitFor( `!document.querySelector('.log-level .ajax-success-msg')`, 5000, 100 );
+    }
+
+    check( 'a value that is not a level is refused and nothing is changed', 'Unknown log level' === ( await browser.ev( `(async () => { const r = await fetch( ajaxurl, { method : 'POST', body : new URLSearchParams( { action : 'syncpilot_save_log_level', level : 'nonsense', nonce : syncpilot_nonces.save_log_level } ) } ); return ( await r.json() ).body; })()` ) ) && original === level() );
+
+    await browser.click( '.clear-log' );
+    await browser.waitFor( `document.querySelector('.debug-log-textarea').value === ''`, 5000, 50 );
+    await wait( 500 );
+
+    check( 'Clear empties the field and the log of the site', '0' === wp( config.wp, 'echo count( SyncPilot_Logger::entries() );' ), wp( config.wp, 'echo count( SyncPilot_Logger::entries() );' ) );
+    check( 'diagnostics tab: no error in the page', browser.takeProblems().length === 0, browser.takeProblems().join( ' | ' ) );
+
     section( 'dialogs' );
 
     await browser.goto( page + '&syncpilot-profile=-1' );

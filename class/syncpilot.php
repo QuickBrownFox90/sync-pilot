@@ -25,6 +25,8 @@ class SyncPilot extends SyncPilot_Base {
 	 * on a fresh installation (get_option() gives false), so it is made an array first; PHP 8.1 and later report
 	 * "automatic conversion of false to array" when a key is set on false
 	 * @since   0.1.0
+	 * @since   0.3.0  Moves an autoloaded log of an older version into the new log on init (import_autoloaded_log())
+	 *
 	 * @param   string $plugin_file_path  The main file of the plugin
 	 */
 	function __construct( $plugin_file_path ) {
@@ -90,6 +92,8 @@ class SyncPilot extends SyncPilot_Base {
 		add_action( 'wp_ajax_syncpilot_finalize_migration', array( $this, 'ajax_finalize_migration' ) );
 		add_action( 'wp_ajax_syncpilot_clear_log', array( $this, 'ajax_clear_log' ) );
 		add_action( 'wp_ajax_syncpilot_get_log', array( $this, 'ajax_get_log' ) );
+		add_action( 'wp_ajax_syncpilot_get_diagnostics', array( $this, 'ajax_get_diagnostics' ) );
+		add_action( 'wp_ajax_syncpilot_save_log_level', array( $this, 'ajax_save_log_level' ) );
 		add_action( 'wp_ajax_syncpilot_fire_migration_complete', array( $this, 'fire_migration_complete' ) );
 		add_action( 'wp_ajax_syncpilot_update_max_request_size', array( $this, 'ajax_update_max_request_size' ) );
 		add_action( 'wp_ajax_syncpilot_plugin_compatibility', array( $this, 'ajax_plugin_compatibility' ) );
@@ -106,8 +110,8 @@ class SyncPilot extends SyncPilot_Base {
 		add_action( 'wp_ajax_nopriv_syncpilot_remote_finalize_migration', array( $this, 'respond_to_remote_finalize_migration' ) );
 		add_action( 'wp_ajax_nopriv_syncpilot_process_push_migration_cancellation', array( $this, 'respond_to_process_push_migration_cancellation' ) );
 
-		// an error log of an older version can be big and autoloaded
-		add_action( 'init', array( $this, 'trim_error_log' ) );
+		// the log of an older version was an option, it can be big and autoloaded
+		add_action( 'init', array( $this, 'import_autoloaded_log' ) );
 
 		// Clear update transients when the user clicks the "Check Again" button from the update screen
 		add_action( 'current_screen', array( $this, 'check_again_clear_transients' ) );
@@ -403,23 +407,68 @@ class SyncPilot extends SyncPilot_Base {
 		return $links;
 	}
 
+	/**
+	 * Delete the log
+	 * @since   0.0.1
+	 * @since   0.3.0  Deletes the log files, the entries of the fallback option and the log of an older version
+	 */
 	function ajax_clear_log() {
 		$this->check_ajax_referer( 'clear-log' );
 
-		delete_option( 'syncpilot_error_log' );
+		SyncPilot_Logger::clear();
 
 		$result = $this->end_ajax();
 
 		return $result;
 	}
 
+	/**
+	 * Answer with the log and nothing else: JSON, {"entries": [...]}, the oldest entry first
+	 * @since   0.0.1
+	 * @since   0.3.0  Only the log, as JSON; the diagnostic info is ajax_get_diagnostics(). Before, one text held the diagnostic info and the log
+	 */
 	function ajax_get_log() {
 		$this->check_ajax_referer( 'get-log' );
+
+		$result = $this->end_ajax( wp_json_encode( array( 'entries' => SyncPilot_Logger::entries() ) ) );
+
+		return $result;
+	}
+
+	/**
+	 * Save the level of the log: off, errors or verbose. Nothing else is accepted.
+	 * @since   0.3.0
+	 */
+	function ajax_save_log_level() {
+		$this->check_ajax_referer( 'save-log-level' );
+
+		$level = isset( $_POST['level'] ) && is_string( $_POST['level'] ) ? $_POST['level'] : '';
+
+		if ( ! in_array( $level, array( SyncPilot_Logger::LEVEL_OFF, SyncPilot_Logger::LEVEL_ERRORS, SyncPilot_Logger::LEVEL_VERBOSE ), true ) ) {
+			$result = $this->end_ajax( wp_json_encode( array( 'syncpilot_error' => 1, 'body' => 'Unknown log level' ) ) );
+
+			return $result;
+		}
+
+		$this->settings['log_level'] = $level;
+
+		update_option( 'syncpilot_settings', $this->settings );
+
+		$result = $this->end_ajax( wp_json_encode( array( 'level' => $level ) ) );
+
+		return $result;
+	}
+
+	/**
+	 * Answer with the diagnostic info of this site as text: addresses, versions, limits
+	 * @since   0.3.0  Split off from ajax_get_log()
+	 */
+	function ajax_get_diagnostics() {
+		$this->check_ajax_referer( 'get-diagnostics' );
 
 		ob_start();
 
 		$this->output_diagnostic_info();
-		$this->output_log_file();
 
 		$return = ob_get_clean();
 		$result = $this->end_ajax( $return );
@@ -427,11 +476,18 @@ class SyncPilot extends SyncPilot_Base {
 		return $result;
 	}
 
-	function output_log_file() {
-		$log = get_option( 'syncpilot_error_log' );
+	/**
+	 * The log of the versions before 0.2.3 was autoloaded and without a limit, so it is in the options that WordPress has
+	 * loaded already; it is moved into the log once. A log that is not autoloaded is moved when the log is read, which
+	 * costs no query on the other requests.
+	 * @since   0.3.0
+	 */
+	function import_autoloaded_log() {
 
-		if ( $log )
-			echo $log;
+		$alloptions = wp_load_alloptions();
+
+		if ( isset( $alloptions[ SyncPilot_Logger::LEGACY_OPTION ] ) )
+			SyncPilot_Logger::import_legacy_log();
 	}
 
 	function output_diagnostic_info() {
@@ -565,6 +621,11 @@ class SyncPilot extends SyncPilot_Base {
 		return substr( $plugin, 1 );
 	}
 
+	/**
+	 * Tell the site that a pull is complete (public endpoint, signed)
+	 * @since   0.0.1
+	 * @since   0.3.0  An invalid signature is logged (help code InvalidSignature, site 1)
+	 */
 	function fire_migration_complete() {
 
 		$filtered_post = $this->filter_post_elements( $_POST, array( 'action', 'url' ) );
@@ -573,7 +634,7 @@ class SyncPilot extends SyncPilot_Base {
 
 			$error_msg = $this->invalid_content_verification_error . ' (#138)';
 
-			$this->log_error( $error_msg, $filtered_post );
+			$this->log_error( SyncPilot_HelpCode::InvalidSignature, array( 'request' => $filtered_post ), site: 1 );
 
 			$result = $this->end_ajax( $error_msg );
 
@@ -646,13 +707,18 @@ class SyncPilot extends SyncPilot_Base {
 		return $result;
 	}
 
+	/**
+	 * Public endpoint: the other site asks this site to replace its tables with the migrated ones (signed)
+	 * @since   0.0.1
+	 * @since   0.3.0  An invalid signature is logged (InvalidSignature, site 2)
+	 */
 	function respond_to_remote_finalize_migration() {
 
 		$filtered_post = $this->filter_post_elements( $_POST, array( 'action', 'intent', 'url', 'key', 'form_data', 'prefix', 'type', 'location', 'tables', 'temp_prefix' ) );
 
 		if ( ! $this->verify_signature( $filtered_post, $this->settings['key'] ) ) {
 			$error_msg = $this->invalid_content_verification_error . ' (#123)';
-			$this->log_error( $error_msg, $filtered_post );
+			$this->log_error( SyncPilot_HelpCode::InvalidSignature, array( 'request' => $filtered_post ), site: 2 );
 
 			$result = $this->end_ajax( $error_msg );
 
@@ -665,6 +731,11 @@ class SyncPilot extends SyncPilot_Base {
 		return $result;
 	}
 
+	/**
+	 * Replace the tables of the site with the migrated ones
+	 * @since   0.0.1
+	 * @since   0.3.0  The fallback option of the log is kept like the old log option; a table name that is not valid and temporary tables that are missing are logged (TableNameInvalid, TempTablesMissing)
+	 */
 	function finalize_migration() {
 		global $wpdb;
 
@@ -681,6 +752,8 @@ class SyncPilot extends SyncPilot_Base {
 		foreach ( array_merge( $tables, array( $temp_prefix, $_POST['prefix'] ) ) as $name ) {
 
 			if ( false !== strpos( $name, '`' ) ) {
+				$this->log_error( SyncPilot_HelpCode::TableNameInvalid, array( 'name_bytes' => strlen( $name ) ), site: 1 );
+
 				$result = $this->end_ajax( __( 'The migration could not be completed: a table name is not valid. No table was replaced. (#141)', self::TEXT_DOMAIN ) );
 
 				return $result;
@@ -697,6 +770,9 @@ class SyncPilot extends SyncPilot_Base {
 		if ( ! empty( $missing ) ) {
 
 			$shown = implode( ', ', array_slice( $missing, 0, 10 ) ) . ( count( $missing ) > 10 ? ', …' : '' );
+
+			$this->log_error( SyncPilot_HelpCode::TempTablesMissing, array( 'missing' => count( $missing ), 'tables' => $shown ), site: 1 );
+
 			$result = $this->end_ajax( sprintf( __( 'The migration could not be completed: these temporary tables do not exist: %s. No table was replaced, the data of this site is unchanged. (#140)', self::TEXT_DOMAIN ), esc_html( $shown ) ) );
 
 			return $result;
@@ -726,7 +802,7 @@ class SyncPilot extends SyncPilot_Base {
 
 		$sql .= 'RENAME TABLE ' . implode( ', ', $renames ) . ";\n";
 
-		$preserved_options = array( 'syncpilot_settings', 'syncpilot_error_log' );
+		$preserved_options = array( 'syncpilot_settings', SyncPilot_Logger::LEGACY_OPTION, SyncPilot_Logger::FALLBACK_OPTION );
 
 		$this->form_data = $this->parse_migration_form_data( $_POST['form_data'] );
 
@@ -801,6 +877,11 @@ class SyncPilot extends SyncPilot_Base {
 		do_action( 'syncpilot_migration_complete', $type, $location );
 	}
 
+	/**
+	 * Public endpoint: receive a chunk of SQL of a push (signed) and run it
+	 * @since   0.0.1
+	 * @since   0.3.0  The early exits are logged: no chunk uploaded, chunk not readable, push not allowed, invalid signature (InvalidSignature, site 3)
+	 */
 	function ajax_process_chunk() {
 
 		$filtered_post = $this->filter_post_elements( $_POST, array( 'action', 'table', 'chunk_gzipped' ) );
@@ -810,12 +891,18 @@ class SyncPilot extends SyncPilot_Base {
 		// when the request turns out to be unsigned
 		if ( !isset( $_FILES['chunk']['tmp_name'] ) || !is_string( $_FILES['chunk']['tmp_name'] ) || !is_uploaded_file( $_FILES['chunk']['tmp_name'] ) ) {
 
+			$this->log_error( SyncPilot_HelpCode::ChunkMissing, array( 'files' => array_keys( $_FILES ), 'request_bytes' => (int) ( $_SERVER['CONTENT_LENGTH'] ?? 0 ) ), site: 1 );
+
 			$result = $this->end_ajax( __( 'Could not upload the SQL to the server. (#135)', self::TEXT_DOMAIN ) );
 
 			return $result;
 		}
 
+		error_clear_last();
+
 		if ( false === ( $chunk = file_get_contents( $_FILES['chunk']['tmp_name'] ) ) ) {
+
+			$this->log_error( SyncPilot_HelpCode::ChunkUnreadable, array( 'php_reason' => $this->last_php_error() ), site: 1 );
 
 			$result = $this->end_ajax( __( 'Could not read the SQL file we uploaded to the server. (#136)', self::TEXT_DOMAIN ) );
 
@@ -828,7 +915,7 @@ class SyncPilot extends SyncPilot_Base {
 
 			$error_msg = $this->invalid_content_verification_error . ' (#130)';
 
-			$this->log_error( $error_msg, $filtered_post );
+			$this->log_error( SyncPilot_HelpCode::InvalidSignature, array( 'request' => $filtered_post ), site: 3 );
 
 			$result = $this->end_ajax( $error_msg );
 
@@ -836,6 +923,8 @@ class SyncPilot extends SyncPilot_Base {
 		}
 
 		if ( $this->settings['allow_push'] != true ) {
+
+			$this->log_error( SyncPilot_HelpCode::PushNotAllowed, array(), site: 1 );
 
 			$result = $this->end_ajax( __( 'The connection succeeded but the remote site is configured to reject push connections. You can change this in the "settings" tab on the remote site. (#133)', self::TEXT_DOMAIN ) );
 
@@ -847,6 +936,8 @@ class SyncPilot extends SyncPilot_Base {
 			$filtered_post['chunk'] = @gzuncompress( $filtered_post['chunk'] );
 
 			if ( false === $filtered_post['chunk'] ) {
+
+				$this->log_error( SyncPilot_HelpCode::ChunkUnreadable, array( 'reason' => 'gzuncompress failed' ), site: 2 );
 
 				$result = $this->end_ajax( __( 'Could not read the SQL file we uploaded to the server. (#136)', self::TEXT_DOMAIN ) );
 
@@ -1041,6 +1132,11 @@ class SyncPilot extends SyncPilot_Base {
 		return $result;
 	}
 
+	/**
+	 * Public endpoint: back up one table of this site before a push replaces it (signed)
+	 * @since   0.0.1
+	 * @since   0.3.0  An invalid signature is logged (InvalidSignature, site 4)
+	 */
 	function respond_to_backup_remote_table() {
 
 		$filtered_post                 = $this->filter_post_elements( $_POST, array( 'action', 'intent', 'url', 'key', 'table', 'form_data', 'stage', 'bottleneck', 'prefix', 'current_row', 'dump_filename', 'last_table', 'gzip', 'primary_keys', 'path_current_site', 'domain_current_site' ) );
@@ -1049,7 +1145,7 @@ class SyncPilot extends SyncPilot_Base {
 		if ( ! $this->verify_signature( $filtered_post, $this->settings['key'] ) ) {
 
 			$error_msg = $this->invalid_content_verification_error . ' (#137)';
-			$this->log_error( $error_msg, $filtered_post );
+			$this->log_error( SyncPilot_HelpCode::InvalidSignature, array( 'request' => $filtered_post ), site: 4 );
 			$result = $this->end_ajax( $error_msg );
 
 			return $result;
@@ -1094,6 +1190,11 @@ class SyncPilot extends SyncPilot_Base {
 		return $result;
 	}
 
+	/**
+	 * Public endpoint: send a chunk of one table to the site that pulls (signed)
+	 * @since   0.0.1
+	 * @since   0.3.0  An invalid signature and a pull that is not allowed are logged (InvalidSignature, site 5; PullNotAllowed, site 1)
+	 */
 	function respond_to_process_pull_request() {
 
 		$filtered_post = $this->filter_post_elements( $_POST, array( 'action', 'intent', 'url', 'key', 'table', 'form_data', 'stage', 'bottleneck', 'prefix', 'current_row', 'dump_filename', 'pull_limit', 'last_table', 'gzip', 'primary_keys', 'path_current_site', 'domain_current_site' ) );
@@ -1108,13 +1209,15 @@ class SyncPilot extends SyncPilot_Base {
 		if ( ! $this->verify_signature( $filtered_post, $this->settings['key'] ) ) {
 
 			$error_msg = $this->invalid_content_verification_error . ' (#124)';
-			$this->log_error( $error_msg, $filtered_post );
+			$this->log_error( SyncPilot_HelpCode::InvalidSignature, array( 'request' => $filtered_post ), site: 5 );
 			$result = $this->end_ajax( $error_msg );
 
 			return $result;
 		}
 
 		if ( $this->settings['allow_pull'] != true ) {
+			$this->log_error( SyncPilot_HelpCode::PullNotAllowed, array(), site: 1 );
+
 			$result = $this->end_ajax( __( 'The connection succeeded but the remote site is configured to reject pull connections. You can change this in the "settings" tab on the remote site. (#132)', self::TEXT_DOMAIN ) );
 
 			return $result;
@@ -1132,13 +1235,24 @@ class SyncPilot extends SyncPilot_Base {
 		return $result;
 	}
 
-	// Occurs right before the first table is migrated / backed up during the migration process
-	// Does a quick check to make sure the verification string is valid and also opens / creates files for writing to (if required)
+	/**
+	 * Start a migration: check the connection data, ask the other site to agree and set up the dump
+	 * @since   0.0.1
+	 * @since   0.3.0  An answer of the other site that cannot be read is logged (RemoteAnswerUnreadable, site 1). Makes the ID of the migration and writes it with the environment of this site (event "Migration started") and of the other site (event "Remote site agreed"); the browser gets the ID as migration_id
+	 */
 	function ajax_initiate_migration() {
 
 		$this->check_ajax_referer( 'initiate-migration' );
 
 		$this->form_data = $this->parse_migration_form_data( $_POST['form_data'] );
+
+		// the ID that both sites write in their logs, from here to the end of the migration
+		SyncPilot_Logger::set_migration_id( SyncPilot_Logger::new_migration_id() );
+		SyncPilot_Logger::event( 'Migration started', array(
+			'intent'      => $_POST['intent'],
+			'stage'       => $_POST['stage'] ?? '',
+			'environment' => SyncPilot_Logger::environment(),
+		) );
 
 		if ( $_POST['intent'] == 'savefile' ) {
 
@@ -1202,7 +1316,7 @@ class SyncPilot extends SyncPilot_Base {
 				$error_msg = __( 'Failed attempting to unserialize the response from the remote server. Please contact support.', self::TEXT_DOMAIN );
 				$return    = array( 'syncpilot_error' => 1, 'body' => $error_msg );
 
-				$this->log_error( $error_msg, $response );
+				$this->log_error( SyncPilot_HelpCode::RemoteAnswerUnreadable, array( 'received_bytes' => strlen( (string) $response ), 'excerpt' => SyncPilot_Logger::excerpt( $response ) ), site: 1 );
 
 				$result = $this->end_ajax( json_encode( $return ) );
 
@@ -1216,6 +1330,10 @@ class SyncPilot extends SyncPilot_Base {
 
 				return $result;
 			}
+
+			// what the other site says about itself is for the log, not for the browser
+			SyncPilot_Logger::event( 'Remote site agreed', array( 'environment' => $return['environment'] ?? null ) );
+			unset( $return['environment'] );
 
 			if ( $_POST['intent'] == 'pull' ) {
 				// sets up our table to store 'ALTER' queries
@@ -1239,12 +1357,19 @@ class SyncPilot extends SyncPilot_Base {
 		$return['dump_filename'] = ( empty( $return['dump_filename'] ) ) ? '' : $return['dump_filename'];
 		$return['dump_url']      = ( empty( $return['dump_url'] ) )      ? '' : $return['dump_url'];
 
+		// the browser sends it with every request of this migration from now on
+		$return['migration_id'] = SyncPilot_Logger::migration_id();
+
 		$result = $this->end_ajax( json_encode( $return ) );
 
 		return $result;
 	}
 
-	// End point for the above remote_post call, ensures that the verification string is valid before continuing with the migration
+	/**
+	 * Public endpoint: the other site asks if this site agrees to the migration (signed)
+	 * @since   0.0.1
+	 * @since   0.3.0  An invalid signature and a migration that is not allowed are logged (InvalidSignature, site 6; PullNotAllowed / PushNotAllowed, site 2). Answers with the environment of this site, and writes it as the event "Migration requested by remote site"
+	 */
 	function respond_to_remote_initiate_migration() {
 
 		$return        = array();
@@ -1252,8 +1377,14 @@ class SyncPilot extends SyncPilot_Base {
 
 		if ( $this->verify_signature( $filtered_post, $this->settings['key'] ) ) {
 
-			if ( isset( $this->settings['allow_' . $_POST['intent']] ) && ( true === $this->settings['allow_' . $_POST['intent']] || 1 === $this->settings['allow_' . $_POST['intent']] ) )
+			if ( isset( $this->settings['allow_' . $_POST['intent']] ) && ( true === $this->settings['allow_' . $_POST['intent']] || 1 === $this->settings['allow_' . $_POST['intent']] ) ) {
 				$return['error'] = 0;
+
+				// the signature is right and the migration is allowed: the other site learns the environment of this site, and it is in the log here
+				$return['environment'] = SyncPilot_Logger::environment();
+
+				SyncPilot_Logger::event( 'Migration requested by remote site', array( 'intent' => 'pull' === $_POST['intent'] ? 'pull' : 'push', 'environment' => $return['environment'] ) );
+			}
 
 			else {
 
@@ -1266,6 +1397,8 @@ class SyncPilot extends SyncPilot_Base {
 					$intent = __( 'push', self::TEXT_DOMAIN );
 
 				$return['message'] = sprintf( __( 'The connection succeeded but the remote site is configured to reject %s connections. You can change this in the "settings" tab on the remote site. (#110)', self::TEXT_DOMAIN), $intent );
+
+				$this->log_error( 'pull' == $_POST['intent'] ? SyncPilot_HelpCode::PullNotAllowed : SyncPilot_HelpCode::PushNotAllowed, array(), site: 2 );
 			}
 		}
 
@@ -1273,7 +1406,7 @@ class SyncPilot extends SyncPilot_Base {
 			$return['error'] = 1;
 			$error_msg       = $this->invalid_content_verification_error . ' (#111)';
 
-			$this->log_error( $error_msg, $filtered_post );
+			$this->log_error( SyncPilot_HelpCode::InvalidSignature, array( 'request' => $filtered_post ), site: 6 );
 
 			$return['message'] = $error_msg;
 		}
@@ -1381,8 +1514,11 @@ class SyncPilot extends SyncPilot_Base {
 		return $result;
 	}
 
-	// AJAX endpoint for when the user pastes into the connection data box (or when they click "connect")
-	// Responsible for contacting the remote website and retrieving info and testing the verification string
+	/**
+	 * Contact the remote site with the connection data the user pasted, check the key and read its tables and settings
+	 * @since   0.0.1
+	 * @since   0.3.0  An answer that cannot be read and an error reported by the remote site are logged (RemoteAnswerUnreadable, site 2; RemoteReportedError, site 1)
+	 */
 	function ajax_verify_connection_to_remote_site() {
 
 		$this->check_ajax_referer( 'verify-connection-to-remote-site' );
@@ -1413,7 +1549,7 @@ class SyncPilot extends SyncPilot_Base {
 			$error_msg = __( 'Failed attempting to unserialize the response from the remote server. Please contact support.', self::TEXT_DOMAIN );
 			$return    = array( 'syncpilot_error' => 1, 'body' => $error_msg );
 
-			$this->log_error( $error_msg );
+			$this->log_error( SyncPilot_HelpCode::RemoteAnswerUnreadable, array( 'received_bytes' => strlen( (string) $response ), 'excerpt' => SyncPilot_Logger::excerpt( $response ) ), site: 2 );
 
 			$result = $this->end_ajax( json_encode( $return ) );
 
@@ -1423,7 +1559,7 @@ class SyncPilot extends SyncPilot_Base {
 		if ( isset( $response['error'] ) && $response['error'] == 1 ) {
 			$return = array( 'syncpilot_error' => 1, 'body' => $response['message'] );
 
-			$this->log_error( $response['message'], $response );
+			$this->log_error( SyncPilot_HelpCode::RemoteReportedError, array( 'message' => $response['message'] ?? '' ), site: 1 );
 
 			$result = $this->end_ajax( json_encode( $return ) );
 
@@ -1450,7 +1586,11 @@ class SyncPilot extends SyncPilot_Base {
 		return $result;
 	}
 
-	// End point for the above remote_post call, returns table information, absolute file path, table prefix, etc
+	/**
+	 * Public endpoint for the call above: check the signature and the permission, answer with the tables, the path, the prefix and the limits of this site
+	 * @since   0.0.1
+	 * @since   0.3.0  An invalid signature and a migration that is not allowed are logged (InvalidSignature, site 7; PullNotAllowed / PushNotAllowed, site 3)
+	 */
 	function respond_to_verify_connection_to_remote_site() {
 
 		global $wpdb;
@@ -1463,7 +1603,7 @@ class SyncPilot extends SyncPilot_Base {
 			$return['error']   = 1;
 			$return['message'] = $this->invalid_content_verification_error . ' (#120) <a href="#" class="try-again js-action-link">' . __( 'Try again?', self::TEXT_DOMAIN ) . '</a>';
 
-			$this->log_error( $this->invalid_content_verification_error . ' (#120)', $filtered_post );
+			$this->log_error( SyncPilot_HelpCode::InvalidSignature, array( 'request' => $filtered_post ), site: 7 );
 
 			$result = $this->end_ajax( serialize( $return ) );
 
@@ -1481,6 +1621,9 @@ class SyncPilot extends SyncPilot_Base {
 				$intent = __( 'push', self::TEXT_DOMAIN );
 
 			$return['message'] = sprintf( __( 'The connection succeeded but the remote site is configured to reject %s connections. You can change this in the "settings" tab on the remote site. (#122) <a href="#" class="try-again js-action-link">Try again?</a>', self::TEXT_DOMAIN ), $intent );
+
+			$this->log_error( 'pull' == $_POST['intent'] ? SyncPilot_HelpCode::PullNotAllowed : SyncPilot_HelpCode::PushNotAllowed, array(), site: 3 );
+
 			$result            = $this->end_ajax( serialize( $return ) );
 
 			return $result;
@@ -1852,10 +1995,13 @@ class SyncPilot extends SyncPilot_Base {
 	 * Modified by Scott Merrill (http://www.skippy.net/)
 	 * to use the WordPress $wpdb object
 	 *
-	 * @param string  $table
-	 * @return void
+	 * @since   0.0.1
+	 * @since   0.3.0  A table structure or CREATE TABLE query that cannot be read is logged (TableStructureFailed, CreateQueryFailed)
+	 *
+	 * @param   string $table  The table
+	 *
+	 * @return  void
 	 */
-
 	function export_table( $table ) {
 
 		global $wpdb;
@@ -1871,6 +2017,8 @@ class SyncPilot extends SyncPilot_Base {
 
 		if ( ! $table_structure ) {
 			$this->error = __( 'Failed to retrieve table structure, please ensure your database is online. (#125)', self::TEXT_DOMAIN );
+
+			$this->log_error( SyncPilot_HelpCode::TableStructureFailed, array( 'table' => $table, 'db_error' => $wpdb->last_error ), site: 1 );
 
 			return false;
 		}
@@ -1913,6 +2061,8 @@ class SyncPilot extends SyncPilot_Base {
 
 			if ( false === $create_table ) {
 				$this->error = __( 'Failed to generate the create table query, please ensure your database is online. (#126)', self::TEXT_DOMAIN );
+
+				$this->log_error( SyncPilot_HelpCode::CreateQueryFailed, array( 'table' => $table, 'db_error' => $wpdb->last_error ), site: 1 );
 
 				return false;
 			}
@@ -2522,6 +2672,16 @@ class SyncPilot extends SyncPilot_Base {
 		unset( $this->fp );
 	}
 
+	/**
+	 * Add a line to the chunk and, for a dump file, write it to the file
+	 * @since   0.0.1
+	 * @since   0.3.0  A failed write is logged with the size, whether the file is open and the reason of PHP (DumpWriteFailed, DumpGzipWriteFailed); an empty line is no failure for a gzipped file (gzwrite() gives 0), it set the error "Failed to write the gzipped SQL data" without a reason
+	 *
+	 * @param   string $query_line  The SQL
+	 * @param   bool   $replace     Replace the old values by the new ones
+	 *
+	 * @return  bool|void
+	 */
 	function stow( $query_line, $replace = true ) {
 
 		$this->current_chunk .= $query_line;
@@ -2530,15 +2690,24 @@ class SyncPilot extends SyncPilot_Base {
 
 			if ( $this->gzip() && isset( $this->form_data['gzip_file'] ) ) {
 
-				if ( empty( $this->fp ) || ! @gzwrite( $this->fp, $query_line ) ) {
+				error_clear_last();
+
+				// gzwrite() gives 0 for an empty line: that is not a failure, only false is
+				if ( empty( $this->fp ) || false === @gzwrite( $this->fp, $query_line ) ) {
 					$this->error = __( 'Failed to write the gzipped SQL data to the file. (#127)', self::TEXT_DOMAIN );
+
+					$this->log_error( SyncPilot_HelpCode::DumpGzipWriteFailed, array( 'bytes' => strlen( $query_line ), 'file_open' => ! empty( $this->fp ), 'php_reason' => $this->last_php_error() ), site: 1 );
 					return false;
 				}
 			}
 
 			else {
+				error_clear_last();
+
 				if ( empty( $this->fp ) || false === @fwrite( $this->fp, $query_line ) ) {
 					$this->error = __( 'Failed to write the SQL data to the file. (#128)', self::TEXT_DOMAIN );
+
+					$this->log_error( SyncPilot_HelpCode::DumpWriteFailed, array( 'bytes' => strlen( $query_line ), 'file_open' => ! empty( $this->fp ), 'php_reason' => $this->last_php_error() ), site: 1 );
 
 					return false;
 				}
@@ -2826,6 +2995,8 @@ class SyncPilot extends SyncPilot_Base {
 			'verify_connection_to_remote_site'	=> wp_create_nonce( 'verify-connection-to-remote-site' ),
 			'clear_log'							=> wp_create_nonce( 'clear-log' ),
 			'get_log'							=> wp_create_nonce( 'get-log' ),
+			'get_diagnostics'					=> wp_create_nonce( 'get-diagnostics' ),
+			'save_log_level'					=> wp_create_nonce( 'save-log-level' ),
 			'save_profile'						=> wp_create_nonce( 'save-profile' ),
 			'initiate_migration'				=> wp_create_nonce( 'initiate-migration' ),
 			'migrate_table'						=> wp_create_nonce( 'migrate-table' ),
@@ -3100,6 +3271,13 @@ class SyncPilot extends SyncPilot_Base {
 	 *
 	 * @return array POST data filtered
 	 */
+	/**
+	 * The fields of the request of the browser that are passed on to the other site, with its signature
+	 * @since   0.0.1
+	 * @since   0.3.0  Without migration_id: the other site gets the ID in a header, and a field that it does not know would break the signature
+	 *
+	 * @return  array
+	 */
 	function get_post_data_filtered() {
 
 		$data = $_POST;
@@ -3107,6 +3285,9 @@ class SyncPilot extends SyncPilot_Base {
 		// Fix polylang pluing injection in POST data, which breaks the signature verification
 		if ( isset( $data['pll_ajax_backend'] ) )
 			unset( $data['pll_ajax_backend'] );
+
+		// the ID of the migration is for the log of this site; the other site reads it from the header
+		unset( $data['migration_id'] );
 
 		return $data;
 	}

@@ -5,10 +5,6 @@ class SyncPilot_Base {
 	// the tables that are replaced are renamed to <this prefix><name> first and dropped when the migration has worked
 	const OLD_TABLE_PREFIX = '_old_';
 
-	// the error log keeps its newest entries up to this size; one entry is cut at the second size
-	const LOG_MAX_BYTES       = 102400;
-	const LOG_ENTRY_MAX_BYTES = 4096;
-
 	protected $settings;
 	protected $plugin_file_path;
 	protected $plugin_dir_path;
@@ -51,6 +47,8 @@ class SyncPilot_Base {
 	 * Read the settings and set up the paths. Nothing is translated here: the constructor runs on plugins_loaded, and
 	 * WordPress 6.7 and later report a text domain that is used before init as loaded too early
 	 * @since   0.1.0
+	 * @since   0.3.0  Guards the AJAX requests of the plugin (SyncPilot_Request_Guard)
+	 *
 	 * @param   string $plugin_file_path  The main file of the plugin
 	 */
 	function __construct( $plugin_file_path ) {
@@ -77,6 +75,9 @@ class SyncPilot_Base {
 
 		// allow devs to change the temporary prefix applied to the tables
 		$this->temp_prefix = apply_filters( 'syncpilot_temporary_prefix', $this->temp_prefix );
+
+		// an exception or a fatal error in an AJAX request of ours is logged and answered, not left to the critical error page
+		SyncPilot_Request_Guard::install( $this );
 	}
 
 	/**
@@ -123,6 +124,19 @@ class SyncPilot_Base {
 		return @unserialize( $data, array( 'allowed_classes' => false ) );
 	}
 
+	/**
+	 * Send a signed request to the other site and check the answer
+	 * @since   0.0.1
+	 * @since   0.3.0  Sends the ID of the migration to the other site (header X-SyncPilot-Migration). Every failure is logged with its own help code (RemoteTimeout, RemoteHostNotFound, RemoteTlsFailed, RemoteRequestFailed, RemoteAuthRequired, RemoteHttpError, RemoteAnswerInvalid, RemotePluginMissing) and the facts of describe_remote_response() as context (scope, duration, sizes, status or cURL number, a cleaned beginning of the answer); at the level verbose every answered request is logged without the answer
+	 *
+	 * @param   string $url               The address of admin-ajax.php of the other site
+	 * @param   array  $data              The fields of the request
+	 * @param   string $scope             The function that asks, for the log
+	 * @param   array  $args              Arguments of wp_remote_post()
+	 * @param   bool   $expecting_serial  The answer has to be serialized data
+	 *
+	 * @return  string|false  The answer; false when it failed (the text for the user is in $this->error)
+	 */
 	function remote_post( $url, $data, $scope, $args = array(), $expecting_serial = false ) {
 
 		$this->set_time_limit();
@@ -155,12 +169,19 @@ class SyncPilot_Base {
 		$args['headers']['Content-Type'] = 'multipart/form-data; boundary=' . $this->multipart_boundary;
 		$args['headers']['Referer']      = network_admin_url( 'admin-ajax.php' );
 
+		// the other site writes the same ID in its log; the header is not part of the signature
+		if ( '' !== SyncPilot_Logger::migration_id() )
+			$args['headers']['X-SyncPilot-Migration'] = SyncPilot_Logger::migration_id();
+
 		$this->attempting_to_connect_to = $url;
 
+		$started  = microtime( true );
 		$response = wp_remote_post( $url, $args );
 
 		if ( ! is_wp_error( $response ) )
 			$response['body'] = trim( $response['body'], "\xef\xbb\xbf" );
+
+		$context = array( 'scope' => $scope ) + $this->describe_remote_response( $response, $started, strlen( (string) ( $args['body'] ?? '' ) ) );
 
 		if ( is_wp_error( $response ) ) {
 
@@ -170,6 +191,8 @@ class SyncPilot_Base {
 
 			else if ( isset( $response->errors['http_request_failed'][0] ) && strstr( $response->errors['http_request_failed'][0], 'timed out' ) ) {
 				$this->error = sprintf( __( 'The connection to the remote server has timed out, no changes have been committed. (#134 - scope: %s)', self::TEXT_DOMAIN ), $scope );
+
+				$this->log_error( SyncPilot_HelpCode::RemoteTimeout, $context, site: 1 );
 			}
 
 			else if ( isset( $response->errors['http_request_failed'][0] ) && ( strstr( $response->errors['http_request_failed'][0], 'Could not resolve host' ) || strstr( $response->errors['http_request_failed'][0], 'couldn\'t connect to host' ) ) ) {
@@ -184,17 +207,21 @@ class SyncPilot_Base {
 						$this->error .= __( 'It appears that you might be trying to push to a local environment. This will not work if <u>this</u> website happens to be located on a remote server, it would be impossible for this server to contact your local environment.', self::TEXT_DOMAIN );
 					}
 				}
+
+				$this->log_error( SyncPilot_HelpCode::RemoteHostNotFound, $context, site: 1 );
 			}
 
 			else if ( isset( $response->errors['http_request_failed'][0] ) && preg_match( '/ssl|certificate|tls/i', $response->errors['http_request_failed'][0] ) ) {
 				$this->error = sprintf( __( 'The TLS certificate of the remote site could not be verified. Install a valid certificate there or switch off "Enable SSL verification" in the settings. (#139 - scope: %s)', self::TEXT_DOMAIN ), $scope );
+
+				$this->log_error( SyncPilot_HelpCode::RemoteTlsFailed, $context, site: 1 );
 			}
 
 			else {
 				$this->error = sprintf( __( 'The connection failed, an unexpected error occurred, please contact support. (#121 - scope: %s)', self::TEXT_DOMAIN ), $scope );
-			}
 
-			$this->log_error( $this->error, $response );
+				$this->log_error( SyncPilot_HelpCode::RemoteRequestFailed, $context, site: 1 );
+			}
 
 			return false;
 		}
@@ -208,7 +235,7 @@ class SyncPilot_Base {
 			else if ( $response['response']['code'] == '401' ) {
 				$this->error = __( 'The remote site is protected with Basic Authentication. Please enter the username and password above to continue. (401 Unauthorized)', self::TEXT_DOMAIN );
 
-				$this->log_error( $this->error, $response );
+				$this->log_error( SyncPilot_HelpCode::RemoteAuthRequired, $context, site: 1 );
 
 				return false;
 			}
@@ -216,7 +243,8 @@ class SyncPilot_Base {
 			else {
 				$this->error = sprintf( __( 'Unable to connect to the remote server, please check the connection details - %1$s %2$s (#129 - scope: %3$s)', self::TEXT_DOMAIN ), $response['response']['code'], $response['response']['message'], $scope );
 
-				$this->log_error( $this->error, $response );
+				$this->log_error( SyncPilot_HelpCode::RemoteHttpError, $context, site: 1 );
+
 				return false;
 			}
 		}
@@ -227,7 +255,7 @@ class SyncPilot_Base {
 
 			$this->error = __( 'There was a problem with the AJAX request, we were expecting a serialized response, instead we received:<br />', self::TEXT_DOMAIN ) . htmlentities( $response['body'] );
 
-			$this->log_error( $this->error, $response );
+			$this->log_error( SyncPilot_HelpCode::RemoteAnswerInvalid, $context, site: 1 );
 
 			return false;
 		}
@@ -239,7 +267,7 @@ class SyncPilot_Base {
 
 			$this->error = sprintf( __( 'SyncPilot does not seem to be installed or active on the remote site. (#131 - scope: %s)', self::TEXT_DOMAIN ), $scope );
 
-			$this->log_error( $this->error, $response );
+			$this->log_error( SyncPilot_HelpCode::RemotePluginMissing, $context, site: 1 );
 
 			return false;
 		}
@@ -251,6 +279,10 @@ class SyncPilot_Base {
 			if ( isset( $unserialized_response['error'] ) && '1' == $unserialized_response['error'] && $this->may_retry_over_http( $url, $scope ) )
 				return $this->retry_remote_post( $url, $data, $scope, $args, $expecting_serial );
 		}
+
+		// at the level verbose every request to the other site: how long it took and how big it was, no answer
+		unset( $context['excerpt'] );
+		SyncPilot_Logger::info( 'Remote request answered', $context );
 
 		return $response['body'];
 	}
@@ -322,156 +354,138 @@ class SyncPilot_Base {
 	}
 
 	/**
-	 * Add an entry to the error log. The log is an option that is not loaded on every request, it keeps only its newest
-	 * LOG_MAX_BYTES, and the data that belongs to an error is described and never copied: the public endpoints log
-	 * requests of anyone, before the signature is known to be right, and such a request can be as big as the server
-	 * accepts and contains SQL rows, the signature and keys
+	 * Add an entry to the log (see SyncPilot_Logger). What went wrong is the English text of the help code, the facts that
+	 * belong to it (names, sizes, status) are the context. The data of a request is described and never copied: the public
+	 * endpoints log requests of anyone, before the signature is known to be right, and such a request can be as big as the
+	 * server accepts and contains SQL rows, the signature and keys.
+	 * The place that wrote the entry is named twice: by the number of the site (130.02 is the second place that reports
+	 * code 130, numbered by hand, a test makes sure that no number is used twice) and by the function that called.
 	 * @since   0.2.3
-	 * @param   string $syncpilot_error       What went wrong
-	 * @param   mixed  $additional_error_var  Request data, a response or an error object; false for nothing
+	 * @since   0.3.0  Takes a help code and a context instead of a text; writes to SyncPilot_Logger (a JSON line in a file) instead of the option syncpilot_error_log
+	 *
+	 * @param   SyncPilot_HelpCode $code     What went wrong
+	 * @param   array              $context  Names and sizes that belong to it; request data, a response or an error object are described
+	 * @param   int                $site     The number of the place in the code that reports this code, 1 and up
+	 * @param   string             $level    error, or info for what is only written at the level verbose
 	 */
-	function log_error( $syncpilot_error, $additional_error_var = false ) {
+	function log_error( SyncPilot_HelpCode $code, $context = array(), $site = 0, $level = 'error' ) {
 
-		$error_header = "********************************************\n******  Log date: " . date( 'Y/m/d H:i:s' ) . " ******\n********************************************\n\n";
-		$error        = $error_header . "SyncPilot Error: " . $this->shorten_log_text( (string) $syncpilot_error, 2000 ) . "\n\n";
+		$trace  = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 2 );
+		$caller = isset( $trace[1]['function'] ) ? ( isset( $trace[1]['class'] ) ? $trace[1]['class'] . '::' : '' ) . $trace[1]['function'] : '';
+		$fields = array( 'help' => $code->value );
+
+		if ( $site > 0 )
+			$fields['site'] = (int) $site;
+
+		if ( '' !== $caller )
+			$fields['at'] = $caller . ( isset( $trace[0]['line'] ) ? ':' . $trace[0]['line'] : '' );
 
 		if ( ! empty( $this->attempting_to_connect_to ) )
-			$error .= "Attempted to connect to: " . $this->shorten_log_text( (string) $this->attempting_to_connect_to, 300 ) . "\n\n";
+			$context['connecting_to'] = SyncPilot_Logger::strip_credentials( $this->attempting_to_connect_to );
 
 		if ( ! empty( $_SERVER['CONTENT_LENGTH'] ) )
-			$error .= "Size of the request: " . (int) $_SERVER['CONTENT_LENGTH'] . " bytes\n\n";
+			$context['request_bytes'] = (int) $_SERVER['CONTENT_LENGTH'];
 
-		if ( $additional_error_var !== false )
-			$error .= $this->describe_log_data( $additional_error_var ) . "\n";
-
-		$this->save_error_log( (string) get_option( 'syncpilot_error_log' ), $this->cut_log_text( $error, self::LOG_ENTRY_MAX_BYTES ) );
+		SyncPilot_Logger::write( $level, $code->log_text(), $context, $fields );
 	}
 
 	/**
-	 * Append an entry to the log and cut the log to its size; the oldest entries go first
-	 * @since   0.2.3
-	 * @param   string $log    The log as it is stored
-	 * @param   string $entry  The new entry
+	 * What is known about a request to the other site and its answer, for the log: how long it took, how much was sent and
+	 * received, and for an answer the status, a few headers (type, server, where it redirects to) and a cleaned beginning
+	 * of the body (see SyncPilot_Logger::excerpt()); for a request that failed the message of cURL and its number.
+	 * @since   0.3.0
+	 *
+	 * @param   array|WP_Error $response    The result of wp_remote_post()
+	 * @param   float          $started     microtime( true ) before the request
+	 * @param   int            $sent_bytes  The size of the body that was sent
+	 *
+	 * @return  array
 	 */
-	function save_error_log( $log, $entry ) {
+	function describe_remote_response( $response, $started, $sent_bytes ) {
 
-		$log .= $entry;
+		$facts = array(
+			'duration_ms' => (int) round( ( microtime( true ) - $started ) * 1000 ),
+			'sent_bytes'  => (int) $sent_bytes,
+		);
 
-		if ( strlen( $log ) > self::LOG_MAX_BYTES ) {
+		if ( is_wp_error( $response ) ) {
 
-			$log    = substr( $log, -self::LOG_MAX_BYTES );
-			$marker = "********************************************\n******  Log date:";
-			$start  = strpos( $log, $marker );
+			$message = $response->get_error_message();
 
-			// start at the beginning of an entry, not in the middle of one
-			if ( false !== $start )
-				$log = substr( $log, $start );
+			$facts['error'] = SyncPilot_Logger::shorten( $message, 300 );
+
+			if ( preg_match( '/cURL error (\d+)/', $message, $found ) )
+				$facts['curl_errno'] = (int) $found[1];
+
+			return $facts;
 		}
 
-		// not autoloaded: a log that grows must not be read on every page
-		update_option( 'syncpilot_error_log', $log, false );
-	}
+		$body = (string) wp_remote_retrieve_body( $response );
 
-	/**
-	 * An error log of an older version can be big and is loaded on every request; it is cut and stored without autoload
-	 * once. Only an autoloaded log is in the options that WordPress has loaded already, so this costs no query.
-	 * @since   0.2.3
-	 */
-	function trim_error_log() {
+		$facts['status']         = (int) wp_remote_retrieve_response_code( $response );
+		$facts['status_text']    = SyncPilot_Logger::shorten( (string) wp_remote_retrieve_response_message( $response ), 60 );
+		$facts['received_bytes'] = strlen( $body );
 
-		$alloptions = wp_load_alloptions();
+		foreach ( array( 'content-type', 'server', 'location' ) as $header ) {
 
-		if ( ! isset( $alloptions['syncpilot_error_log'] ) )
-			return;
+			$value = wp_remote_retrieve_header( $response, $header );
 
-		$log = (string) $alloptions['syncpilot_error_log'];
-
-		delete_option( 'syncpilot_error_log' );
-
-		if ( '' !== $log )
-			$this->save_error_log( '', $log );
-	}
-
-	/**
-	 * Describe data for the log in a few lines: names and sizes, short beginnings of values, nothing that is secret
-	 * @since   0.2.3
-	 * @param   mixed  $data   Array, WP_Error, object or scalar
-	 * @param   int    $depth  How deep it went already
-	 * @return  string
-	 */
-	function describe_log_data( $data, $depth = 0 ) {
-
-		$indent = str_repeat( '  ', $depth );
-
-		if ( is_wp_error( $data ) )
-			return $indent . 'WP_Error ' . $this->shorten_log_text( (string) $data->get_error_code() . ': ' . $data->get_error_message(), 500 ) . "\n";
-
-		if ( is_object( $data ) )
-			return $indent . get_class( $data ) . "\n";
-
-		if ( ! is_array( $data ) )
-			return $indent . $this->shorten_log_text( is_scalar( $data ) ? (string) $data : gettype( $data ), 500 ) . "\n";
-
-		$secret = array( 'sig', 'key', 'secret_key', 'nonce', 'chunk', 'form_data', 'connection_info', 'auth', 'password', 'cookies', 'authorization', 'set-cookie' );
-		$text   = '';
-		$count  = 0;
-
-		foreach ( $data as $name => $value ) {
-
-			if ( ++$count > 20 ) {
-				$text .= $indent . "... " . ( count( $data ) - 20 ) . " more\n";
-				break;
-			}
-
-			$label = $indent . $this->shorten_log_text( (string) $name, 60 ) . ': ';
-
-			if ( in_array( strtolower( (string) $name ), $secret, true ) )
-				$text .= $label . '[not logged' . ( is_string( $value ) ? ', ' . strlen( $value ) . ' bytes' : '' ) . "]\n";
-
-			elseif ( is_array( $value ) && $depth < 2 )
-				$text .= rtrim( $label ) . "\n" . $this->describe_log_data( $value, $depth + 1 );
-
-			elseif ( is_array( $value ) )
-				$text .= $label . '[array, ' . count( $value ) . " items]\n";
-
-			elseif ( is_object( $value ) )
-				$text .= $label . get_class( $value ) . "\n";
-
-			else
-				$text .= $label . $this->shorten_log_text( is_scalar( $value ) ? (string) $value : gettype( $value ), 300 ) . "\n";
+			if ( is_string( $value ) && '' !== $value )
+				$facts[ 'header_' . str_replace( '-', '_', $header ) ] = SyncPilot_Logger::shorten( SyncPilot_Logger::strip_credentials( $value ), 120 );
 		}
 
-		return $text;
+		$facts['excerpt'] = SyncPilot_Logger::excerpt( $body );
+
+		return $facts;
 	}
 
 	/**
-	 * The beginning of a text, with its size when it is cut
-	 * @since   0.2.3
-	 * @param   string $text    The text
-	 * @param   int    $length  How many bytes stay
-	 * @return  string
+	 * The reason PHP gave for the last error, for an operation that failed silently (it was called with @)
+	 * @since   0.3.0
+	 *
+	 * @return  string  The message; an empty text when there was no error
 	 */
-	function shorten_log_text( $text, $length ) {
+	function last_php_error() {
 
-		if ( strlen( $text ) <= $length )
-			return $text;
+		$error = error_get_last();
 
-		return $this->cut_log_text( $text, $length ) . '... (' . strlen( $text ) . ' bytes)';
+		return $error ? SyncPilot_Logger::shorten( $error['message'], 300 ) : '';
 	}
 
 	/**
-	 * Cut a text to a number of bytes without breaking a multibyte character
-	 * @since   0.2.3
-	 * @param   string $text    The text
-	 * @param   int    $length  How many bytes stay at most
-	 * @return  string
+	 * What decides whether a folder can be written, for the log: the nearest folder that exists (the one that was asked for
+	 * may not), if it is writable, its mode and owner, and the user the web server runs as. Names and numbers only.
+	 * @since   0.3.0
+	 *
+	 * @param   string $folder  The folder, it may not exist yet
+	 * @param   array  $facts   Facts to add to
+	 *
+	 * @return  array
 	 */
-	function cut_log_text( $text, $length ) {
+	function folder_facts( $folder, $facts = array() ) {
 
-		if ( strlen( $text ) <= $length )
-			return $text;
+		$existing = (string) $folder;
 
-		return function_exists( 'mb_strcut' ) ? mb_strcut( $text, 0, $length, 'UTF-8' ) : substr( $text, 0, $length );
+		while ( '' !== $existing && ! file_exists( $existing ) && dirname( $existing ) !== $existing )
+			$existing = dirname( $existing );
+
+		$facts['checked']  = $existing;
+		$facts['exists']   = file_exists( (string) $folder );
+		$facts['writable'] = is_writable( $existing );
+		$facts['mode']     = substr( sprintf( '%o', (int) @fileperms( $existing ) ), -4 );
+
+		if ( function_exists( 'posix_getpwuid' ) ) {
+
+			$owner = @posix_getpwuid( (int) @fileowner( $existing ) );
+			$user  = @posix_getpwuid( posix_geteuid() );
+
+			$facts['owner']    = $owner['name'] ?? '';
+			$facts['web_user'] = $user['name'] ?? '';
+		}
+
+		$facts['php_reason'] = $this->last_php_error();
+
+		return $facts;
 	}
 
 	function display_errors() {
