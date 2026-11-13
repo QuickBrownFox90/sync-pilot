@@ -7,6 +7,8 @@ class SyncPilot extends SyncPilot_Base {
 	protected $default_profile;
 	protected $maximum_chunk_size;
 	protected $current_chunk = '';
+	protected $chunk_stats   = array();
+	protected $chunk_queries = 0;
 	protected $connection_details;
 	protected $remote_url;
 	protected $remote_key;
@@ -663,11 +665,18 @@ class SyncPilot extends SyncPilot_Base {
 	}
 
 	// After table migration, delete old tables and rename new tables removing the temporarily prefix
+	/**
+	 * Replace the tables with the migrated ones (the last step of a pull or a push)
+	 * @since   0.0.1
+	 * @since   0.3.1  Two actions around it: syncpilot_before_finalize_migration, and syncpilot_migration_finalized when the tables were replaced (the media files that the other site does not have are removed there)
+	 */
 	function ajax_finalize_migration() {
 
 		$this->check_ajax_referer( 'finalize-migration' );
 
 		global $wpdb;
+
+		do_action( 'syncpilot_before_finalize_migration' );
 
 		$return = '';
 
@@ -701,6 +710,10 @@ class SyncPilot extends SyncPilot_Base {
 
 			$return = ob_get_clean();
 		}
+
+		// an empty answer is a success: only then the last thing is done that cannot be undone
+		if ( '' === trim( (string) $return ) )
+			do_action( 'syncpilot_migration_finalized', $_POST['intent'] );
 
 		$result = $this->end_ajax( $return );
 
@@ -881,9 +894,11 @@ class SyncPilot extends SyncPilot_Base {
 	 * Public endpoint: receive a chunk of SQL of a push (signed) and run it
 	 * @since   0.0.1
 	 * @since   0.3.0  The early exits are logged: no chunk uploaded, chunk not readable, push not allowed, invalid signature (InvalidSignature, site 3)
+	 * @since   0.3.1  A chunk that was run is logged with size, number of queries, duration and memory peak (verbose only)
 	 */
 	function ajax_process_chunk() {
 
+		$started       = microtime( true );
 		$filtered_post = $this->filter_post_elements( $_POST, array( 'action', 'table', 'chunk_gzipped' ) );
 		$gzip          = ( isset( $_POST['chunk_gzipped'] ) && $_POST['chunk_gzipped'] );
 
@@ -946,11 +961,69 @@ class SyncPilot extends SyncPilot_Base {
 		}
 
 		$process_chunk_result = $this->process_chunk( $filtered_post['chunk'] );
-		$result               = $this->end_ajax( $process_chunk_result );
+
+		if ( true === $process_chunk_result && 'verbose' === SyncPilot_Logger::level() ) {
+
+			SyncPilot_Logger::info( 'Chunk imported', array(
+				'table'             => $_POST['table'] ?? '',
+				'chunk_bytes'       => strlen( $filtered_post['chunk'] ),
+				'request_bytes'     => (int) ( $_SERVER['CONTENT_LENGTH'] ?? 0 ),
+				'queries'           => $this->chunk_queries,
+				'duration_ms'       => (int) round( ( microtime( true ) - $started ) * 1000 ),
+				'memory_peak_bytes' => memory_get_peak_usage( true ),
+			) );
+		}
+
+		$result = $this->end_ajax( $process_chunk_result );
 
 		return $result;
 	}
 
+	/**
+	 * What the log says about a query that failed: its kind and table, its number in the chunk, its size and the error of
+	 * the database. The error can quote a value ("Duplicate entry 'x' for key"), so every quoted text in it is replaced.
+	 * @since   0.3.1
+	 *
+	 * @param   string $query   The query
+	 * @param   int    $number  The place of the query in the chunk, the first query is 1 (0 is the SET that is run before)
+	 *
+	 * @return  array  The facts for log_error()
+	 */
+	function describe_failed_query( $query, $number ) {
+
+		global $wpdb;
+
+		$kind  = '';
+		$table = '';
+
+		if ( preg_match( '/^\s*([A-Za-z]+(?:\s+(?:INTO|TABLE|IGNORE))?)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?`?([A-Za-z0-9_$]+)`?/i', $query, $match ) ) {
+			$kind  = strtoupper( preg_replace( '/\s+/', ' ', $match[1] ) );
+			$table = $match[2];
+		}
+
+		$errno = ( $wpdb->dbh instanceof mysqli ) ? $wpdb->dbh->errno : 0;
+		// the name of the key or the column ("for key 'PRIMARY'", "for column 'post_content'") is what is needed, the rest in quotes can be a value
+		$error = preg_replace( "/(?<!for key )(?<!for column )'(?:[^'\\\\]|\\\\.)*'/s", "'[value]'", (string) $wpdb->last_error );
+
+		return array(
+			'query'       => $kind,
+			'table'       => $table,
+			'number'      => (int) $number,
+			'query_bytes' => strlen( $query ),
+			'db_errno'    => $errno,
+			'db_error'    => $error,
+		);
+	}
+
+	/**
+	 * Run the queries of a chunk
+	 * @since   0.0.1
+	 * @since   0.3.1  A query that fails is logged (QueryFailed): the kind of query and its table, the number of the query, its size and the error of the database without the values in it; the number of queries is kept in chunk_queries
+	 *
+	 * @param   string $chunk  The SQL, the queries separated by a semicolon and a line break
+	 *
+	 * @return  true|string  true when all queries ran, otherwise the output of the errors
+	 */
 	function process_chunk( $chunk ) {
 		// prepare db
 		global $wpdb;
@@ -959,6 +1032,8 @@ class SyncPilot extends SyncPilot_Base {
 
 		$queries = array_filter( explode( ";\n", $chunk ) );
 		array_unshift( $queries, "SET sql_mode='NO_AUTO_VALUE_ON_ZERO';" );
+
+		$this->chunk_queries = count( $queries ) - 1;
 
 		ob_start();
 		$wpdb->show_errors();
@@ -969,8 +1044,11 @@ class SyncPilot extends SyncPilot_Base {
 			$wpdb->set_charset( $wpdb->dbh, $wpdb->charset );
 		}
 
-		foreach( $queries as $query ) {
+		foreach( $queries as $number => $query ) {
 			if( false === $wpdb->query( $query ) ) {
+
+				$this->log_error( SyncPilot_HelpCode::QueryFailed, $this->describe_failed_query( $query, $number ), site: 1 );
+
 				$return = ob_get_clean();
 				$result = $this->end_ajax( $return );
 				return $result;
@@ -1997,6 +2075,7 @@ class SyncPilot extends SyncPilot_Base {
 	 *
 	 * @since   0.0.1
 	 * @since   0.3.0  A table structure or CREATE TABLE query that cannot be read is logged (TableStructureFailed, CreateQueryFailed)
+	 * @since   0.3.1  Notes the time, the rows and the largest value of the chunk for the log (chunk_stats, see log_chunk_exported())
 	 *
 	 * @param   string $table  The table
 	 *
@@ -2007,6 +2086,8 @@ class SyncPilot extends SyncPilot_Base {
 		global $wpdb;
 
 		$this->set_time_limit();
+
+		$this->chunk_stats = array( 'started' => microtime( true ), 'rows' => 0, 'largest' => array( 'bytes' => 0 ) );
 
 		if ( empty( $this->form_data ) )
 			$this->form_data = $this->parse_migration_form_data( $_POST['form_data'] );
@@ -2365,6 +2446,8 @@ class SyncPilot extends SyncPilot_Base {
 									$value = preg_replace( array_keys( $domain_replaces ), array_values( $domain_replaces ), $value );
 								}
 
+								$this->track_largest_value( $table, $key, $value, $row );
+
 								if ( 'guid' != $key || ( isset( $this->form_data['replace_guids'] ) && $this->table_is( 'posts', $table ) ) ) {
 									if ( $_POST['stage'] != 'backup' )
 										$value = $this->recursive_unserialize_replace( $value );
@@ -2386,6 +2469,7 @@ class SyncPilot extends SyncPilot_Base {
 							$insert_buffer .= $insert_line;
 
 							++$this->row_tracker;
+							++$this->chunk_stats['rows'];
 
 							if ( ! empty( $this->primary_keys ) ) {
 								foreach( $this->primary_keys as $primary_key => $value )
@@ -2418,6 +2502,7 @@ class SyncPilot extends SyncPilot_Base {
 					$query_size    += strlen( $insert_line );
 
 					++$this->row_tracker;
+					++$this->chunk_stats['rows'];
 
 					if ( ! empty( $this->primary_keys ) ) {
 						foreach ( $this->primary_keys as $primary_key => $value )
@@ -2719,8 +2804,72 @@ class SyncPilot extends SyncPilot_Base {
 		}
 	}
 
-	// Called in the $this->stow function once our chunk buffer is full, will transfer the SQL to the remote server for importing
+	/**
+	 * Remember the largest value of the chunk: the table, the column, the ID of the row and the size, never the value.
+	 * The ID is only noted for a table with an integer primary key, so it is a number.
+	 * @since   0.3.1
+	 *
+	 * @param   string $table   The table
+	 * @param   string $column  The column
+	 * @param   mixed  $value   The value before the replace
+	 * @param   object $row     The row
+	 *
+	 * @return  void
+	 */
+	function track_largest_value( $table, $column, $value, $row ) {
+
+		$bytes = strlen( (string) $value );
+
+		if ( $bytes <= $this->chunk_stats['largest']['bytes'] )
+			return;
+
+		$id = array();
+
+		foreach ( array_keys( $this->primary_keys ) as $primary_key )
+			$id[ $primary_key ] = (int) $row->$primary_key;
+
+		$this->chunk_stats['largest'] = array( 'table' => $table, 'column' => $column, 'row' => $id, 'bytes' => $bytes );
+	}
+
+	/**
+	 * Write the entry of the chunk that this request has read from the table (verbose only): where it began, how many rows,
+	 * how large, how long it took, the peak of the memory and the largest value
+	 * @since   0.3.1
+	 *
+	 * @return  void
+	 */
+	function log_chunk_exported() {
+
+		if ( 'verbose' !== SyncPilot_Logger::level() || empty( $this->chunk_stats['started'] ) )
+			return;
+
+		$context = array(
+			'table'             => $_POST['table'] ?? '',
+			'intent'            => $_POST['intent'] ?? '',
+			'stage'             => $_POST['stage'] ?? '',
+			'start_row'         => max( 0, (int) ( $_POST['current_row'] ?? 0 ) ),
+			'rows'              => $this->chunk_stats['rows'],
+			'table_done'        => -1 === $this->row_tracker,
+			'chunk_bytes'       => strlen( $this->current_chunk ),
+			'limit_bytes'       => (int) $this->maximum_chunk_size,
+			'duration_ms'       => (int) round( ( microtime( true ) - $this->chunk_stats['started'] ) * 1000 ),
+			'memory_peak_bytes' => memory_get_peak_usage( true ),
+		);
+
+		if ( $this->chunk_stats['largest']['bytes'] > 0 )
+			$context['largest_value'] = $this->chunk_stats['largest'];
+
+		SyncPilot_Logger::info( 'Chunk read', $context );
+	}
+
+	/**
+	 * Called in the $this->stow function once our chunk buffer is full, will transfer the SQL to the remote server for importing
+	 * @since   0.0.1
+	 * @since   0.3.1  Writes the entry of the chunk for the log before it goes on (verbose only, see log_chunk_exported())
+	 */
 	function transfer_chunk() {
+
+		$this->log_chunk_exported();
 
 		if( $_POST['intent'] == 'savefile' || $_POST['stage'] == 'backup' ) {
 
@@ -2906,6 +3055,10 @@ class SyncPilot extends SyncPilot_Base {
 			'please_wait'							=> __( "please wait...", self::TEXT_DOMAIN ),
 			'complete'								=> __( "complete", self::TEXT_DOMAIN ),
 			'migration_failed'						=> __( "Migration failed", self::TEXT_DOMAIN ),
+			'migration_stopped'						=> __( "Migration stopped", self::TEXT_DOMAIN ),
+			'not_from_wordpress'					=> __( "The answer did not come from WordPress: a firewall or a proxy in front of the site has probably blocked the request. The administrator of the server can allow the requests of SyncPilot, they go to admin-ajax.php with an action that starts with syncpilot_.", self::TEXT_DOMAIN ),
+			'block_page_gives'						=> __( "The block page gives: %s.", self::TEXT_DOMAIN ),
+			'media_not_removed'						=> __( "The media files that the other site does not have were not removed, because the migration had errors.", self::TEXT_DOMAIN ),
 			'backing_up'							=> __( "Backing up", self::TEXT_DOMAIN ),
 			'migrating'								=> __( "Migrating", self::TEXT_DOMAIN ),
 			'status'								=> __( "Status", self::TEXT_DOMAIN ),
@@ -2950,10 +3103,10 @@ class SyncPilot extends SyncPilot_Base {
 		// the texts of Media Files are localized on the same script
 		do_action( 'syncpilot_load_assets' );
 
-		wp_enqueue_script('jquery');
-		wp_enqueue_script('jquery-ui-core');
-		wp_enqueue_script('jquery-ui-slider');
-		wp_enqueue_script('jquery-ui-sortable');
+		wp_enqueue_script( 'jquery' );
+		wp_enqueue_script( 'jquery-ui-core' );
+		wp_enqueue_script( 'jquery-ui-slider' );
+		wp_enqueue_script( 'jquery-ui-sortable' );
 
 	}
 
@@ -3288,6 +3441,9 @@ class SyncPilot extends SyncPilot_Base {
 
 		// the ID of the migration is for the log of this site; the other site reads it from the header
 		unset( $data['migration_id'] );
+
+		// whether the migration was without errors is for this site (it decides about the removal of media files)
+		unset( $data['media_clean'] );
 
 		return $data;
 	}

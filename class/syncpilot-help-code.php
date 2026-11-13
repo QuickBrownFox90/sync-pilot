@@ -29,6 +29,7 @@ enum SyncPilot_HelpCode: int {
 	case RemoteAnswerInvalid     = 144;
 	case RemoteAnswerUnreadable  = 145;
 	case RemoteReportedError     = 146;
+	case RemoteNotWordPress      = 153;
 
 	// the request itself (caught by SyncPilot_Request_Guard)
 	case UncaughtException       = 147;
@@ -51,6 +52,7 @@ enum SyncPilot_HelpCode: int {
 	case ChunkUnreadable         = 136;
 	case TempTablesMissing       = 140;
 	case TableNameInvalid        = 141;
+	case QueryFailed             = 152;
 
 	// media files
 	case MediaMoveFailed         = 203;
@@ -62,6 +64,10 @@ enum SyncPilot_HelpCode: int {
 	case MediaListMismatch       = 212;
 	case MediaPathOutside        = 213;
 	case MediaDownloadFailed     = 214;
+	case MediaFolderNotWritable  = 215;
+	case MediaTempNotWritable    = 216;
+	case MediaDiskLow            = 217;
+	case MediaRemoveFailed       = 218;
 
 	// the numbers of the earlier versions: as the user saw them (#111, #103mf) without # => the code that means it now
 	const LEGACY = array(
@@ -93,6 +99,7 @@ enum SyncPilot_HelpCode: int {
 			self::RemoteAnswerInvalid    => array( 'log' => 'Answer of remote site is not serialized data' ),
 			self::RemoteAnswerUnreadable => array( 'log' => 'Answer of remote site cannot be unserialized' ),
 			self::RemoteReportedError    => array( 'log' => 'Remote site reported an error' ),
+			self::RemoteNotWordPress     => array( 'log' => 'Answer did not come from WordPress' ),
 
 			self::UncaughtException      => array( 'log' => 'Uncaught exception in request' ),
 			self::PhpFatalError          => array( 'log' => 'PHP fatal error in request' ),
@@ -112,6 +119,7 @@ enum SyncPilot_HelpCode: int {
 			self::ChunkUnreadable        => array( 'log' => 'Chunk file not readable' ),
 			self::TempTablesMissing      => array( 'log' => 'Temporary tables missing at finalize' ),
 			self::TableNameInvalid       => array( 'log' => 'Table name invalid at finalize' ),
+			self::QueryFailed            => array( 'log' => 'Database query failed' ),
 
 			self::MediaMoveFailed        => array( 'log' => 'Moving downloaded media file failed' ),
 			self::MediaFolderFailed      => array( 'log' => 'Creating media folder failed' ),
@@ -122,6 +130,10 @@ enum SyncPilot_HelpCode: int {
 			self::MediaListMismatch      => array( 'log' => 'Media file list does not match upload' ),
 			self::MediaPathOutside       => array( 'log' => 'Media file path outside uploads folder' ),
 			self::MediaDownloadFailed    => array( 'log' => 'Downloading media file failed' ),
+			self::MediaFolderNotWritable => array( 'log' => 'Media folder not writable' ),
+			self::MediaTempNotWritable   => array( 'log' => 'Temporary folder not writable' ),
+			self::MediaDiskLow           => array( 'log' => 'Not enough free disk space for media files' ),
+			self::MediaRemoveFailed      => array( 'log' => 'Removing media files failed' ),
 		};
 	}
 

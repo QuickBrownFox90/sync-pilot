@@ -7,6 +7,15 @@
 //   node tests/browser/push.mjs --yes --backup         with the backup of the receiving site before the data is replaced (the
 //                                                      stage "backup", then the switch to the migration); the backup file is
 //                                                      removed again through the plugin of that site
+//   node tests/browser/push.mjs --yes --verbose        at the level verbose of the log: checks the entries of the chunks on both sites
+//   node tests/browser/push.mjs --yes --media --stray  with "remove the media files that the other site does not have": a file that only the
+//                                                      receiving site has must be gone at the end (and only then)
+//   node tests/browser/push.mjs --yes --media --stray --broken
+//                                                      one file cannot be written (a folder is where it goes): the migration ends with
+//                                                      an error, so the stray file must stay and the log says why
+//   node tests/browser/push.mjs --yes --media --unwritable
+//                                                      the uploads folder of the receiving site cannot be written: the migration must
+//                                                      stop before the database is replaced and remove its temporary tables
 //   node tests/browser/push.mjs --yes --pull           the other direction: the second site is pulled into the first one
 //                                                      (it permits pulls for the time of the test); the media files of
 //                                                      the first site are the ones that are taken away and come back
@@ -39,8 +48,20 @@ if ( ! process.argv.includes( '--yes' ) ) {
 
 const withMedia = process.argv.includes( '--media' );
 const pull      = process.argv.includes( '--pull' );
+const verbose   = process.argv.includes( '--verbose' );
 const backup    = process.argv.includes( '--backup' );
 const cancel    = process.argv.includes( '--cancel' );
+const broken    = process.argv.includes( '--broken' );
+const stray     = process.argv.includes( '--stray' ) || broken;
+const unwritable = process.argv.includes( '--unwritable' );
+const strayFile = 'sp-test-stray-remove-me.jpg';
+
+// the removal takes every file that the sending site does not know: in a pull that would be files of the first test site. A push
+// removes them from the second one, which has none besides the file of the test
+if ( stray && pull ) {
+    console.log( '--stray and --broken are for a push: a pull would remove the files of the first test site that the second one does not have.' );
+    process.exit( 1 );
+}
 
 // the site that receives the data, and the one it comes from (the names of the sides in the checksums: source is config.wp)
 const receiver = pull ? config.wp : config.remoteWp;
@@ -166,6 +187,20 @@ if ( withMedia ) {
     remove( receiver, takenAway );
 }
 
+const uploadsMode = unwritable ? wp( receiver, 'echo substr( sprintf( "%o", fileperms( wp_upload_dir()["basedir"] ) ), -4 );' ) : '';
+const brokenDir = broken && takenAway.length ? takenAway[0] : '';
+
+if ( stray )
+    wp( receiver, 'file_put_contents( wp_upload_dir()["basedir"] . "/' + strayFile + '", "x" );' );
+
+// a link that leads nowhere where a file of the push goes: it is not in the list of the files (its size cannot be read), so the
+// file is sent, and it cannot be written
+if ( brokenDir )
+    wp( receiver, 'symlink( "/nonexistent-sp-test/file", wp_upload_dir()["basedir"] . "/' + brokenDir + '" );' );
+
+if ( unwritable )
+    wp( receiver, 'chmod( wp_upload_dir()["basedir"], 0555 );' );
+
 const key    = wp( config.remoteWp, 'echo get_option( "syncpilot_settings" )["key"];' );
 
 // a pull needs the permission on the other site (it is put back at the end)
@@ -173,6 +208,14 @@ const remoteSettings = wp( config.remoteWp, 'echo base64_encode( serialize( get_
 
 if ( pull )
     wp( config.remoteWp, '$s = get_option( "syncpilot_settings" ); $s["allow_pull"] = true; update_option( "syncpilot_settings", $s );' );
+
+// --verbose: both sites write the level verbose (the reference backup brings the settings of the source back, the settings of the other site are put back at the end)
+const ownSettings = wp( config.wp, 'echo base64_encode( serialize( get_option( "syncpilot_settings" ) ) );' );
+
+if ( verbose ) {
+    for ( const path of [ config.wp, config.remoteWp ] )
+        wp( path, '$s = get_option( "syncpilot_settings" ); $s["log_level"] = "verbose"; update_option( "syncpilot_settings", $s ); SyncPilot_Logger::clear();' );
+}
 
 // a row that exists only on the other site: the push has to replace the table, so it must be gone afterwards (the two test
 // sites are copies of each other, without it a push that sends nothing would pass as well)
@@ -215,6 +258,12 @@ try {
         await browser.waitFor( `(() => { const e = document.querySelector('#media-files'); return !! e && e.offsetWidth > 0 && e.offsetHeight > 0; })()`, 10000 );
         await browser.click( '#media-files', 600 );
         check( 'the option "media files" is checked', await browser.ev( `jQuery('#media-files').is(':checked')` ) );
+
+        if ( stray ) {
+
+            await browser.click( '#remove-local-media', 400 );
+            check( 'the option "remove the media files that the other site does not have" is checked', await browser.ev( `jQuery('#remove-local-media').is(':checked')` ) );
+        }
     }
 
     if ( backup ) {
@@ -304,98 +353,186 @@ try {
 
         const widths = await browser.progressWidths();
 
-        check( `the ${ pull ? 'pull' : 'push' } runs to the end without an error message`, finished && ! failed, text );
+        if ( unwritable )
+            check( 'the migration stops with a message that names the folder (#215)', failed && /#215/.test( text + ' ' + await browser.ev( `jQuery('.progress-text').text()` ) ), text );
+
+        else if ( broken )
+            check( 'the migration ends with the message "completed with some errors"', failed && /Fehler|error/i.test( text ), text );
+
+        else
+            check( `the ${ pull ? 'pull' : 'push' } runs to the end without an error message`, finished && ! failed, text );
 
         // with media files the bar starts again at 0 for the files, so it only has to rise within each part
         check( 'the progress bar moves', widths.some( w => w > 0 && w < 100 ) && ( withMedia || backup || widths.every( ( w, i ) => i === 0 || w >= widths[i - 1] ) ), `${ widths.length } samples, highest ${ Math.max( ...widths ) }%` );
         check( 'no error in the page', browser.takeProblems().length === 0, browser.takeProblems().join( ' | ' ) );
 
-        section( 'the other site afterwards' );
+        if ( unwritable ) {
 
-        if ( backup ) {
+            section( 'the migration was stopped before anything was replaced' );
 
-            const made = backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) );
+            const left = Object.keys( counts( receiver ) ).filter( t => t.startsWith( '_mig_' ) || t.startsWith( '_old_' ) );
+            const log  = JSON.parse( wp( config.wp, 'echo json_encode( array_map( "json_decode", SyncPilot_Logger::lines() ) );' ) );
+            const stop = log.filter( e => e.message === 'Migration stopped by the media check' ).pop();
+            const folder = log.filter( e => 215 === e.help ).pop();
 
-            check( 'one backup was made, with content', made.length === 1 && statSync( join( backupDir( receiver ), made[0] ) ).size > 1000, made.map( f => f + ' ' + statSync( join( backupDir( receiver ), made[0] ) ).size + ' bytes' ).join( ', ' ) );
-
-            // the backup belongs to the web server (the folder is not writable for this user): the plugin of that site removes it
-            // the way it removes the backup of a cancelled migration
-            const site = pull ? config.site : config.remoteSite;
-
-            if ( ! pull )
-                await browser.login( config.remoteWp, config.remoteSite );
-
-            await browser.goto( `${ site }/wp-admin/tools.php?page=sync-pilot` );
-
-            for ( const file of made )
-                await browser.ev( `fetch( ajaxurl, { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams( { action : 'syncpilot_cancel_migration', intent : 'pull', stage : 'backup', dump_filename : ${ JSON.stringify( file.replace( /\.sql(\.gz)?$/, '' ) ) }, form_data : '', temp_prefix : '_mig_', nonce : syncpilot_nonces.cancel_migration } ) } ).then( r => r.text() )` );
-
-            check( 'the backup is removed again', backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) ).length === 0, backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) ).join( ', ' ) );
+            check( 'the marker row of the receiving site is still there (the tables were not replaced)', marked() === '1' );
+            check( 'no temporary tables are left on the receiving site', left.length === 0, left.join( ', ' ) );
+            check( 'the log says it: help code 215 with the folder and "Migration stopped by the media check"', stop && folder && 'uploads' === folder.context.folder && false === folder.context.writable, JSON.stringify( folder?.context ) );
+            check( 'it was the site that writes: ' + ( pull ? 'this site' : 'the remote site' ), folder?.context.where === ( pull ? 'this site' : 'remote site' ) );
         }
 
-        if ( withMedia ) {
+        if ( ! unwritable ) {
 
-            const onTarget = new Set( files( receiver ) );
-            const missing  = takenAway.filter( f => ! onTarget.has( f ) );
+            section( 'the other site afterwards' );
 
-            check( 'the files that were taken away are back on the other site', takenAway.length > 0 && missing.length === 0, `${ takenAway.length } files taken away, ${ missing.length } not back${ missing.length ? ': ' + missing.slice( 0, 3 ).join( ', ' ) : '' }` );
+            if ( backup ) {
+
+                const made = backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) );
+
+                check( 'one backup was made, with content', made.length === 1 && statSync( join( backupDir( receiver ), made[0] ) ).size > 1000, made.map( f => f + ' ' + statSync( join( backupDir( receiver ), made[0] ) ).size + ' bytes' ).join( ', ' ) );
+
+                // the backup belongs to the web server (the folder is not writable for this user): the plugin of that site removes it
+                // the way it removes the backup of a cancelled migration
+                const site = pull ? config.site : config.remoteSite;
+
+                if ( ! pull )
+                    await browser.login( config.remoteWp, config.remoteSite );
+
+                await browser.goto( `${ site }/wp-admin/tools.php?page=sync-pilot` );
+
+                for ( const file of made )
+                    await browser.ev( `fetch( ajaxurl, { method : 'POST', headers : { 'Content-Type' : 'application/x-www-form-urlencoded' }, body : new URLSearchParams( { action : 'syncpilot_cancel_migration', intent : 'pull', stage : 'backup', dump_filename : ${ JSON.stringify( file.replace( /\.sql(\.gz)?$/, '' ) ) }, form_data : '', temp_prefix : '_mig_', nonce : syncpilot_nonces.cancel_migration } ) } ).then( r => r.text() )` );
+
+                check( 'the backup is removed again', backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) ).length === 0, backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) ).join( ', ' ) );
+            }
+
+            if ( withMedia ) {
+
+                const onTarget = new Set( files( receiver ) );
+
+                // with --broken one file cannot be written, on purpose
+                const missing  = takenAway.filter( f => ! onTarget.has( f ) && f !== brokenDir );
+
+                check( 'the files that were taken away are back on the other site', takenAway.length > 0 && missing.length === 0, `${ takenAway.length } files taken away, ${ missing.length } not back${ missing.length ? ': ' + missing.slice( 0, 3 ).join( ', ' ) : '' }` );
+            }
+
+            const rowsSource = counts( sender ), rowsTarget = counts( receiver );
+            const left       = Object.keys( rowsTarget ).filter( t => t.startsWith( '_mig_' ) || t.startsWith( '_old_' ) );
+            const differ     = Object.keys( rowsSource ).filter( t => rowsSource[t] !== rowsTarget[t] );
+
+            check( 'the data of the sending site replaced the table on the receiving site (its marker row is gone)', marked() === '0' );
+            check( 'no temporary or old tables are left', left.length === 0, left.join( ', ' ) );
+
+            if ( chosen ) {
+
+                // the other tables were not sent: the sites may differ there (and must not have changed on the other site)
+                const wrong = chosen.filter( t => rowsSource[t] !== rowsTarget[t] );
+
+                check( 'the pushed tables have the same number of rows on both sites', wrong.length === 0 && chosen.every( t => t in rowsTarget ), wrong.join( ', ' ) );
+
+                const nowTarget = sums( receiver );
+
+                // the options are written by WordPress itself; the users' meta (sessions) of a site that is logged in change as well
+                // (the pull is received by the site of the test, and the backup is removed through the receiving site)
+                const changed   = Object.keys( before[received] ).filter( t => ! chosen.includes( t ) && before[received][t] !== nowTarget[t] && ! t.endsWith( 'options' ) && ! t.endsWith( 'usermeta' ) );
+
+                check( 'the other tables of the receiving site were not touched', changed.length === 0, changed.join( ', ' ) );
+            } else {
+
+                check( 'same tables, same number of rows (except the options, whose transients are not sent)', Object.keys( rowsSource ).length === Object.keys( rowsTarget ).length && differ.every( t => t.endsWith( 'options' ) ), 'different: ' + differ.join( ', ' ) );
+            }
+
+            section( 'the log of the migration' );
+
+            const entries = path => JSON.parse( wp( path, 'echo json_encode( array_map( "json_decode", SyncPilot_Logger::lines() ) );' ) );
+            const last    = ( list, message ) => list.filter( e => e.message === message ).pop();
+
+            // the site whose admin page was clicked is config.wp, in a push and in a pull
+            const own       = entries( config.wp );
+            const other     = entries( config.remoteWp );
+            const started   = last( own, 'Migration started' );
+            const agreed    = last( own, 'Remote site agreed' );
+            const requested = last( other, 'Migration requested by remote site' );
+            const id        = started?.migration;
+
+            // the log of the test sites also holds the entries of earlier runs (the folder belongs to the web server, so it cannot be emptied from here): only what came after the start of this migration counts
+            const since    = ( list, from ) => list.slice( list.lastIndexOf( from ) + 1 );
+            const ownNow   = since( own, started );
+            const otherNow = since( other, requested );
+            const needed    = [ 'plugin', 'wordpress', 'php', 'memory_limit', 'max_execution_time', 'post_max_size', 'db', 'db_charset', 'sql_mode', 'max_allowed_packet', 'free_disk_bytes' ];
+            const missing   = env => needed.filter( key => ! env || ! ( key in env ) );
+
+            check( 'this site wrote "Migration started" with an ID', /^\d{6}-\d{6}-[0-9a-f]{6}$/.test( id || '' ) && 'event' === started.level, id );
+            check( 'the entry has the environment of this site and the intent', missing( started?.context?.environment ).length === 0 && started.context.intent === ( pull ? 'pull' : 'push' ), missing( started?.context?.environment ).join( ', ' ) );
+            check( 'the other site wrote "Migration requested by remote site" with the same ID', requested?.migration === id && 'remote' === requested.src, requested?.migration );
+            check( 'its entry has the environment of the other site', missing( requested?.context?.environment ).length === 0, missing( requested?.context?.environment ).join( ', ' ) );
+            check( 'this site wrote the environment of the other site as well ("Remote site agreed", the same ID)', agreed?.migration === id && missing( agreed?.context?.environment ).length === 0 && agreed.context.environment.php === requested?.context?.environment?.php, agreed?.migration );
+            check( 'no key, no address and no path in the entries of the migration', ! JSON.stringify( [ started, agreed, requested ] ).match( new RegExp( [ key, '/www/', config.site.replace( /^https?:\/\//, '' ), config.remoteSite.replace( /^https?:\/\//, '' ) ].map( t => t.replace( /[.*+?^${}()|[\]\\]/g, '\\$&' ) ).join( '|' ) ) ) );
+
+            if ( verbose ) {
+
+                section( 'the chunks in the log (verbose)' );
+
+                // the sender reads the chunks (a push: this site; a pull: the other site), the receiver runs them
+                const sending   = pull ? otherNow : ownNow;
+                const receiving = pull ? ownNow : otherNow;
+                const read      = sending.filter( e => e.message === 'Chunk read' );
+                const imported  = receiving.filter( e => e.message === 'Chunk imported' );
+                const wanted    = [ 'table', 'rows', 'chunk_bytes', 'duration_ms', 'memory_peak_bytes', 'table_done' ];
+                const lacking   = read.flatMap( e => wanted.filter( k => ! ( k in e.context ) ) );
+                const largest   = read.map( e => e.context.largest_value ).filter( Boolean );
+                const thick     = JSON.stringify( [ read, imported ] );
+
+                check( 'the sending site wrote an entry for chunks, with the ID of the migration', read.length > 0 && read.every( e => e.migration === id && 'info' === e.level ), read.length + ' entries' );
+                check( 'every entry has table, rows, size, duration, memory peak and whether the table is done', lacking.length === 0, [ ...new Set( lacking ) ].join( ', ' ) );
+                check( 'at least one entry per table ends it (table_done)', read.some( e => e.context.table_done ) );
+                check( 'the largest value says table, column, row and size, and no value', largest.length > 0 && largest.every( v => v.table && v.column && v.bytes > 0 && typeof v.row === 'object' && ! ( 'value' in v ) ), JSON.stringify( largest[0] ) );
+
+                if ( ! pull ) {
+                    check( 'the receiving site wrote "Chunk imported" with the same ID, the table and the number of queries', imported.length > 0 && imported.every( e => e.migration === id && e.context.table && e.context.queries > 0 ), imported.length + ' entries' );
+                    check( 'it imported as many chunks as were sent', imported.length === read.filter( e => 'push' === e.context.intent ).length, imported.length + ' / ' + read.length );
+                }
+
+                if ( withMedia ) {
+
+                    const media = ownNow.filter( e => e.message === 'Media check before writing' ).pop();
+
+                    check( 'the media files: the check before they are written is in the log, for the site that writes, without a problem', media && media.migration === id && media.context.where === ( pull ? 'this site' : 'remote site' ) && 0 === media.context.problems && media.context.files > 0, JSON.stringify( media?.context ) );
+                }
+
+                check( 'no error in the log of either site since the start', ! [ ...ownNow, ...otherNow ].some( e => 'error' === e.level ), [ ...ownNow, ...otherNow ].filter( e => 'error' === e.level ).map( e => e.message ).join( ', ' ) );
+            }
+
+            const tables = browser.requests.filter( r => /action=syncpilot_migrate_table/.test( r ) );
+            const first  = browser.requests.findIndex( r => /action=syncpilot_initiate_migration/.test( r ) );
+
+            check( 'the browser sends the ID with every request after the start (tables)', tables.length > 0 && tables.every( r => r.endsWith( '&migration_id=' + id ) ), tables.length + ' requests' );
+            check( 'and not before it (the start itself and the connection)', browser.requests.slice( 0, first + 1 ).every( r => ! /migration_id=/.test( r ) ) );
+
+            if ( stray ) {
+
+                section( 'the media files that the other site does not have' );
+
+                const strayLeft = wp( receiver, 'echo (int) is_file( wp_upload_dir()["basedir"] . "/' + strayFile + '" );' ) === '1';
+                const sinceStart = list => list.filter( e => 'event' === e.level );
+                const done      = ( pull ? ownNow : otherNow ).filter( e => e.message === 'Media files removed' ).pop();
+                const notDone   = ownNow.filter( e => e.message === 'Media files not removed' ).pop();
+
+                if ( broken ) {
+
+                    check( 'one file could not be written, so the file that only the receiving site has is still there', strayLeft );
+                    check( 'the log says why nothing was removed', !! notDone && notDone.migration === id && ! sinceStart( ownNow ).some( e => e.message === 'Media files removed' ), JSON.stringify( notDone?.context ) );
+                    check( 'the message at the end says that the files were not removed', /nicht entfernt|not removed/.test( await browser.ev( `jQuery('.progress-text').text()` ) ) );
+                } else {
+
+                    check( 'the file that only the receiving site has is removed', ! strayLeft );
+                    check( 'the receiving site wrote "Media files removed" with the number, none failed', !! done && done.migration === id && done.context.removed >= 1 && 0 === done.context.failed, JSON.stringify( done?.context ) );
+                    check( 'and it was not announced as not removed', ! ownNow.some( e => e.message === 'Media files not removed' ) );
+                }
+            }
+
+            check( 'the receiving site kept its address and its key', wp( receiver, 'echo get_option( "home" );' ) === ( pull ? config.site : config.remoteSite ) && wp( receiver, 'echo get_option( "syncpilot_settings" )["key"];' ) === ( pull ? wp( config.wp, 'echo get_option( "syncpilot_settings" )["key"];' ) : key ) );
         }
-
-        const rowsSource = counts( sender ), rowsTarget = counts( receiver );
-        const left       = Object.keys( rowsTarget ).filter( t => t.startsWith( '_mig_' ) || t.startsWith( '_old_' ) );
-        const differ     = Object.keys( rowsSource ).filter( t => rowsSource[t] !== rowsTarget[t] );
-
-        check( 'the data of the sending site replaced the table on the receiving site (its marker row is gone)', marked() === '0' );
-        check( 'no temporary or old tables are left', left.length === 0, left.join( ', ' ) );
-
-        if ( chosen ) {
-
-            // the other tables were not sent: the sites may differ there (and must not have changed on the other site)
-            const wrong = chosen.filter( t => rowsSource[t] !== rowsTarget[t] );
-
-            check( 'the pushed tables have the same number of rows on both sites', wrong.length === 0 && chosen.every( t => t in rowsTarget ), wrong.join( ', ' ) );
-
-            const nowTarget = sums( receiver );
-
-            // the options are written by WordPress itself; the users' meta (sessions) of a site that is logged in change as well
-            // (the pull is received by the site of the test, and the backup is removed through the receiving site)
-            const changed   = Object.keys( before[received] ).filter( t => ! chosen.includes( t ) && before[received][t] !== nowTarget[t] && ! t.endsWith( 'options' ) && ! t.endsWith( 'usermeta' ) );
-
-            check( 'the other tables of the receiving site were not touched', changed.length === 0, changed.join( ', ' ) );
-        } else {
-
-            check( 'same tables, same number of rows (except the options, whose transients are not sent)', Object.keys( rowsSource ).length === Object.keys( rowsTarget ).length && differ.every( t => t.endsWith( 'options' ) ), 'different: ' + differ.join( ', ' ) );
-        }
-
-        section( 'the log of the migration' );
-
-        const entries = path => JSON.parse( wp( path, 'echo json_encode( array_map( "json_decode", SyncPilot_Logger::lines() ) );' ) );
-        const last    = ( list, message ) => list.filter( e => e.message === message ).pop();
-
-        // the site whose admin page was clicked is config.wp, in a push and in a pull
-        const own       = entries( config.wp );
-        const other     = entries( config.remoteWp );
-        const started   = last( own, 'Migration started' );
-        const agreed    = last( own, 'Remote site agreed' );
-        const requested = last( other, 'Migration requested by remote site' );
-        const id        = started?.migration;
-        const needed    = [ 'plugin', 'wordpress', 'php', 'memory_limit', 'max_execution_time', 'post_max_size', 'db', 'db_charset', 'sql_mode', 'max_allowed_packet', 'free_disk_bytes' ];
-        const missing   = env => needed.filter( key => ! env || ! ( key in env ) );
-
-        check( 'this site wrote "Migration started" with an ID', /^\d{6}-\d{6}-[0-9a-f]{6}$/.test( id || '' ) && 'event' === started.level, id );
-        check( 'the entry has the environment of this site and the intent', missing( started?.context?.environment ).length === 0 && started.context.intent === ( pull ? 'pull' : 'push' ), missing( started?.context?.environment ).join( ', ' ) );
-        check( 'the other site wrote "Migration requested by remote site" with the same ID', requested?.migration === id && 'remote' === requested.src, requested?.migration );
-        check( 'its entry has the environment of the other site', missing( requested?.context?.environment ).length === 0, missing( requested?.context?.environment ).join( ', ' ) );
-        check( 'this site wrote the environment of the other site as well ("Remote site agreed", the same ID)', agreed?.migration === id && missing( agreed?.context?.environment ).length === 0 && agreed.context.environment.php === requested?.context?.environment?.php, agreed?.migration );
-        check( 'no key, no address and no path in the entries of the migration', ! JSON.stringify( [ started, agreed, requested ] ).match( new RegExp( [ key, '/www/', config.site.replace( /^https?:\/\//, '' ), config.remoteSite.replace( /^https?:\/\//, '' ) ].map( t => t.replace( /[.*+?^${}()|[\]\\]/g, '\\$&' ) ).join( '|' ) ) ) );
-
-        const tables = browser.requests.filter( r => /action=syncpilot_migrate_table/.test( r ) );
-        const first  = browser.requests.findIndex( r => /action=syncpilot_initiate_migration/.test( r ) );
-
-        check( 'the browser sends the ID with every request after the start (tables)', tables.length > 0 && tables.every( r => r.endsWith( '&migration_id=' + id ) ), tables.length + ' requests' );
-        check( 'and not before it (the start itself and the connection)', browser.requests.slice( 0, first + 1 ).every( r => ! /migration_id=/.test( r ) ) );
-
-        check( 'the receiving site kept its address and its key', wp( receiver, 'echo get_option( "home" );' ) === ( pull ? config.site : config.remoteSite ) && wp( receiver, 'echo get_option( "syncpilot_settings" )["key"];' ) === ( pull ? wp( config.wp, 'echo get_option( "syncpilot_settings" )["key"];' ) : key ) );
     }
 } catch ( error ) {
 
@@ -405,7 +542,21 @@ try {
     // whatever happens, both sites are put back
     try { await browser.close(); } catch {}
 
+    // what the test made on the receiving site, before the files are put back
+    if ( unwritable )
+        wp( receiver, 'chmod( wp_upload_dir()["basedir"], ' + uploadsMode + ' );' );
+
+    if ( brokenDir )
+        wp( receiver, '@unlink( wp_upload_dir()["basedir"] . "/' + brokenDir + '" );' );
+
+    if ( stray )
+        wp( receiver, '@unlink( wp_upload_dir()["basedir"] . "/' + strayFile + '" );' );
+
     wp( config.remoteWp, 'update_option( "syncpilot_settings", unserialize( base64_decode( ' + JSON.stringify( remoteSettings ) + ' ) ) );' );
+
+    // the options are not part of what is put back: the level of the log has to be put back by hand
+    if ( verbose )
+        wp( config.wp, 'update_option( "syncpilot_settings", unserialize( base64_decode( ' + JSON.stringify( ownSettings ) + ' ) ) );' );
 
     section( 'put everything back' );
 

@@ -2,6 +2,7 @@
 // of the log is chosen under the title of the log.
 
 import { spinner_url } from './spinner.js';
+import { ajax_problem_text } from './helpers.js';
 
 const $ = jQuery;
 
@@ -22,8 +23,8 @@ export function refresh_debug_log() {
             action : 'syncpilot_get_diagnostics',
             nonce  : syncpilot_nonces.get_diagnostics,
         },
-        error : function () {
-            syncpilot_alert( syncpilot_i10n.update_log_problem );
+        error : function ( jqXHR ) {
+            syncpilot_alert( ajax_problem_text( syncpilot_i10n.update_log_problem, jqXHR ) );
         },
         success : function ( data ) {
             $( '.debug-info-textarea' ).val( data );
@@ -39,8 +40,8 @@ export function refresh_debug_log() {
             action : 'syncpilot_get_log',
             nonce  : syncpilot_nonces.get_log,
         },
-        error : function () {
-            syncpilot_alert( syncpilot_i10n.update_log_problem );
+        error : function ( jqXHR ) {
+            syncpilot_alert( ajax_problem_text( syncpilot_i10n.update_log_problem, jqXHR ) );
         },
         success : function ( data ) {
 
@@ -77,10 +78,10 @@ function init_log_level() {
                 level  : $select.val(),
                 nonce  : syncpilot_nonces.save_log_level,
             },
-            error : function () {
+            error : function ( jqXHR ) {
 
                 $( '.log-level .ajax-spinner' ).remove();
-                syncpilot_alert( syncpilot_i10n.save_settings_problem );
+                syncpilot_alert( ajax_problem_text( syncpilot_i10n.save_settings_problem, jqXHR ) );
             },
             success : function ( data ) {
 
@@ -121,7 +122,7 @@ export function init_diagnostics() {
                 nonce  : syncpilot_nonces.clear_log,
             },
             error : function ( jqXHR, textStatus, errorThrown ) {
-                syncpilot_alert( syncpilot_i10n.clear_log_problem );
+                syncpilot_alert( ajax_problem_text( syncpilot_i10n.clear_log_problem, jqXHR ) );
             },
             success : function ( data ) { }
         } );

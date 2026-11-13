@@ -265,6 +265,39 @@ try {
     }
 
     check( 'delete: no error in the page', browser.takeProblems().length === 0, browser.takeProblems().join( ' | ' ) );
+
+    section( 'a firewall answers instead of WordPress' );
+
+    // the answer of a firewall for the request that saves a profile, as the browser gets it (no X-Robots-Tag, that is the header
+    // that admin-ajax.php always sends); a transport of jQuery answers it, so that the real handler of the plugin runs
+    const waf = '<html><head><title> The URL you requested has been blocked </title></head><body><h3>Web Page Blocked!</h3><p>URL: www.example.test/wp-admin/admin-ajax.php<br/>Client IP: 80.153.24.194<br/>Attack ID: 20000008<br/>Message ID: 000186991602</p></body></html>';
+
+    await browser.goto( page + '&syncpilot-profile=-1' );
+    await browser.click( '#savefile' );
+    await browser.chooseTables( quickTables( wp( config.wp, 'global $wpdb; echo $wpdb->prefix;' ) ) );
+    await browser.ev( `jQuery('#save-migration-profile').prop('checked', true).trigger('change')` );
+    await wait( 300 );
+    await browser.ev( `window.__waf = true; jQuery.ajaxTransport( '+*', function ( options ) { if ( ! window.__waf || String( options.data ).indexOf( 'action=syncpilot_save_profile' ) === -1 ) return; return { send : function ( headers, complete ) { complete( 500, 'Internal Server Error', { text : ${ JSON.stringify( waf ) } }, 'Content-Type: text/html\\r\\nServer: Apache' ); }, abort : function () {} }; } );` );
+    await browser.ev( `jQuery('.create-new-profile').val('zz-waf-profile').trigger('input').trigger('change')` );
+    await browser.click( '.save-settings-button', 600 );
+
+    const note = await browser.ev( `(() => { const d = document.getElementById('syncpilot-dialog'); return d && d.open ? d.querySelector('.syncpilot-dialog-message').textContent : null; })()` );
+
+    check( 'the message says that the answer did not come from WordPress, with the status', !! note && /WordPress/.test( note ) && /500/.test( note ), note );
+    check( 'it names the reference numbers of the block page', !! note && /Attack ID: 20000008/.test( note ) && /Message ID: 000186991602/.test( note ), note );
+    check( 'it does not show the words or the address of the page', !! note && ! /Web Page Blocked|80\.153|example\.test/.test( note ), note );
+
+    await browser.click( '.syncpilot-dialog-ok', 300 );
+
+    // an answer of WordPress (the header is there) gets no such sentence
+    await browser.ev( `window.__waf = false; jQuery.ajaxTransport( '+*', function ( options ) { if ( String( options.data ).indexOf( 'action=syncpilot_save_profile' ) === -1 ) return; return { send : function ( headers, complete ) { complete( 500, 'Internal Server Error', { text : 'There has been a critical error' }, 'Content-Type: text/html\\r\\nX-Robots-Tag: noindex' ); }, abort : function () {} }; } );` );
+    await browser.click( '.save-settings-button', 600 );
+
+    const plain = await browser.ev( `(() => { const d = document.getElementById('syncpilot-dialog'); return d && d.open ? d.querySelector('.syncpilot-dialog-message').textContent : null; })()` );
+
+    check( 'an error answer of WordPress itself: the status, and no sentence about a firewall', !! plain && /500/.test( plain ) && ! /Firewall|firewall/.test( plain ), plain );
+
+    await browser.click( '.syncpilot-dialog-ok', 300 );
 } catch ( error ) {
 
     check( 'the test itself ran through', false, error.message );

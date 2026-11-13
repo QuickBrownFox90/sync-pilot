@@ -1,5 +1,7 @@
 // Deleting saved profiles, from the list on the migrate form and from the list of profiles.
 
+import { ajax_problem_text } from './helpers.js';
+
 const $ = jQuery;
 
 export function init_profiles() {
@@ -45,7 +47,7 @@ export function init_profiles() {
                 nonce      : syncpilot_nonces.delete_migration_profile,
             },
             error : function ( jqXHR, textStatus, errorThrown ) {
-                syncpilot_alert( syncpilot_i10n.remove_profile_problem );
+                syncpilot_alert( ajax_problem_text( syncpilot_i10n.remove_profile_problem, jqXHR ) );
             },
             success : function ( data ) {
                 if ( data == '-1' ) {

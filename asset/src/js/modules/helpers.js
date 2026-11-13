@@ -70,12 +70,70 @@ export function remove_protocol( url ) {
     return url.replace( /^https?:/i, '' );
 }
 
-// text of the dialog after a failed request: what went wrong and the HTTP status; the response itself goes to the
-// console, it can be a whole HTML page
+/**
+ * Did the answer of a failed request come from something else than WordPress? admin-ajax.php sends the header
+ * X-Robots-Tag with every answer, also with an error; a firewall or a proxy that answers in its place does not. No answer
+ * at all (status 0: no connection, a request that was stopped) is not an answer of anything.
+ * @since   0.3.1
+ * @param   {object} jqXHR  The request that failed
+ * @return  {boolean}
+ */
+export function answer_not_from_wordpress( jqXHR ) {
+
+    return jqXHR.status > 0 && ! /noindex/i.test( jqXHR.getResponseHeader( 'X-Robots-Tag' ) || '' );
+}
+
+/**
+ * The reference numbers that the block page of a firewall names (Attack ID, Message ID...), as the text "Attack ID: 1,
+ * Message ID: 2". The page is read as a document that does not run anything.
+ * @since   0.3.1
+ * @param   {string} html  The response
+ * @return  {string}       Empty when the page names none
+ */
+export function block_references( html ) {
+
+    var doc  = new DOMParser().parseFromString( html || '', 'text/html' );
+
+    // every tag is a gap between words (a <br> between "Client IP: ..." and "Attack ID: ..." must not glue them)
+    doc.querySelectorAll( 'script, style' ).forEach( function ( el ) { el.remove(); } );
+    doc.querySelectorAll( '*' ).forEach( function ( el ) { el.append( ' ' ); el.prepend( ' ' ); } );
+
+    var text = ( doc.body ? doc.body.textContent : '' ).replace( /\s+/g, ' ' );
+    var re   = /\b(Attack ID|Message ID|Support ID|Ray ID|Incident ID|Block ID|Event ID|Request ID|Reference(?: number)?)\s*[:#]?\s*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9][A-Za-z0-9-]{5,30})(?![A-Za-z0-9-])/gi;
+    var ids  = [];
+    var found;
+
+    while ( ( found = re.exec( text ) ) !== null && ids.length < 5 )
+        ids.push( found[1] + ': ' + found[2] );
+
+    return ids.join( ', ' );
+}
+
+/**
+ * The sentence that says a firewall or a proxy has answered instead of WordPress, with the reference numbers of its page;
+ * an empty text when the answer came from WordPress. The words of the page itself are never shown.
+ * @since   0.3.1
+ * @param   {object} jqXHR  The request that failed
+ * @return  {string}        Plain text
+ */
+export function firewall_note( jqXHR ) {
+
+    if ( ! answer_not_from_wordpress( jqXHR ) )
+        return '';
+
+    var references = block_references( jqXHR.responseText );
+
+    return syncpilot_i10n.not_from_wordpress + ( references ? ' ' + syncpilot_i10n.block_page_gives.replace( '%s', references ) : '' );
+}
+
+// text of the dialog after a failed request: what went wrong and the HTTP status (and, when a firewall or a proxy has
+// answered, that and its reference numbers); the response itself goes to the console, it can be a whole HTML page
 export function ajax_problem_text( message, jqXHR ) {
 
     if ( window.console && console.log )
         console.log( 'SyncPilot: ' + message, jqXHR.status, jqXHR.statusText, jqXHR.responseText );
 
-    return message + '\n\n' + jqXHR.status + ' ' + jqXHR.statusText;
+    var note = firewall_note( jqXHR );
+
+    return message + '\n\n' + jqXHR.status + ' ' + jqXHR.statusText + ( note ? '\n\n' + note : '' );
 }

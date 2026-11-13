@@ -3,6 +3,7 @@
 
 import { state } from './state.js';
 import { migration_failed } from './migration.js';
+import { firewall_note } from './helpers.js';
 
 const $ = jQuery;
 
@@ -142,6 +143,10 @@ function finalize_tables() {
             temp_prefix : connection_data.temp_prefix,
             tables      : state.tables_to_migrate.join( ',' ),
             nonce       : syncpilot_nonces.finalize_migration,
+
+            // everything before it was without an error: only then the server removes the media files that the other
+            // site does not have, which cannot be undone
+            media_clean : ( false == migration_error && '' == non_fatal_errors ) ? 1 : 0,
         },
         error : function ( jqXHR, textStatus, errorThrown ) {
 
@@ -151,7 +156,9 @@ function finalize_tables() {
                 console.log( 'SyncPilot: finalize', textStatus, errorThrown, jqXHR.responseText );
             }
 
-            migration_failed( syncpilot_i10n.finalize_tables_problem );
+            var note = firewall_note( jqXHR );
+
+            migration_failed( syncpilot_i10n.finalize_tables_problem + ( note ? '<br /><br />' + $( '<div>' ).text( note ).html() : '' ) );
         },
         success : function ( data ) {
 
@@ -162,6 +169,10 @@ function finalize_tables() {
 
                 return;
             }
+
+            // the removal was chosen, but the migration had errors: it says so in the message at the end
+            if ( $( '#remove-local-media' ).is( ':checked' ) && '' != non_fatal_errors )
+                non_fatal_errors += '<br />' + syncpilot_i10n.media_not_removed;
 
             next_step_in_migration = {
                 fn : run_next_step

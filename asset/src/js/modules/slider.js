@@ -1,6 +1,7 @@
 // The slider for the maximum size of a request.
 
 import { spinner_url } from './spinner.js';
+import { ajax_problem_text } from './helpers.js';
 
 const $ = jQuery;
 
@@ -37,7 +38,7 @@ export function init_slider() {
 
                     $( '.slider' ).slider( 'enable' );
                     $( '.slider-spinner' ).remove();
-                    syncpilot_alert( syncpilot_i10n.max_request_size_problem );
+                    syncpilot_alert( ajax_problem_text( syncpilot_i10n.max_request_size_problem, jqXHR ) );
                 },
                 success : function ( data ) {
 

@@ -2,6 +2,8 @@
 class SyncPilot_Media_Files extends SyncPilot_Base {
 	protected $files_to_migrate;
 	protected $responding_to_get_remote_media_listing = false;
+	protected $unwritable_media_folders               = array();
+	protected $remembered_uploads_dir                 = '';
 
 	function __construct( $plugin_file_path ) {
 
@@ -16,6 +18,10 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		add_filter( 'syncpilot_accepted_profile_fields', array( $this, 'accepted_profile_fields' ) );
 		add_filter( 'syncpilot_establish_remote_connection_data', array( $this, 'establish_remote_connection_data' ) );
 		add_filter( 'syncpilot_nonces', array( $this, 'add_nonces' ) );
+
+		// the media files that the other site does not have are removed when everything else is done
+		add_action( 'syncpilot_before_finalize_migration', array( $this, 'remember_uploads_dir' ) );
+		add_action( 'syncpilot_migration_finalized', array( $this, 'remove_media_after_finalize' ) );
 
 		// compatibility with CLI migraitons
 		add_filter( 'syncpilot_cli_finalize_migration', array( $this, 'cli_migration' ), 10, 4 );
@@ -209,7 +215,17 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		return ! empty( $this->settings[ $setting ] );
 	}
 
+	/**
+	 * The uploads folder of this site, with a slash at the end
+	 * @since   0.0.1
+	 * @since   0.3.1  After remember_uploads_dir() the folder from before the tables were replaced: a pull brings the options of the other site, and with them maybe another uploads folder
+	 *
+	 * @return  string
+	 */
 	function uploads_dir() {
+
+		if ( '' !== $this->remembered_uploads_dir )
+			return $this->remembered_uploads_dir;
 
 		if ( defined( 'UPLOADBLOGSDIR' ) ) {
 			$upload_dir = trailingslashit( ABSPATH ) . UPLOADBLOGSDIR;
@@ -229,11 +245,14 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 	 * that cannot be opened are skipped: before, the exception ended the request with the "critical error" page of
 	 * WordPress (HTTP 500) and the media files could not be determined at all
 	 * @since   0.2.6
+	 * @since   0.3.1  Notes the folders of the uploads folder that cannot be written (the first 50) in unwritable_media_folders, for the check before the media files are written (media_write_state())
 	 * @return  array  Relative path => size in bytes
 	 */
 	function get_local_media() {
 
 		$upload_dir = untrailingslashit( $this->uploads_dir() );
+
+		$this->unwritable_media_folders = array();
 
 		if ( ! file_exists( $upload_dir ) )
 			return array();
@@ -251,6 +270,10 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 
 			$name               = str_replace( array( $upload_dir . DS, '\\' ), array( '', '/' ), $name );
 			$local_media[$name] = $size;
+
+			// the iterator also gives "." and ".." of every folder: they are the folder itself
+			if ( ! in_array( $object->getFilename(), array( '.', '..' ), true ) && $object->isDir() && ! $object->isWritable() && count( $this->unwritable_media_folders ) < 50 )
+				$this->unwritable_media_folders[] = $name;
 		}
 
 		return $local_media;
@@ -572,6 +595,122 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		return $result;
 	}
 
+	/**
+	 * The folders where this site writes media files, as far as the log needs them: the uploads folder, the temporary
+	 * folder (the files are downloaded there first), the free space of both and the folders of the uploads folder that
+	 * cannot be written. Call get_local_media() first, it notes those. Names, modes, owners and numbers only.
+	 * @since   0.3.1
+	 *
+	 * @return  array  uploads and temp (folder_facts() of them), uploads_free and temp_free (bytes, null when unknown), folders (relative path => folder_facts())
+	 */
+	function media_write_state() {
+
+		$uploads = untrailingslashit( $this->uploads_dir() );
+		$temp    = untrailingslashit( get_temp_dir() );
+
+		// folder_facts() says why PHP failed last: not an error from before
+		error_clear_last();
+
+		$free = static function ( $folder ) {
+			$bytes = @disk_free_space( $folder );
+
+			return false === $bytes ? null : (int) $bytes;
+		};
+
+		$state = array(
+			'uploads'      => $this->folder_facts( $uploads ),
+			'uploads_free' => $free( $uploads ),
+			'temp'         => $this->folder_facts( $temp ),
+			'temp_free'    => $free( $temp ),
+			'folders'      => array(),
+		);
+
+		foreach ( $this->unwritable_media_folders as $folder )
+			$state['folders'][ $folder ] = $this->folder_facts( $uploads . DS . $folder );
+
+		return $state;
+	}
+
+	/**
+	 * Say before the first file is written what will stop it: a folder that cannot be written (the uploads folder, the
+	 * temporary folder, or the folder of a file that is to be written), not enough free space. One entry for each folder.
+	 * The migration goes on: a folder that is reported wrongly (open_basedir, an ACL) must not stop what would work.
+	 * @since   0.3.1
+	 *
+	 * @param   array  $state      From media_write_state(), of the site that writes
+	 * @param   array  $existing   Relative path => size of everything in the uploads folder of that site (folders as well)
+	 * @param   array  $files      Relative path => size of the files to write
+	 * @param   string $where      "this site" or "remote site": the site that writes
+	 *
+	 * @return  array  The problems as texts for the user, none when all is fine
+	 */
+	function check_media_write( $state, $existing, $files, $where ) {
+
+		$total    = array_sum( $files );
+		$largest  = $files ? max( $files ) : 0;
+		$problems = array();
+		$context  = array( 'where' => $where );
+		$label    = ( 'this site' === $where ) ? __( 'this site', self::TEXT_DOMAIN ) : __( 'the remote site', self::TEXT_DOMAIN );
+
+		if ( empty( $files ) )
+			return $problems;
+
+		if ( empty( $state['uploads']['writable'] ) ) {
+			$this->log_error( SyncPilot_HelpCode::MediaFolderNotWritable, $state['uploads'] + $context + array( 'folder' => 'uploads' ), site: 1 );
+			$problems[] = sprintf( __( 'The folder for the media files cannot be written on %1$s: %2$s (#215)', self::TEXT_DOMAIN ), $label, 'uploads' );
+		}
+
+		if ( empty( $state['temp']['writable'] ) ) {
+			$this->log_error( SyncPilot_HelpCode::MediaTempNotWritable, $state['temp'] + $context, site: 1 );
+			$problems[] = sprintf( __( 'The temporary folder cannot be written on %s (#216)', self::TEXT_DOMAIN ), $label );
+		}
+
+		if ( isset( $state['uploads_free'] ) && $state['uploads_free'] < $total ) {
+			$this->log_error( SyncPilot_HelpCode::MediaDiskLow, $context + array( 'folder' => 'uploads', 'free_bytes' => $state['uploads_free'], 'needed_bytes' => $total ), site: 1 );
+			$problems[] = sprintf( __( 'Not enough free disk space for the media files on %1$s: %2$s needed, %3$s free (#217)', self::TEXT_DOMAIN ), $label, size_format( $total ), size_format( $state['uploads_free'] ) );
+		}
+
+		if ( isset( $state['temp_free'] ) && $state['temp_free'] < $largest ) {
+			$this->log_error( SyncPilot_HelpCode::MediaDiskLow, $context + array( 'folder' => 'temp', 'free_bytes' => $state['temp_free'], 'needed_bytes' => $largest ), site: 2 );
+			$problems[] = sprintf( __( 'Not enough free disk space in the temporary folder on %1$s: %2$s needed, %3$s free (#217)', self::TEXT_DOMAIN ), $label, size_format( $largest ), size_format( $state['temp_free'] ) );
+		}
+
+		// the folders of the files: the nearest one that exists decides, once for each
+		$reported = array();
+
+		foreach ( array_keys( $files ) as $file ) {
+
+			$folder = dirname( $file );
+
+			while ( '.' !== $folder && '' !== $folder && ! isset( $existing[ $folder ] ) )
+				$folder = dirname( $folder );
+
+			if ( '.' === $folder || isset( $reported[ $folder ] ) || ! isset( $state['folders'][ $folder ] ) )
+				continue;
+
+			$reported[ $folder ] = true;
+
+			$this->log_error( SyncPilot_HelpCode::MediaFolderNotWritable, $state['folders'][ $folder ] + $context + array( 'folder' => $folder ), site: 2 );
+			$problems[] = sprintf( __( 'The folder for the media files cannot be written on %1$s: %2$s (#215)', self::TEXT_DOMAIN ), $label, $folder );
+		}
+
+		SyncPilot_Logger::info( 'Media check before writing', $context + array(
+			'files'        => count( $files ),
+			'total_bytes'  => $total,
+			'largest_file' => $largest,
+			'uploads_free' => $state['uploads_free'] ?? null,
+			'temp_free'    => $state['temp_free'] ?? null,
+			'problems'     => count( $problems ),
+		) );
+
+		return $problems;
+	}
+
+	/**
+	 * Work out which media files the other site lacks (or has in an older version) and how large they are
+	 * @since   0.0.1
+	 * @since   0.3.1  Checks before the files are written whether they can be (check_media_write()) and stops the migration when not (syncpilot_abort); the media files that the other site does not have are no longer removed here, but at the end (remove_media_after_finalize())
+	 */
 	function ajax_determine_media_to_migrate() {
 
 		$this->check_ajax_referer( 'determine-media-to-migrate' );
@@ -602,27 +741,35 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		else
 			$this->media_diff( $remote_attachments, $local_attachments, $remote_media, $local_media );
 
+		// the site that writes the files: this one for a pull, the other one for a push
+		$problems = array();
+
+		if ( 'pull' === $_POST['intent'] )
+			$problems = $this->check_media_write( $this->media_write_state(), $local_media, $this->files_to_migrate, 'this site' );
+
+		elseif ( isset( $response['media_write'] ) && is_array( $response['media_write'] ) )
+			$problems = $this->check_media_write( $response['media_write'], $remote_media, $this->files_to_migrate, 'remote site' );
+
+		// the files cannot be written: the migration stops here, before the database is replaced (the browser removes the temporary tables)
+		if ( $problems && apply_filters( 'syncpilot_media_check_stops_migration', true, $problems ) ) {
+
+			SyncPilot_Logger::event( 'Migration stopped by the media check', array( 'problems' => count( $problems ) ) );
+
+			$return = array(
+				'syncpilot_abort' => 1,
+				'body'            => implode( '<br />', $problems ) . '<br />' . __( 'The migration was stopped before the database was replaced, nothing was changed. Fix the folders, or migrate again without the media files.', self::TEXT_DOMAIN ),
+			);
+
+			$result = $this->end_ajax( json_encode( $return ) );
+
+			return $result;
+		}
+
 		$return['files_to_migrate']   = $this->files_to_migrate;
 		$return['total_size']         = array_sum( $this->files_to_migrate );
 		$return['remote_uploads_url'] = $response['remote_uploads_url'];
 
-		// remove local/remote media if it doesn't exist on the local/remote site
-		if( $_POST['remove_local_media'] == '1' ) {
-
-			if( $_POST['intent'] == 'pull' ) {
-				$this->remove_local_attachments( $remote_attachments );
-			}
-
-			else {
-				$data                       = array();
-				$data['action']             = 'syncpilot_mf_remove_local_attachments';
-				$data['remote_attachments'] = serialize( $local_attachments );
-				$data['sig']                = $this->create_signature( $data, $_POST['key'] );
-				$ajax_url                   = trailingslashit( $_POST['url'] ) . 'wp-admin/admin-ajax.php';
-				$response                   = $this->remote_post( $ajax_url, $data, __FUNCTION__ );
-				// the response is ignored here (for now) as this is not a critical task
-			}
-		}
+		// the media files that the other site does not have are not removed here: that is irreversible, so it is done at the very end, see remove_media_after_finalize()
 
 		$result = $this->end_ajax( json_encode( $return ) );
 
@@ -633,6 +780,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 	 * Public endpoint: remove the media files of this site that the other site does not have (signed)
 	 * @since   0.0.1
 	 * @since   0.3.0  A refusal is logged (InvalidSignature, site 9; PushNotAllowed, site 6; MediaDataUnreadable)
+	 * @since   0.3.1  Answers with the numbers of removed files and files that could not be removed (it answered nothing before), and writes them to its log (MediaRemoveFailed, site 1)
 	 */
 	function respond_to_remove_local_attachments() {
 
@@ -682,17 +830,154 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 			return $result;
 		}
 
-		$this->remove_local_attachments( $remote_attachments );
+		$removal = $this->remove_local_attachments( $remote_attachments );
+
+		$this->report_media_removal( $removal, 'this site' );
 
 		$return = array(
 			'success' 	=> 1,
-		);
+		) + $removal;
 
-		$result = serialize( json_encode( $return ) );
+		$result = $this->end_ajax( serialize( $return ) );
 
 		return $result;
 	}
 
+	/**
+	 * Remember the uploads folder before the tables are replaced (a pull brings the options of the other site, and with
+	 * them maybe another uploads folder); uploads_dir() gives it from then on
+	 * @since   0.3.1
+	 *
+	 * @return  void
+	 */
+	function remember_uploads_dir() {
+
+		$this->remembered_uploads_dir = $this->uploads_dir();
+	}
+
+	/**
+	 * The very last thing of a migration with media files, only when everything before it worked: remove the media files
+	 * that the other site does not have. It cannot be undone and SyncPilot makes no backup of the files, so it is not done
+	 * before the files are copied and not when anything went wrong (a file that could not be copied, an error that was
+	 * shown, a media check that failed). It is called when the tables were replaced, in the same request: after a pull the
+	 * users and their sessions are the ones of the other site, and a request of the browser could be refused.
+	 * @since   0.3.1
+	 *
+	 * @param   string $intent  pull or push
+	 *
+	 * @return  void
+	 */
+	function remove_media_after_finalize( $intent ) {
+
+		global $syncpilot;
+
+		$form_data = $syncpilot->parse_migration_form_data( (string) ( $_POST['form_data'] ?? '' ) );
+
+		if ( empty( $form_data['media_files'] ) || empty( $form_data['remove_local_media'] ) || ! in_array( $intent, array( 'pull', 'push' ), true ) )
+			return;
+
+		if ( empty( $_POST['media_clean'] ) ) {
+
+			SyncPilot_Logger::event( 'Media files not removed', array( 'reason' => 'the migration had errors' ) );
+
+			return;
+		}
+
+		$data = array( 'temp_prefix' => $this->temp_prefix );
+
+		if ( 'pull' === $intent ) {
+
+			$data['action'] = 'syncpilot_mf_get_remote_media_listing';
+			$data['intent'] = 'pull';
+		}
+
+		else {
+
+			$data['action']             = 'syncpilot_mf_remove_local_attachments';
+			$data['remote_attachments'] = serialize( $this->get_local_attachments() );
+
+			unset( $data['temp_prefix'] );
+		}
+
+		$data['sig'] = $this->create_signature( $data, $_POST['key'] );
+		$ajax_url    = trailingslashit( $_POST['url'] ) . 'wp-admin/admin-ajax.php';
+		$answer      = $this->read_remote_answer( $this->remote_post( $ajax_url, $data, __FUNCTION__ ) );
+
+		$this->error = '';
+
+		if ( ! is_array( $answer ) || isset( $answer['syncpilot_error'] ) ) {
+
+			$this->log_error( SyncPilot_HelpCode::MediaRemoveFailed, array( 'where' => ( 'pull' === $intent ) ? 'this site' : 'remote site', 'reason' => 'no usable answer of the other site' ), site: 2 );
+
+			return;
+		}
+
+		if ( 'pull' === $intent ) {
+
+			if ( ! isset( $answer['remote_attachments'] ) || ! is_array( $answer['remote_attachments'] ) ) {
+
+				$this->log_error( SyncPilot_HelpCode::MediaRemoveFailed, array( 'where' => 'this site', 'reason' => 'the list of the other site has no media files' ), site: 3 );
+
+				return;
+			}
+
+			$this->get_local_media();
+			$this->report_media_removal( $this->remove_local_attachments( $answer['remote_attachments'] ), 'this site' );
+
+			return;
+		}
+
+		// the other site has removed and written its own entry; this is the note of this site
+		SyncPilot_Logger::event( 'Media files removed', array( 'where' => 'remote site', 'removed' => $answer['removed'] ?? null, 'failed' => $answer['failed'] ?? null ) );
+	}
+
+	/**
+	 * The answer of the other site as an array (the answers of the media files are serialized)
+	 * @since   0.3.1
+	 *
+	 * @param   string|false $response  What remote_post() gave
+	 *
+	 * @return  array|false  false when there is no answer or it is not what was expected
+	 */
+	function read_remote_answer( $response ) {
+
+		if ( ! is_string( $response ) || ! is_serialized( trim( $response ) ) )
+			return false;
+
+		return $this->safe_unserialize( trim( $response ) );
+	}
+
+	/**
+	 * Say in the log what the removal of media files did: the numbers as an event, and the files that could not be
+	 * removed (the first 20, relative to the uploads folder) with the folder facts as one error
+	 * @since   0.3.1
+	 *
+	 * @param   array  $removal  From remove_local_attachments()
+	 * @param   string $where    this site or remote site
+	 *
+	 * @return  void
+	 */
+	function report_media_removal( $removal, $where ) {
+
+		SyncPilot_Logger::event( 'Media files removed', array( 'where' => $where, 'removed' => $removal['removed'], 'failed' => $removal['failed'] ) );
+
+		if ( empty( $removal['failed'] ) )
+			return;
+
+		$first = reset( $removal['failed_files'] );
+
+		$this->log_error( SyncPilot_HelpCode::MediaRemoveFailed, $this->folder_facts( dirname( $this->uploads_dir() . $first ), array( 'where' => $where, 'failed' => $removal['failed'], 'files' => $removal['failed_files'] ) ), site: 1 );
+	}
+
+	/**
+	 * Remove the local media files that the other site does not have
+	 * @since   0.0.1
+	 * @since   0.3.1  Gives the number of files that were removed and the files that could not be removed (the first 20); it is called at the end of the migration only (remove_media_after_finalize(), respond_to_remove_local_attachments())
+	 *
+	 * @param   array $remote_attachments  The attachments of the other site
+	 *
+	 * @return  array  removed, failed (numbers) and failed_files (relative paths)
+	 */
 	function remove_local_attachments( $remote_attachments ) {
 
 		$flat_remote_attachments = array_flip( $this->get_flat_attachments( $remote_attachments ) );
@@ -703,6 +988,8 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		$allowed_mime_types = array_flip( get_allowed_mime_types() );
 
 		$upload_dir = $this->uploads_dir();
+		$removed    = 0;
+		$failed     = array();
 
 		foreach( $temp_local_media as $local_media_file ) {
 			// don't remove folders
@@ -719,8 +1006,14 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 			if( true === isset( $flat_remote_attachments[$local_media_file] ) )
 				continue;
 
-			@unlink( $upload_dir . $local_media_file );
+			if ( @unlink( $upload_dir . $local_media_file ) )
+				++$removed;
+
+			else
+				$failed[] = $local_media_file;
 		}
+
+		return array( 'removed' => $removed, 'failed' => count( $failed ), 'failed_files' => array_slice( $failed, 0, 20 ) );
 	}
 
 	function media_diff( $site_a_attachments, $site_b_attachments, $site_a_media, $site_b_media ) {
@@ -776,6 +1069,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 	 * Public endpoint: list the media files of this site for the other site (signed)
 	 * @since   0.0.1
 	 * @since   0.3.0  A refusal is logged (InvalidSignature, site 10; PullNotAllowed / PushNotAllowed, site 4)
+	 * @since   0.3.1  For a push the answer says whether this site can write the media files (media_write, see media_write_state())
 	 */
 	function respond_to_get_remote_media_listing() {
 
@@ -823,6 +1117,10 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		$return['remote_attachments'] = $this->get_local_attachments();
 		$return['remote_media']       = $this->get_local_media();
 		$return['remote_uploads_url'] = $upload_url;
+
+		// a push writes on this site: the other site needs to know if it can
+		if ( 'push' === ( $filtered_post['intent'] ?? '' ) )
+			$return['media_write'] = $this->media_write_state();
 
 		$result = $this->end_ajax( serialize( $return ) );
 

@@ -1315,3 +1315,55 @@ msgstr "Die Update-Daten wurden zurückgesetzt. WordPress fragt beim nächsten A
 #: class/syncpilot-updater.php
 msgid "The folder of the update could not be renamed."
 msgstr "Der Ordner des Updates konnte nicht umbenannt werden."
+
+#: class/syncpilot.php
+msgid "Migration stopped"
+msgstr "Migration angehalten"
+
+#: class/syncpilot.php
+msgid "The media files that the other site does not have were not removed, because the migration had errors."
+msgstr "Die Mediendateien, die die andere Website nicht hat, wurden nicht entfernt, weil die Migration Fehler hatte."
+
+#: class/syncpilot-media-files.php
+msgid "this site"
+msgstr "dieser Website"
+
+#: class/syncpilot-media-files.php
+msgid "the remote site"
+msgstr "der Remote-Website"
+
+#: class/syncpilot-media-files.php
+msgid "The folder for the media files cannot be written on %1$s: %2$s (#215)"
+msgstr "Der Ordner für die Mediendateien kann auf %1$s nicht beschrieben werden: %2$s (#215)"
+
+#: class/syncpilot-media-files.php
+msgid "The temporary folder cannot be written on %s (#216)"
+msgstr "Der temporäre Ordner kann auf %s nicht beschrieben werden (#216)"
+
+#: class/syncpilot-media-files.php
+msgid "Not enough free disk space for the media files on %1$s: %2$s needed, %3$s free (#217)"
+msgstr "Auf %1$s ist nicht genug freier Speicherplatz für die Mediendateien: %2$s nötig, %3$s frei (#217)"
+
+#: class/syncpilot-media-files.php
+msgid "Not enough free disk space in the temporary folder on %1$s: %2$s needed, %3$s free (#217)"
+msgstr "Im temporären Ordner auf %1$s ist nicht genug freier Speicherplatz: %2$s nötig, %3$s frei (#217)"
+
+#: class/syncpilot-media-files.php
+msgid "The migration was stopped before the database was replaced, nothing was changed. Fix the folders, or migrate again without the media files."
+msgstr "Die Migration wurde angehalten, bevor die Datenbank ersetzt wurde, es wurde nichts verändert. Behebe das Problem mit den Ordnern oder migriere erneut ohne die Mediendateien."
+
+#: class/syncpilot.php
+msgid "The answer did not come from WordPress: a firewall or a proxy in front of the site has probably blocked the request. The administrator of the server can allow the requests of SyncPilot, they go to admin-ajax.php with an action that starts with syncpilot_."
+msgstr "Die Antwort kam nicht von WordPress: Eine Firewall oder ein Proxy vor der Website hat die Anfrage vermutlich blockiert. Der Administrator des Servers kann die Anfragen von SyncPilot erlauben, sie gehen an admin-ajax.php mit einer Action, die mit syncpilot_ beginnt."
+
+#: class/syncpilot.php
+msgid "The block page gives: %s."
+msgstr "Die Sperrseite nennt: %s."
+
+#: class/syncpilot-base.php
+msgid "The remote site did not answer through WordPress (HTTP %s): a firewall or a proxy in front of it has probably blocked the request. The administrator of that server can allow the requests of SyncPilot, they go to admin-ajax.php with an action that starts with syncpilot_."
+msgstr "Die Remote-Website hat nicht über WordPress geantwortet (HTTP %s): Eine Firewall oder ein Proxy davor hat die Anfrage vermutlich blockiert. Der Administrator dieses Servers kann die Anfragen von SyncPilot erlauben, sie gehen an admin-ajax.php mit einer Action, die mit syncpilot_ beginnt."
+
+#: class/syncpilot-base.php
+msgid "(#153 - scope: %s)"
+msgstr "(#153 - Bereich: %s)"

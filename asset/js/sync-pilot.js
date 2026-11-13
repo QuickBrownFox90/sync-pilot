@@ -291,10 +291,37 @@ function syncpilot_parse_json( maybe_json ) {
   function remove_protocol(url) {
     return url.replace(/^https?:/i, "");
   }
+  function answer_not_from_wordpress(jqXHR) {
+    return jqXHR.status > 0 && !/noindex/i.test(jqXHR.getResponseHeader("X-Robots-Tag") || "");
+  }
+  function block_references(html) {
+    var doc = new DOMParser().parseFromString(html || "", "text/html");
+    doc.querySelectorAll("script, style").forEach(function(el) {
+      el.remove();
+    });
+    doc.querySelectorAll("*").forEach(function(el) {
+      el.append(" ");
+      el.prepend(" ");
+    });
+    var text = (doc.body ? doc.body.textContent : "").replace(/\s+/g, " ");
+    var re = /\b(Attack ID|Message ID|Support ID|Ray ID|Incident ID|Block ID|Event ID|Request ID|Reference(?: number)?)\s*[:#]?\s*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9][A-Za-z0-9-]{5,30})(?![A-Za-z0-9-])/gi;
+    var ids = [];
+    var found;
+    while ((found = re.exec(text)) !== null && ids.length < 5)
+      ids.push(found[1] + ": " + found[2]);
+    return ids.join(", ");
+  }
+  function firewall_note(jqXHR) {
+    if (!answer_not_from_wordpress(jqXHR))
+      return "";
+    var references = block_references(jqXHR.responseText);
+    return syncpilot_i10n.not_from_wordpress + (references ? " " + syncpilot_i10n.block_page_gives.replace("%s", references) : "");
+  }
   function ajax_problem_text(message, jqXHR) {
     if (window.console && console.log)
       console.log("SyncPilot: " + message, jqXHR.status, jqXHR.statusText, jqXHR.responseText);
-    return message + "\n\n" + jqXHR.status + " " + jqXHR.statusText;
+    var note = firewall_note(jqXHR);
+    return message + "\n\n" + jqXHR.status + " " + jqXHR.statusText + (note ? "\n\n" + note : "");
   }
 
   // asset/src/js/modules/timer.js
@@ -347,7 +374,7 @@ function syncpilot_parse_json( maybe_json ) {
           error: function(jqXHR, textStatus, errorThrown) {
             $2(".slider").slider("enable");
             $2(".slider-spinner").remove();
-            syncpilot_alert(syncpilot_i10n.max_request_size_problem);
+            syncpilot_alert(ajax_problem_text(syncpilot_i10n.max_request_size_problem, jqXHR));
           },
           success: function(data) {
             $2(".slider").slider("enable");
@@ -474,8 +501,8 @@ function syncpilot_parse_json( maybe_json ) {
         action: "syncpilot_get_diagnostics",
         nonce: syncpilot_nonces.get_diagnostics
       },
-      error: function() {
-        syncpilot_alert(syncpilot_i10n.update_log_problem);
+      error: function(jqXHR) {
+        syncpilot_alert(ajax_problem_text(syncpilot_i10n.update_log_problem, jqXHR));
       },
       success: function(data) {
         $4(".debug-info-textarea").val(data);
@@ -490,8 +517,8 @@ function syncpilot_parse_json( maybe_json ) {
         action: "syncpilot_get_log",
         nonce: syncpilot_nonces.get_log
       },
-      error: function() {
-        syncpilot_alert(syncpilot_i10n.update_log_problem);
+      error: function(jqXHR) {
+        syncpilot_alert(ajax_problem_text(syncpilot_i10n.update_log_problem, jqXHR));
       },
       success: function(data) {
         if (typeof data.syncpilot_error != "undefined" && data.syncpilot_error == 1) {
@@ -516,9 +543,9 @@ function syncpilot_parse_json( maybe_json ) {
           level: $select.val(),
           nonce: syncpilot_nonces.save_log_level
         },
-        error: function() {
+        error: function(jqXHR) {
           $4(".log-level .ajax-spinner").remove();
-          syncpilot_alert(syncpilot_i10n.save_settings_problem);
+          syncpilot_alert(ajax_problem_text(syncpilot_i10n.save_settings_problem, jqXHR));
         },
         success: function(data) {
           $4(".log-level .ajax-spinner").remove();
@@ -548,7 +575,7 @@ function syncpilot_parse_json( maybe_json ) {
           nonce: syncpilot_nonces.clear_log
         },
         error: function(jqXHR, textStatus, errorThrown) {
-          syncpilot_alert(syncpilot_i10n.clear_log_problem);
+          syncpilot_alert(ajax_problem_text(syncpilot_i10n.clear_log_problem, jqXHR));
         },
         success: function(data) {
         }
@@ -772,7 +799,7 @@ function syncpilot_parse_json( maybe_json ) {
           nonce: syncpilot_nonces.delete_migration_profile
         },
         error: function(jqXHR, textStatus, errorThrown) {
-          syncpilot_alert(syncpilot_i10n.remove_profile_problem);
+          syncpilot_alert(ajax_problem_text(syncpilot_i10n.remove_profile_problem, jqXHR));
         },
         success: function(data) {
           if (data == "-1") {
@@ -812,7 +839,7 @@ function syncpilot_parse_json( maybe_json ) {
           nonce: syncpilot_nonces.reset_api_key
         },
         error: function(jqXHR, textStatus, errorThrown) {
-          syncpilot_alert(syncpilot_i10n.reset_api_key_problem);
+          syncpilot_alert(ajax_problem_text(syncpilot_i10n.reset_api_key_problem, jqXHR));
           $9(".reset-api-key-ajax-spinner").remove();
           state.doing_reset_api_key_ajax = false;
         },
@@ -846,7 +873,7 @@ function syncpilot_parse_json( maybe_json ) {
           nonce: syncpilot_nonces.save_setting
         },
         error: function(jqXHR, textStatus, errorThrown) {
-          syncpilot_alert(syncpilot_i10n.save_settings_problem);
+          syncpilot_alert(ajax_problem_text(syncpilot_i10n.save_settings_problem, jqXHR));
           $10(".ajax-spinner").remove();
         },
         success: function(data) {
@@ -1072,7 +1099,7 @@ function syncpilot_parse_json( maybe_json ) {
         nonce: syncpilot_nonces.save_profile
       },
       error: function(jqXHR, textStatus, errorThrown) {
-        syncpilot_alert(syncpilot_i10n.save_profile_problem);
+        syncpilot_alert(ajax_problem_text(syncpilot_i10n.save_profile_problem, jqXHR));
         if (on_error) {
           on_error();
         }
@@ -1265,7 +1292,11 @@ function syncpilot_parse_json( maybe_json ) {
   }
   function connection_request_failed(jqXHR, code) {
     $16(".connection-status").html(syncpilot_i10n.connection_local_server_problem + " (" + code + ")");
-    $16(".connection-status").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
+    var note = firewall_note(jqXHR);
+    if (note)
+      $16(".connection-status").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />" + $16("<div>").text(note).html());
+    else
+      $16(".connection-status").append("<br /><br />Status: " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />Response:<br />" + jqXHR.responseText);
     $16(".connection-status").addClass("notification-message error-notice migration-error");
     $16(".ajax-spinner").remove();
     state.doing_ajax = false;
@@ -1624,6 +1655,9 @@ function syncpilot_parse_json( maybe_json ) {
     console.log(jqXHR);
     console.log(textStatus);
     console.log(errorThrown);
+    var note = firewall_note(jqXHR);
+    if (note)
+      return "<br /><br />" + status_label + ": " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />" + $17("<div>").text(note).html();
     return "<br /><br />" + status_label + ": " + jqXHR.status + " " + jqXHR.statusText + "<br /><br />" + response_label + ":<br />" + jqXHR.responseText;
   }
   function initiate_migration(table_rows, total_size) {
@@ -1889,14 +1923,18 @@ function syncpilot_parse_json( maybe_json ) {
         prefix: connection_data.prefix,
         temp_prefix: connection_data.temp_prefix,
         tables: state.tables_to_migrate.join(","),
-        nonce: syncpilot_nonces.finalize_migration
+        nonce: syncpilot_nonces.finalize_migration,
+        // everything before it was without an error: only then the server removes the media files that the other
+        // site does not have, which cannot be undone
+        media_clean: false == migration_error && "" == non_fatal_errors ? 1 : 0
       },
       error: function(jqXHR, textStatus, errorThrown) {
         state.doing_ajax = false;
         if (window.console && console.log) {
           console.log("SyncPilot: finalize", textStatus, errorThrown, jqXHR.responseText);
         }
-        migration_failed(syncpilot_i10n.finalize_tables_problem);
+        var note = firewall_note(jqXHR);
+        migration_failed(syncpilot_i10n.finalize_tables_problem + (note ? "<br /><br />" + $18("<div>").text(note).html() : ""));
       },
       success: function(data) {
         state.doing_ajax = false;
@@ -1904,6 +1942,8 @@ function syncpilot_parse_json( maybe_json ) {
           migration_failed(syncpilot_sanitize_html(data));
           return;
         }
+        if ($18("#remove-local-media").is(":checked") && "" != non_fatal_errors)
+          non_fatal_errors += "<br />" + syncpilot_i10n.media_not_removed;
         next_step_in_migration = {
           fn: run_next_step
         };
@@ -1924,6 +1964,8 @@ function syncpilot_parse_json( maybe_json ) {
   var $19 = jQuery;
   function init_migration_control() {
     window.execute_next_step = execute_next_step2;
+    window.syncpilot_firewall_note = firewall_note;
+    window.stop_migration = cancel_on_server;
     window.migration_request_running = function(running) {
       state.doing_ajax = running;
     };
@@ -1988,7 +2030,7 @@ function syncpilot_parse_json( maybe_json ) {
     }
     return progress_msg;
   }
-  function cancel_on_server() {
+  function cancel_on_server(reason) {
     state.migration_intent = $19("input[name=action]:checked").val();
     $19(".progress-text").html(removing_text());
     var request_data = {
@@ -2017,6 +2059,10 @@ function syncpilot_parse_json( maybe_json ) {
         data = $19.trim(data);
         if (data != "") {
           migration_failed(syncpilot_sanitize_html(data), syncpilot_i10n.migration_cancellation_failed);
+          return;
+        }
+        if (reason) {
+          migration_failed(syncpilot_sanitize_html(reason), syncpilot_i10n.migration_stopped);
           return;
         }
         state.completed_msg = syncpilot_i10n.migration_cancelled;
@@ -2320,7 +2366,7 @@ var media_successfully_determined;
                     $( '.progress-title' ).html( syncpilot_mf_strings.migration_failed );
 
                     $( '.progress-text' ).html( syncpilot_mf_strings.error_determining +
-                        ' (#101mf)' );
+                        ' (#101mf)' + media_firewall_note( jqXHR ) );
 
                     $( '.progress-text' ).addClass( 'migration-error' );
                     console.log( jqXHR );
@@ -2354,6 +2400,14 @@ var media_successfully_determined;
             } );
         };
 
+        // the sentence that a firewall or a proxy has answered (and its reference numbers), as HTML; nothing when WordPress did
+        function media_firewall_note( jqXHR ) {
+
+            var note = window.syncpilot_firewall_note( jqXHR );
+
+            return note ? '<br /><br />' + $( '<div>' ).text( note ).html() : '';
+        }
+
         function migration_failed( data ) {
 
             $( '.progress-title' ).html( syncpilot_mf_strings.migration_failed );
@@ -2364,6 +2418,13 @@ var media_successfully_determined;
         }
 
         media_successfully_determined = function ( data ) {
+
+            // the files cannot be written: the migration stops before the database is replaced and removes what it made
+            if ( typeof data.syncpilot_abort != 'undefined' && data.syncpilot_abort == 1 ) {
+                stop_migration( data.body );
+
+                return;
+            }
 
             if ( typeof data.syncpilot_error != 'undefined' && data.syncpilot_error == 1 ) {
                 non_fatal_errors += data.body;
@@ -2469,7 +2530,7 @@ var media_successfully_determined;
                     $( '.progress-title' ).html( syncpilot_mf_strings.migration_failed );
 
                     $( '.progress-text' ).html( syncpilot_mf_strings.problem_migrating_media +
-                        ' (#102mf)' );
+                        ' (#102mf)' + media_firewall_note( jqXHR ) );
 
                     $( '.progress-text' ).addClass( 'migration-error' );
                     console.log( jqXHR );

@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { spinner_url } from './spinner.js';
 import { maybe_show_ssl_warning, maybe_show_version_warning, maybe_show_prefix_notice } from './notices.js';
 import { add_scheme_row } from './replace-rows.js';
-import { get_domain_name, remove_protocol } from './helpers.js';
+import { get_domain_name, remove_protocol, firewall_note } from './helpers.js';
 
 const $ = jQuery;
 
@@ -271,7 +271,14 @@ function connection_request_failed( jqXHR, code ) {
 
     $( '.connection-status' ).html( syncpilot_i10n.connection_local_server_problem + ' (' + code + ')' );
 
-    $( '.connection-status' ).append( '<br /><br />Status: ' + jqXHR.status + ' ' + jqXHR.statusText + '<br /><br />Response:<br />' + jqXHR.responseText );
+    // a firewall or a proxy has answered: not its page, only that and its reference numbers
+    var note = firewall_note( jqXHR );
+
+    if ( note )
+        $( '.connection-status' ).append( '<br /><br />Status: ' + jqXHR.status + ' ' + jqXHR.statusText + '<br /><br />' + $( '<div>' ).text( note ).html() );
+
+    else
+        $( '.connection-status' ).append( '<br /><br />Status: ' + jqXHR.status + ' ' + jqXHR.statusText + '<br /><br />Response:<br />' + jqXHR.responseText );
 
     $( '.connection-status' ).addClass( 'notification-message error-notice migration-error' );
 

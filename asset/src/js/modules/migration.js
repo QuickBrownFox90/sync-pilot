@@ -4,6 +4,7 @@
 
 import { state } from './state.js';
 import { choose_tables, draw_table_chunks } from './progress.js';
+import { firewall_note } from './helpers.js';
 
 const $ = jQuery;
 
@@ -69,6 +70,12 @@ export function request_problem( jqXHR, textStatus, errorThrown, status_label, r
     console.log( jqXHR );
     console.log( textStatus );
     console.log( errorThrown );
+
+    // a firewall or a proxy has answered: the page of it is not the answer of a site (and not shown), only that and its numbers
+    var note = firewall_note( jqXHR );
+
+    if ( note )
+        return '<br /><br />' + status_label + ': ' + jqXHR.status + ' ' + jqXHR.statusText + '<br /><br />' + $( '<div>' ).text( note ).html();
 
     return '<br /><br />' + status_label + ': ' + jqXHR.status + ' ' + jqXHR.statusText + '<br /><br />' + response_label + ':<br />' +
         jqXHR.responseText;

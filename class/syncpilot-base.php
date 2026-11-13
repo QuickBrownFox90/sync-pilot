@@ -240,6 +240,15 @@ class SyncPilot_Base {
 				return false;
 			}
 
+			// not WordPress: a firewall or a proxy in front of the site has answered, the request did not get there
+			else if ( empty( $context['from_wordpress'] ) ) {
+				$this->error = $this->not_wordpress_text( $response['response']['code'], $context['block_ids'] ?? array(), $scope );
+
+				$this->log_error( SyncPilot_HelpCode::RemoteNotWordPress, $context, site: 1 );
+
+				return false;
+			}
+
 			else {
 				$this->error = sprintf( __( 'Unable to connect to the remote server, please check the connection details - %1$s %2$s (#129 - scope: %3$s)', self::TEXT_DOMAIN ), $response['response']['code'], $response['response']['message'], $scope );
 
@@ -252,6 +261,15 @@ class SyncPilot_Base {
 		elseif ( $expecting_serial && is_serialized( $response['body'] ) == false ) {
 			if ( $this->may_retry_over_http( $url, $scope ) )
 				return $this->retry_remote_post( $url, $data, $scope, $args, $expecting_serial );
+
+			// a page of HTML that did not come from WordPress: a firewall or a proxy has answered (a page that says "blocked" with the status 200)
+			if ( empty( $context['from_wordpress'] ) && preg_match( '/<(?:!DOCTYPE|html|body)\b/i', $response['body'] ) ) {
+				$this->error = $this->not_wordpress_text( $response['response']['code'], $context['block_ids'] ?? array(), $scope );
+
+				$this->log_error( SyncPilot_HelpCode::RemoteNotWordPress, $context, site: 2 );
+
+				return false;
+			}
 
 			$this->error = __( 'There was a problem with the AJAX request, we were expecting a serialized response, instead we received:<br />', self::TEXT_DOMAIN ) . htmlentities( $response['body'] );
 
@@ -285,6 +303,33 @@ class SyncPilot_Base {
 		SyncPilot_Logger::info( 'Remote request answered', $context );
 
 		return $response['body'];
+	}
+
+	/**
+	 * The message for an answer that did not come from WordPress
+	 * @since   0.3.1
+	 *
+	 * @param   int|string $status  The HTTP status of the answer
+	 * @param   array      $ids     The reference numbers of the block page (SyncPilot_Logger::block_ids())
+	 * @param   string     $scope   The function that made the request
+	 *
+	 * @return  string
+	 */
+	function not_wordpress_text( $status, $ids, $scope ) {
+
+		$text = sprintf( __( 'The remote site did not answer through WordPress (HTTP %s): a firewall or a proxy in front of it has probably blocked the request. The administrator of that server can allow the requests of SyncPilot, they go to admin-ajax.php with an action that starts with syncpilot_.', self::TEXT_DOMAIN ), (int) $status );
+
+		if ( $ids ) {
+
+			$list = array();
+
+			foreach ( $ids as $name => $number )
+				$list[] = esc_html( $name . ': ' . $number );
+
+			$text .= ' ' . sprintf( __( 'The block page gives: %s.', self::TEXT_DOMAIN ), implode( ', ', $list ) );
+		}
+
+		return $text . ' ' . sprintf( __( '(#153 - scope: %s)', self::TEXT_DOMAIN ), $scope );
 	}
 
 	function retry_remote_post( $url, $data, $scope, $args = array(), $expecting_serial = false ) {
@@ -394,6 +439,7 @@ class SyncPilot_Base {
 	 * received, and for an answer the status, a few headers (type, server, where it redirects to) and a cleaned beginning
 	 * of the body (see SyncPilot_Logger::excerpt()); for a request that failed the message of cURL and its number.
 	 * @since   0.3.0
+	 * @since   0.3.1  Says whether the answer came from WordPress (from_wordpress: the header X-Robots-Tag that admin-ajax.php always sends), and names the reference numbers of a block page (block_ids)
 	 *
 	 * @param   array|WP_Error $response    The result of wp_remote_post()
 	 * @param   float          $started     microtime( true ) before the request
@@ -433,6 +479,12 @@ class SyncPilot_Base {
 			if ( is_string( $value ) && '' !== $value )
 				$facts[ 'header_' . str_replace( '-', '_', $header ) ] = SyncPilot_Logger::shorten( SyncPilot_Logger::strip_credentials( $value ), 120 );
 		}
+
+		// admin-ajax.php of WordPress always sends this header, also with an error: an answer without it came from something else
+		$facts['from_wordpress'] = (bool) preg_match( '/noindex/i', (string) implode( ',', (array) wp_remote_retrieve_header( $response, 'x-robots-tag' ) ) );
+
+		if ( ! $facts['from_wordpress'] && ( $ids = SyncPilot_Logger::block_ids( $body ) ) )
+			$facts['block_ids'] = $ids;
 
 		$facts['excerpt'] = SyncPilot_Logger::excerpt( $body );
 

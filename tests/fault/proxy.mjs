@@ -7,6 +7,8 @@
 //   pass       forward the request and the answer as they are
 //   status502  HTTP 502 with the page of a web server
 //   status403  HTTP 403 with the page of a firewall
+//   waf        HTTP 500 with the block page of a web application firewall (a title, reference numbers, the address of the visitor)
+//   waf200     the same page with the status 200
 //   basic      HTTP 401 with a request for a user name and a password
 //   empty      HTTP 200 and nothing in the body
 //   truncate   the real answer, cut in the middle
@@ -74,6 +76,9 @@ export async function startProxy( target ) {
 
             if ( 'status403' === proxy.mode )
                 return page( 403, '<html><body><h1>Request blocked</h1><p>ModSecurity: rule 942100 matched. Reference: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8</p></body></html>', { Server : 'Apache' } );
+
+            if ( 'waf' === proxy.mode || 'waf200' === proxy.mode )
+                return page( 'waf' === proxy.mode ? 500 : 200, '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"><html><head><style type="text/css">h3 { color: #c00; }</style><title> The URL you requested has been blocked </title></head><body class="block"><div class="main"><h3>Web Page Blocked!</h3><div class="notice"><p>The page cannot be displayed. Please contact the administrator for additional information.</p><p>URL: www.example.test/wp-admin/admin-ajax.php<br /><br/>Client IP: 80.153.24.194<br/>Attack ID: 20000008<br/>Message ID: 000186991602</p></div></div></body></html>' );
 
             if ( 'basic' === proxy.mode )
                 return page( 401, '<html><body><h1>401 Unauthorized</h1></body></html>', { 'WWW-Authenticate' : 'Basic realm="staging"' } );

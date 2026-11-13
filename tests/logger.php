@@ -176,6 +176,41 @@ $check( 'a line that is not JSON is an entry with the field raw, nothing is lost
 $text = (string) $syncpilot->ajax_get_diagnostics();
 $check( 'get_diagnostics answers the text of the diagnostic info, without the log', false !== strpos( $text, 'site_url(): ' ) && false !== strpos( $text, 'PHP: ' ) && false === strpos( $text, '"message"' ) && null === json_decode( $text ) );
 
+// a query of a chunk that fails: what is logged, and no value of the database in it
+$wpdb->suppress_errors( true );
+$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}sp_test_dup" );
+$wpdb->query( "CREATE TABLE {$wpdb->prefix}sp_test_dup ( id int PRIMARY KEY )" );
+$wpdb->query( "INSERT INTO {$wpdb->prefix}sp_test_dup VALUES ( 7 )" );
+$wpdb->query( "INSERT INTO {$wpdb->prefix}sp_test_dup VALUES ( 7 )" );
+$facts = $syncpilot->describe_failed_query( "INSERT INTO `{$wpdb->prefix}sp_test_dup` VALUES ( 7 )", 3 );
+$check( 'a failed query: the kind, the table, the place in the chunk, the size and the number of the error', 'INSERT INTO' === $facts['query'] && $wpdb->prefix . 'sp_test_dup' === $facts['table'] && 3 === $facts['number'] && $facts['query_bytes'] > 20 && 1062 === $facts['db_errno'], json_encode( $facts ) );
+$check( 'the error of the database has no quoted value (Duplicate entry \'7\')', false === strpos( $facts['db_error'], "'7'" ) && false !== strpos( $facts['db_error'], "'[value]'" ), $facts['db_error'] );
+$facts = $syncpilot->describe_failed_query( "SELECT 'secret value' FROM nowhere_at_all", 1 );
+$check( 'the value in the query itself is not in the facts', false === strpos( json_encode( $facts ), 'secret value' ) );
+$L::clear();
+$result = $syncpilot->process_chunk( "INSERT INTO `{$wpdb->prefix}sp_test_dup` VALUES ( 8 );\nINSERT INTO `{$wpdb->prefix}sp_test_dup` VALUES ( 8 );\n" );
+$entries = $L::entries(); $e = end( $entries );
+$check( 'process_chunk() logs the failing query with help code 152 and its place', true !== $result && 152 === $e['help'] && 2 === $e['context']['number'] && $wpdb->prefix . 'sp_test_dup' === $e['context']['table'], json_encode( $e ) );
+$check( 'and no value in the entry', false === strpos( json_encode( $e ), "'8'" ) );
+$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}sp_test_dup" );
+$wpdb->suppress_errors( false );
+
+// the block page of a firewall: the reference numbers stay, the address of the visitor does not
+$page = '<html><head><title>The URL you requested has been blocked</title></head><body><h3>Web Page Blocked!</h3><p>URL: www.example.test/wp-admin/admin-ajax.php<br /><br/>Client IP: 80.153.24.194<br/>Attack ID: 20000008<br/>Message ID: 000186991602<br/>Reference: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8 Ray ID: 8a1f2b3c4d5e6f70</p></body></html>';
+$ids  = $L::block_ids( $page );
+$check( 'block_ids(): the numbers of the page, with their names, also behind a <br>', array( 'Attack ID' => '20000008', 'Message ID' => '000186991602', 'Ray ID' => '8a1f2b3c4d5e6f70' ) === $ids, json_encode( $ids ) );
+$check( 'a run of 32 letters and digits is not a reference number (it can be a key)', ! in_array( 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8', $ids, true ) );
+$check( 'words like "Reference documentation" are not numbers (a number has a digit)', array() === $L::block_ids( '<p>Reference documentation Request identifier</p>' ) );
+$text = $L::excerpt( $page );
+$check( 'excerpt(): the address of the visitor is [ip]', false === strpos( $text, '80.153' ) && false !== strpos( $text, 'Client IP: [ip]' ), $text );
+$check( 'and the numbers of the page are still in it', false !== strpos( $text, 'Attack ID: 20000008' ), $text );
+$mixed = $L::excerpt( 'Server Apache/2.4.69 at 12:30:45, from 2001:db8:85a3::8a2e:370:7334 and ::1, PHP 8.4.27' );
+$check( 'IPv6 is [ip]; a version, a time and ::1 are not', false !== strpos( $mixed, 'Apache/2.4.69' ) && false !== strpos( $mixed, '12:30:45' ) && false === strpos( $mixed, '2001:db8' ) && false !== strpos( $mixed, '[ip]' ) && false !== strpos( $mixed, 'PHP 8.4.27' ), $mixed );
+$fromwp = $syncpilot->describe_remote_response( array( 'headers' => new WpOrg\Requests\Utility\CaseInsensitiveDictionary( array( 'x-robots-tag' => 'noindex' ) ), 'body' => 'x', 'response' => array( 'code' => 500, 'message' => 'Internal Server Error' ), 'cookies' => array(), 'http_response' => null ), microtime( true ), 10 );
+$other  = $syncpilot->describe_remote_response( array( 'headers' => new WpOrg\Requests\Utility\CaseInsensitiveDictionary( array( 'server' => 'Apache' ) ), 'body' => $page, 'response' => array( 'code' => 500, 'message' => 'Internal Server Error' ), 'cookies' => array(), 'http_response' => null ), microtime( true ), 10 );
+$check( 'describe_remote_response(): the header of admin-ajax.php says it came from WordPress, no block numbers', true === $fromwp['from_wordpress'] && ! isset( $fromwp['block_ids'] ) );
+$check( 'an answer without it: not from WordPress, with the numbers of the page', false === $other['from_wordpress'] && '20000008' === ( $other['block_ids']['Attack ID'] ?? '' ), json_encode( array( $other['from_wordpress'], $other['block_ids'] ?? null ) ) );
+
 // put it back as it was: the test folder goes, the log of the real folder and the options stay as they were
 $L::clear(); foreach ( glob( $tmp . '/{,.}*', GLOB_BRACE ) as $f ) is_file( $f ) && unlink( $f ); @rmdir( $tmp );
 remove_all_filters( 'syncpilot_log_dir' ); $set( 'dir', null );

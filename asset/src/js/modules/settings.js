@@ -1,6 +1,7 @@
 // The checkboxes on the settings tab: each one is saved when it is clicked.
 
 import { spinner_url } from './spinner.js';
+import { ajax_problem_text } from './helpers.js';
 
 const $ = jQuery;
 
@@ -33,7 +34,7 @@ export function init_settings() {
             },
             error : function ( jqXHR, textStatus, errorThrown ) {
 
-                syncpilot_alert( syncpilot_i10n.save_settings_problem );
+                syncpilot_alert( ajax_problem_text( syncpilot_i10n.save_settings_problem, jqXHR ) );
                 $( '.ajax-spinner' ).remove();
             },
             success : function ( data ) {

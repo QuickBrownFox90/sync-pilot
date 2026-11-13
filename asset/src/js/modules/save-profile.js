@@ -1,6 +1,8 @@
 // Saving the settings of the form as a profile: what the two places that do it (the button "Save Profile" and the
 // migration with the box "Save Migration Profile" checked) have in common.
 
+import { ajax_problem_text } from './helpers.js';
+
 const $ = jQuery;
 
 /**
@@ -49,7 +51,7 @@ export function send_profile( on_success, on_error ) {
         },
         error : function ( jqXHR, textStatus, errorThrown ) {
 
-            syncpilot_alert( syncpilot_i10n.save_profile_problem );
+            syncpilot_alert( ajax_problem_text( syncpilot_i10n.save_profile_problem, jqXHR ) );
 
             if ( on_error ) {
                 on_error();

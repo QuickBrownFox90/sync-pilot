@@ -11,9 +11,9 @@
  */
 class SyncPilot_Logger {
 
-	const LEVEL_OFF     = 'off';
-	const LEVEL_ERRORS  = 'errors';
-	const LEVEL_VERBOSE = 'verbose';
+	const LEVEL_OFF       = 'off';
+	const LEVEL_ERRORS    = 'errors';
+	const LEVEL_VERBOSE   = 'verbose';
 
 	// a file is rotated when it would grow above this size; the newest FILES_KEPT - 1 rotated files are kept
 	const FILE_MAX_BYTES  = 1048576;
@@ -329,6 +329,7 @@ class SyncPilot_Logger {
 	 * an error says what it is in a few words; this keeps those and nothing else. Serialized data and SQL (rows of the
 	 * database) are never kept, also not behind a message that stands in front of them.
 	 * @since   0.3.0
+	 * @since   0.3.1  An IP address (IPv4, or IPv6 with three colons or more) is [ip]: the block page of a firewall names the address of the visitor
 	 *
 	 * @param   string $text    The answer
 	 * @param   int    $length  How many bytes stay at most
@@ -348,6 +349,9 @@ class SyncPilot_Logger {
 		$text = preg_replace( '/<[^>]*>/', ' ', (string) $text );
 		$text = preg_replace( '/[\x00-\x1f\x7f]+/', ' ', (string) $text );
 		$text = preg_replace( '/[A-Za-z0-9+\/=_-]{32,}/', '[token]', (string) $text );
+
+		// an address of a machine is not metadata of the migration (a block page of a firewall names the one of the visitor)
+		$text = preg_replace( '/(?<![\w.])\d{1,3}(?:\.\d{1,3}){3}(?![\w.])|(?<![\w:])(?:[0-9a-f]{0,4}:){3,7}[0-9a-f]{0,4}(?![\w:])/i', '[ip]', (string) $text );
 		$text = trim( (string) preg_replace( '/\s+/', ' ', (string) $text ) );
 		$text = (string) preg_replace( '/ ([:;,.!?])/', '$1', $text );
 
@@ -356,6 +360,37 @@ class SyncPilot_Logger {
 			$text = rtrim( substr( $text, 0, $found[0][1] ) ) . ' [data]';
 
 		return self::shorten( $text, $length );
+	}
+
+	/**
+	 * The reference numbers that the block page of a firewall or proxy names (Attack ID, Message ID, Support ID, Ray ID,
+	 * Incident ID, Block ID, Event ID, Request ID, Reference): what the administrator of that server needs to find the rule
+	 * in its log. A number has a digit and 6 to 31 letters, digits and dashes (a longer run of them could be a key and is never logged); the first five are kept.
+	 * @since   0.3.1
+	 *
+	 * @param   string $text  The answer (HTML)
+	 *
+	 * @return  array  Name => number, for example array( 'Attack ID' => '20000008' ); empty when there is none
+	 */
+	static function block_ids( $text ) {
+
+		$text = preg_replace( '#<(script|style)\b[^>]*>.*?</\1>#is', ' ', (string) $text );
+		$text = preg_replace( '/<[^>]*>/', ' ', (string) $text );
+		$text = preg_replace( '/\s+/', ' ', (string) $text );
+		$ids  = array();
+
+		if ( preg_match_all( '/\b(Attack ID|Message ID|Support ID|Ray ID|Incident ID|Block ID|Event ID|Request ID|Reference(?: number)?)\s*[:#]?\s*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9][A-Za-z0-9-]{5,30})(?![A-Za-z0-9-])/i', $text, $found, PREG_SET_ORDER ) ) {
+
+			foreach ( $found as $one ) {
+
+				if ( count( $ids ) >= 5 )
+					break;
+
+				$ids[ preg_replace( '/\s+/', ' ', $one[1] ) ] = $one[2];
+			}
+		}
+
+		return $ids;
 	}
 
 	/**

@@ -151,7 +151,7 @@ var media_successfully_determined;
                     $( '.progress-title' ).html( syncpilot_mf_strings.migration_failed );
 
                     $( '.progress-text' ).html( syncpilot_mf_strings.error_determining +
-                        ' (#101mf)' );
+                        ' (#101mf)' + media_firewall_note( jqXHR ) );
 
                     $( '.progress-text' ).addClass( 'migration-error' );
                     console.log( jqXHR );
@@ -185,6 +185,14 @@ var media_successfully_determined;
             } );
         };
 
+        // the sentence that a firewall or a proxy has answered (and its reference numbers), as HTML; nothing when WordPress did
+        function media_firewall_note( jqXHR ) {
+
+            var note = window.syncpilot_firewall_note( jqXHR );
+
+            return note ? '<br /><br />' + $( '<div>' ).text( note ).html() : '';
+        }
+
         function migration_failed( data ) {
 
             $( '.progress-title' ).html( syncpilot_mf_strings.migration_failed );
@@ -195,6 +203,13 @@ var media_successfully_determined;
         }
 
         media_successfully_determined = function ( data ) {
+
+            // the files cannot be written: the migration stops before the database is replaced and removes what it made
+            if ( typeof data.syncpilot_abort != 'undefined' && data.syncpilot_abort == 1 ) {
+                stop_migration( data.body );
+
+                return;
+            }
 
             if ( typeof data.syncpilot_error != 'undefined' && data.syncpilot_error == 1 ) {
                 non_fatal_errors += data.body;
@@ -300,7 +315,7 @@ var media_successfully_determined;
                     $( '.progress-title' ).html( syncpilot_mf_strings.migration_failed );
 
                     $( '.progress-text' ).html( syncpilot_mf_strings.problem_migrating_media +
-                        ' (#102mf)' );
+                        ' (#102mf)' + media_firewall_note( jqXHR ) );
 
                     $( '.progress-text' ).addClass( 'migration-error' );
                     console.log( jqXHR );

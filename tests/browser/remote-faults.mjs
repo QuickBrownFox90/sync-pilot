@@ -20,13 +20,15 @@ const key  = wp( config.remoteWp, 'echo get_option( "syncpilot_settings" )["key"
 const logs = () => JSON.parse( wp( config.wp, 'echo json_encode( SyncPilot_Logger::entries() );' ) );
 
 const cases = [
-    { mode : 'status502', help : 129, label : 'a web server error (502)', status : 502, includes : '502 Bad Gateway nginx', server : 'nginx' },
-    { mode : 'status403', help : 129, label : 'a firewall (403)', status : 403, includes : 'Request blocked ModSecurity', token : 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8' },
+    { mode : 'status502', help : 153, label : 'a web server error (502)', status : 502, includes : '502 Bad Gateway nginx', server : 'nginx' },
+    { mode : 'status403', help : 153, label : 'a firewall (403)', status : 403, includes : 'Request blocked ModSecurity', token : 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8' },
     { mode : 'basic', help : 142, label : 'a request for a password (401)', status : 401 },
     { mode : 'empty', help : 144, label : 'an empty answer', status : 200, received : 0 },
     { mode : 'truncate', help : 144, label : 'an answer that is cut', status : 200 },
     { mode : 'notice', help : 144, label : 'a PHP notice in front of the answer', status : 200, includes : 'Notice Undefined variable', noData : true },
-    { mode : 'redirect', help : 144, label : 'a redirect to a web page', status : 200, includes : 'Welcome to our shop' },
+    { mode : 'waf', help : 153, label : 'the block page of a firewall (500)', status : 500, includes : 'The URL you requested has been blocked', ids : { 'Attack ID' : '20000008', 'Message ID' : '000186991602' } },
+    { mode : 'waf200', help : 153, label : 'the block page of a firewall with the status 200', status : 200, includes : 'Web Page Blocked', ids : { 'Attack ID' : '20000008', 'Message ID' : '000186991602' } },
+    { mode : 'redirect', help : 153, label : 'a redirect to a web page', status : 200, includes : 'Welcome to our shop' },
     { mode : 'reset', help : 121, label : 'a closed connection', errno : [ 52, 56 ] },
     { mode : 'hang', help : 134, label : 'no answer at all', errno : [ 28 ], slow : true },
 ];
@@ -71,6 +73,16 @@ try {
 
         if ( c.includes )
             check( 'a cleaned beginning of the answer: "' + c.includes + '"', ( ctx.excerpt || '' ).replace( /[:()]/g, ' ' ).replace( /\s+/g, ' ' ).includes( c.includes.replace( /[:()]/g, ' ' ).replace( /\s+/g, ' ' ) ), ctx.excerpt );
+
+        if ( c.ids ) {
+
+            check( 'the reference numbers of the block page are in it', JSON.stringify( ctx.block_ids ) === JSON.stringify( c.ids ), JSON.stringify( ctx.block_ids ) );
+            check( 'the address of the visitor is not (it is [ip])', ! raw.includes( '80.153.24.194' ) && ( ctx.excerpt || '' ).includes( '[ip]' ), ctx.excerpt );
+            check( 'the message for the user names the numbers, not the words of the page', /20000008/.test( answer ) && /000186991602/.test( answer ) && /#153/.test( answer ) && ! /Web Page Blocked/.test( answer ), answer.slice( 0, 400 ) );
+        }
+
+        if ( 153 === c.help )
+            check( 'it says that the answer did not come from WordPress', false === ctx.from_wordpress );
 
         if ( c.server )
             check( 'the server is in it', c.server === ctx.header_server, ctx.header_server );

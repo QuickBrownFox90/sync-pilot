@@ -4,6 +4,7 @@
 import { state } from './state.js';
 import { count } from './timer.js';
 import { migration_failed, request_problem } from './migration.js';
+import { firewall_note } from './helpers.js';
 
 const $ = jQuery;
 
@@ -15,6 +16,12 @@ const $ = jQuery;
 export function init_migration_control() {
 
     window.execute_next_step = execute_next_step;
+
+    // media-files.js is a plain script: it says that a firewall or a proxy has answered through this
+    window.syncpilot_firewall_note = firewall_note;
+
+    // media-files.js stops the migration when it cannot write the files; the temporary tables are removed like at a cancellation
+    window.stop_migration = cancel_on_server;
 
     // media-files.js is a plain script and cannot reach the state of the page: it says whether it has a request under way
     window.migration_request_running = function ( running ) {
@@ -130,10 +137,13 @@ function removing_text() {
 
 /**
  * Ask the server to remove what the migration made so far (the export file, the backup, the temporary tables). An empty
- * answer means it worked; then the migration ends with the message "cancelled"
+ * answer means it worked; then the migration ends with the message "cancelled", or, when it is stopped because of a
+ * reason (the media files cannot be written), with the title "stopped" and the reason
  * @since   0.2.8
+ * @since   0.3.1  The reason: a migration that stops itself, with the same clean-up as a cancellation
+ * @param   {string} reason  Why the migration stops, as HTML from the server; nothing for a cancellation
  */
-function cancel_on_server() {
+function cancel_on_server( reason ) {
 
     state.migration_intent = $( 'input[name=action]:checked' ).val();
 
@@ -172,6 +182,12 @@ function cancel_on_server() {
 
             if ( data != '' ) {
                 migration_failed( syncpilot_sanitize_html( data ), syncpilot_i10n.migration_cancellation_failed );
+
+                return;
+            }
+
+            if ( reason ) {
+                migration_failed( syncpilot_sanitize_html( reason ), syncpilot_i10n.migration_stopped );
 
                 return;
             }
