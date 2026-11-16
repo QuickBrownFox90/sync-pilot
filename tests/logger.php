@@ -86,10 +86,40 @@ update_option( 'syncpilot_settings', array_merge( (array) $settings_before, arra
 $L::event( 'Migration started' ); $check( 'and at verbose', $n + 2 === count( $L::lines() ) );
 update_option( 'syncpilot_settings', $settings_before );
 $env = $L::environment(); $json = wp_json_encode( $env );
-$wanted = array( 'plugin', 'wordpress', 'multisite', 'php', 'sapi', 'os', 'server', 'ssl', 'memory_limit', 'max_execution_time', 'post_max_size', 'upload_max_filesize', 'gzip', 'db', 'db_charset', 'db_collate', 'sql_mode', 'max_allowed_packet', 'free_disk_bytes' );
+$wanted = array( 'plugin', 'wordpress', 'multisite', 'php', 'sapi', 'os', 'server', 'ssl', 'memory_limit', 'max_execution_time', 'post_max_size', 'upload_max_filesize', 'gzip', 'db', 'db_charset', 'db_collate', 'sql_mode', 'max_allowed_packet' );
 $check( 'the environment names versions and limits', array() === array_diff( $wanted, array_keys( $env ) ) && PHP_VERSION === $env['php'] && $env['max_allowed_packet'] > 0 && '' !== $env['db'], implode( ', ', array_diff( $wanted, array_keys( $env ) ) ) );
 $check( 'and nothing that identifies the site: no path, no address, no key', false === strpos( $json, ABSPATH ) && false === strpos( $json, wp_parse_url( home_url(), PHP_URL_HOST ) ) && false === strpos( $json, (string) $settings_before['key'] ) );
 $check( 'an entry with two environments fits into one entry', strlen( $L::build_line( 'event', 'Migration started', array( 'intent' => 'push', 'environment' => $env ) ) ) < $L::ENTRY_MAX_BYTES / 2 );
+
+echo "\n-- the end of a migration: totals between the requests\n";
+$L::clear();
+$L::set_migration_id( 'test-totals-1' );
+$L::tally( array(), true );
+$L::tally( array( 'chunks_read' => 1, 'rows_read' => 10 ) );
+$L::tally( array( 'chunks_read' => 1, 'rows_read' => 5 ) );
+$L::close_migration( 'finished', array( 'intent' => 'push' ) );
+$e = $last();
+$check( 'the end is an event with the totals of all requests and the duration', 'Migration finished' === $e['message'] && 'event' === $e['level'] && 2 === $e['context']['chunks_read'] && 15 === $e['context']['rows_read'] && isset( $e['context']['duration_s'] ) && 'finished' === $e['context']['outcome'], wp_json_encode( $e['context'] ) );
+$check( 'the totals are gone afterwards', false === get_transient( 'syncpilot_tally_test-totals-1' ) );
+$L::close_migration( 'cancelled' );
+$check( 'cancelled and stopped have their own message', 'Migration cancelled' === $last()['message'] );
+$n = count( $L::lines() );
+$L::set_migration_id( '' );
+$L::close_migration( 'finished' );
+$check( 'without an ID of a migration nothing is written', $n === count( $L::lines() ) );
+$L::set_migration_id( 'test-totals-2' );
+update_option( 'syncpilot_settings', array_merge( (array) $settings_before, array( 'log_level' => 'off' ) ) );
+$L::tally( array( 'chunks_read' => 1 ) );
+$check( 'at the level off nothing is kept', false === get_transient( 'syncpilot_tally_test-totals-2' ) );
+update_option( 'syncpilot_settings', $settings_before );
+$L::set_migration_id( '' );
+
+echo "\n-- the environments of two sites are compared\n";
+$a = array( 'php' => '8.4.1', 'db' => '8.0', 'free_disk_bytes' => 100, 'ssl' => true );
+$b = array( 'php' => '8.2.0', 'db' => '8.0', 'free_disk_bytes' => 5, 'ssl' => false, 'extra' => 1 );
+$d = $L::environment_differences( $a, $b );
+$check( 'what differs is listed with both values (this site first), the free space and a name only one site has are not', $d === array( 'php' => array( '8.4.1', '8.2.0' ), 'ssl' => array( true, false ) ), wp_json_encode( $d ) );
+$check( 'an environment that was not sent: nothing, and equal ones: nothing', array() === $L::environment_differences( $a, null ) && array() === $L::environment_differences( $a, $a ) );
 
 echo "\n-- 12000 requests with a 2.4 MB body each (6 MB of log): the files stay within their size\n";
 $L::clear();

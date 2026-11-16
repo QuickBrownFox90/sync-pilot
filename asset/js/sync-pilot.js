@@ -2043,6 +2043,8 @@ function syncpilot_parse_json( maybe_json ) {
       form_data: state.form_data,
       nonce: syncpilot_nonces.cancel_migration
     };
+    if (reason)
+      request_data.stopped = 1;
     if (connection_data)
       request_data.temp_prefix = connection_data.temp_prefix;
     $19.ajax({

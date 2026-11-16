@@ -130,9 +130,65 @@ class SyncPilot_Logger {
 	}
 
 	/**
+	 * The totals of a migration on this site are kept between its requests (every request is a run of PHP of its own) in a
+	 * transient named by the ID of the migration. Only numbers and the time of the start; nothing at the level off or without an ID.
+	 * @since   0.3.2
+	 *
+	 * @param   array $add   Name => number to add to the total of that name; nothing sets only the time of the start
+	 * @param   bool  $start The migration starts here: the time is noted
+	 */
+	static function tally( $add = array(), $start = false ) {
+
+		if ( '' === self::$migration_id || 'off' === self::level() || ! function_exists( 'get_transient' ) )
+			return;
+
+		$key   = 'syncpilot_tally_' . self::$migration_id;
+		$tally = get_transient( $key );
+		$tally = is_array( $tally ) ? $tally : array();
+
+		if ( $start || ! isset( $tally['started'] ) )
+			$tally['started'] = time();
+
+		foreach ( $add as $name => $number )
+			$tally[ $name ] = ( $tally[ $name ] ?? 0 ) + (int) $number;
+
+		set_transient( $key, $tally, DAY_IN_SECONDS );
+	}
+
+	/**
+	 * The end of a migration on this site, with the totals that this site has seen: how long it took, tables, rows and
+	 * bytes that it read or imported. Written at the levels errors and verbose; the totals are removed.
+	 * @since   0.3.2
+	 *
+	 * @param   string $outcome  finished, cancelled or stopped
+	 * @param   array  $context  More facts, see clean()
+	 */
+	static function close_migration( $outcome, $context = array() ) {
+
+		if ( '' === self::$migration_id || 'off' === self::level() || ! function_exists( 'get_transient' ) )
+			return;
+
+		$key   = 'syncpilot_tally_' . self::$migration_id;
+		$tally = get_transient( $key );
+		$tally = is_array( $tally ) ? $tally : array();
+		$start = $tally['started'] ?? null;
+
+		unset( $tally['started'] );
+		delete_transient( $key );
+
+		$facts = array( 'outcome' => $outcome );
+
+		if ( null !== $start )
+			$facts['duration_s'] = max( 0, time() - (int) $start );
+
+		self::event( 'finished' === $outcome ? 'Migration finished' : 'Migration ' . $outcome, $facts + $tally + $context );
+	}
+
+	/**
 	 * What decides whether a migration works, of this site: versions, limits of PHP and of the database. Names, numbers
 	 * and yes/no only: no paths, no addresses, no keys, no names of users.
 	 * @since   0.3.0
+	 * @since   0.3.2  free_disk_bytes is left out when the free space cannot be read (it was null)
 	 *
 	 * @return  array
 	 */
@@ -169,9 +225,40 @@ class SyncPilot_Logger {
 		$uploads = wp_upload_dir( null, false );
 		$free    = @disk_free_space( $uploads['basedir'] );
 
-		$env['free_disk_bytes'] = false === $free ? null : (int) $free;
+		// a value that cannot be read is left out, not written as null
+		if ( false !== $free )
+			$env['free_disk_bytes'] = (int) $free;
 
 		return $env;
+	}
+
+	/**
+	 * What is different in the environments of the two sites (versions, limits, collation, SQL mode): for each name the
+	 * value of this site and of the other site. The free space is not compared, it changes all the time.
+	 * @since   0.3.2
+	 *
+	 * @param   array      $own    The environment of this site
+	 * @param   array|null $other  The environment of the other site
+	 *
+	 * @return  array  name => [ this site, other site ]; empty when they are the same or the other site sent none
+	 */
+	static function environment_differences( $own, $other ) {
+
+		if ( ! is_array( $other ) )
+			return array();
+
+		$differences = array();
+
+		foreach ( $own as $name => $value ) {
+
+			if ( 'free_disk_bytes' === $name || ! array_key_exists( $name, $other ) )
+				continue;
+
+			if ( $value !== $other[ $name ] )
+				$differences[ $name ] = array( $value, $other[ $name ] );
+		}
+
+		return $differences;
 	}
 
 	/**

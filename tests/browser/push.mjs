@@ -316,6 +316,14 @@ try {
         check( 'no temporary tables are left on the receiving site', tables.length === 0, tables.join( ', ' ) );
         check( 'the marker row of the receiving site is still there (nothing was replaced)', marked() === '1' );
 
+        // both sites write that the migration was cancelled
+        const logOf     = path => JSON.parse( wp( path, 'echo json_encode( array_map( "json_decode", SyncPilot_Logger::lines() ) );' ) );
+        const cancelled = path => logOf( path ).filter( e => e.message === 'Migration cancelled' ).pop();
+        const own       = cancelled( config.wp ), remote = cancelled( config.remoteWp );
+
+        check( 'this site wrote "Migration cancelled" with the ID of the migration', own?.migration && 'cancelled' === own.context.outcome, JSON.stringify( own?.context ) );
+        check( 'the other site wrote it too, with the same ID', remote?.migration === own?.migration && 'remote' === remote?.src, JSON.stringify( remote?.context ) );
+
         if ( backup ) {
 
             const left = backupFiles( receiver ).filter( f => ! backupsBefore.includes( f ) );
@@ -379,6 +387,11 @@ try {
             check( 'no temporary tables are left on the receiving site', left.length === 0, left.join( ', ' ) );
             check( 'the log says it: help code 215 with the folder and "Migration stopped by the media check"', stop && folder && 'uploads' === folder.context.folder && false === folder.context.writable, JSON.stringify( folder?.context ) );
             check( 'it was the site that writes: ' + ( pull ? 'this site' : 'the remote site' ), folder?.context.where === ( pull ? 'this site' : 'remote site' ) );
+
+            const end    = log.filter( e => e.message === 'Migration stopped' ).pop();
+            const theirs = JSON.parse( wp( config.remoteWp, 'echo json_encode( array_map( "json_decode", SyncPilot_Logger::lines() ) );' ) ).filter( e => e.message === 'Migration stopped' ).pop();
+
+            check( 'both sites end the migration with "Migration stopped" (not "cancelled")', end?.context.outcome === 'stopped' && theirs?.migration === end.migration, JSON.stringify( [ end?.context, theirs?.context ] ) );
         }
 
         if ( ! unwritable ) {
@@ -459,7 +472,7 @@ try {
             const since    = ( list, from ) => list.slice( list.lastIndexOf( from ) + 1 );
             const ownNow   = since( own, started );
             const otherNow = since( other, requested );
-            const needed    = [ 'plugin', 'wordpress', 'php', 'memory_limit', 'max_execution_time', 'post_max_size', 'db', 'db_charset', 'sql_mode', 'max_allowed_packet', 'free_disk_bytes' ];
+            const needed    = [ 'plugin', 'wordpress', 'php', 'memory_limit', 'max_execution_time', 'post_max_size', 'db', 'db_charset', 'sql_mode', 'max_allowed_packet' ];
             const missing   = env => needed.filter( key => ! env || ! ( key in env ) );
 
             check( 'this site wrote "Migration started" with an ID', /^\d{6}-\d{6}-[0-9a-f]{6}$/.test( id || '' ) && 'event' === started.level, id );
@@ -468,6 +481,25 @@ try {
             check( 'its entry has the environment of the other site', missing( requested?.context?.environment ).length === 0, missing( requested?.context?.environment ).join( ', ' ) );
             check( 'this site wrote the environment of the other site as well ("Remote site agreed", the same ID)', agreed?.migration === id && missing( agreed?.context?.environment ).length === 0 && agreed.context.environment.php === requested?.context?.environment?.php, agreed?.migration );
             check( 'no key, no address and no path in the entries of the migration', ! JSON.stringify( [ started, agreed, requested ] ).match( new RegExp( [ key, '/www/', config.site.replace( /^https?:\/\//, '' ), config.remoteSite.replace( /^https?:\/\//, '' ) ].map( t => t.replace( /[.*+?^${}()|[\]\\]/g, '\\$&' ) ).join( '|' ) ) ) );
+
+            // the options of the migration are in the start entry, as names and numbers
+            const scope = started?.context?.scope;
+
+            check( 'the start entry has the options of the migration (tables, media, backup, find and replace rows)', scope && [ 'tables', 'tables_chosen', 'replace_rows', 'media_files', 'remove_media', 'backup', 'gzip' ].every( k => k in scope ) && scope.replace_rows >= 1 && scope.media_files === withMedia && ( backup ? scope.backup : scope.backup === false ), JSON.stringify( scope ) );
+            check( 'and no text of a find and replace row', ! /wpf\.local|wp7sync|\/www\//.test( JSON.stringify( scope ) ) );
+            check( '"Remote site agreed" lists what is different on the two sites (and nothing that always differs)', agreed?.context?.differences && typeof agreed.context.differences === 'object' && ! ( 'free_disk_bytes' in agreed.context.differences ), JSON.stringify( agreed?.context?.differences ) );
+
+            // the end of the migration: both sites write it, with the same ID and the totals that each has seen
+            const closedOwn   = ownNow.filter( e => e.message === 'Migration finished' ).pop();
+            const closedOther = otherNow.filter( e => e.message === 'Migration finished' ).pop();
+            const reading     = pull ? closedOther : closedOwn;
+            const importing   = pull ? closedOwn : closedOther;
+
+            check( 'this site wrote "Migration finished" with the ID, the outcome and the duration', closedOwn?.migration === id && 'event' === closedOwn.level && 'finished' === closedOwn.context.outcome && Number.isInteger( closedOwn.context.duration_s ), JSON.stringify( closedOwn?.context ) );
+            check( 'the other site wrote it too, with the same ID', closedOther?.migration === id && 'remote' === closedOther.src && 'finished' === closedOther.context.outcome, JSON.stringify( closedOther?.context ) );
+            check( 'the site that read the tables counts tables, rows and bytes', reading?.context.tables_read > 0 && reading.context.rows_read > 0 && reading.context.bytes_read > 0, JSON.stringify( reading?.context ) );
+            check( 'the site that imported them counts chunks, queries and bytes', importing?.context.chunks_imported > 0 && importing.context.queries_run > 0 && importing.context.bytes_imported > 0, JSON.stringify( importing?.context ) );
+            check( 'the totals are numbers and names, no value', ! /INSERT|CREATE|UPDATE/.test( JSON.stringify( [ closedOwn, closedOther ] ) ) );
 
             if ( verbose ) {
 

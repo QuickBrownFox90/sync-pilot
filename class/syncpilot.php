@@ -110,6 +110,7 @@ class SyncPilot extends SyncPilot_Base {
 		add_action( 'wp_ajax_nopriv_syncpilot_fire_migration_complete', array( $this, 'fire_migration_complete' ) );
 		add_action( 'wp_ajax_nopriv_syncpilot_backup_remote_table', array( $this, 'respond_to_backup_remote_table' ) );
 		add_action( 'wp_ajax_nopriv_syncpilot_remote_finalize_migration', array( $this, 'respond_to_remote_finalize_migration' ) );
+		add_action( 'wp_ajax_nopriv_syncpilot_remote_migration_closed', array( $this, 'respond_to_remote_migration_closed' ) );
 		add_action( 'wp_ajax_nopriv_syncpilot_process_push_migration_cancellation', array( $this, 'respond_to_process_push_migration_cancellation' ) );
 
 		// the log of an older version was an option, it can be big and autoloaded
@@ -664,11 +665,72 @@ class SyncPilot extends SyncPilot_Base {
 		return $sql;
 	}
 
+	/**
+	 * The end of a migration: this site writes "Migration finished", "cancelled", "stopped" or "failed" with its totals, and
+	 * tells the other site (a signed request), which writes its own entry with the totals that it has seen. The other site
+	 * has no request of its own at the end of a pull, so it would not know otherwise. A request that fails is not an error
+	 * of the migration, the answer to the browser is not changed.
+	 * @since   0.3.2
+	 *
+	 * @param   string $outcome  finished, cancelled, stopped or failed
+	 *
+	 * @return  void
+	 */
+	function close_migration( $outcome ) {
+
+		$intent = $_POST['intent'] ?? '';
+
+		SyncPilot_Logger::close_migration( $outcome, array( 'intent' => $intent ) );
+
+		if ( ! in_array( $intent, array( 'pull', 'push' ), true ) || empty( $_POST['url'] ) || empty( $_POST['key'] ) || 'off' === SyncPilot_Logger::level() )
+			return;
+
+		$data = array(
+			'action'  => 'syncpilot_remote_migration_closed',
+			'intent'  => $intent,
+			'outcome' => $outcome,
+		);
+
+		$data['sig'] = $this->create_signature( $data, $_POST['key'] );
+
+		$this->remote_post( trailingslashit( $_POST['url'] ) . 'wp-admin/admin-ajax.php', $data, __FUNCTION__ );
+
+		// what the request said is in the log already; the browser does not need it
+		$this->error = '';
+	}
+
+	/**
+	 * Public endpoint: the other site says the migration is over (signed); this site writes its own end of it
+	 * @since   0.3.2
+	 */
+	function respond_to_remote_migration_closed() {
+
+		$filtered_post = $this->filter_post_elements( $_POST, array( 'action', 'intent', 'outcome' ) );
+
+		if ( ! $this->verify_signature( $filtered_post, $this->settings['key'] ) ) {
+
+			$this->log_error( SyncPilot_HelpCode::InvalidSignature, array( 'request' => $filtered_post ), site: 11 );
+
+			$result = $this->end_ajax( $this->invalid_content_verification_error . ' (#124)' );
+
+			return $result;
+		}
+
+		$outcome = in_array( $filtered_post['outcome'] ?? '', array( 'finished', 'cancelled', 'stopped', 'failed' ), true ) ? $filtered_post['outcome'] : 'finished';
+
+		SyncPilot_Logger::close_migration( $outcome, array( 'intent' => 'pull' === ( $filtered_post['intent'] ?? '' ) ? 'pull' : 'push' ) );
+
+		$result = $this->end_ajax( '' );
+
+		return $result;
+	}
+
 	// After table migration, delete old tables and rename new tables removing the temporarily prefix
 	/**
 	 * Replace the tables with the migrated ones (the last step of a pull or a push)
 	 * @since   0.0.1
 	 * @since   0.3.1  Two actions around it: syncpilot_before_finalize_migration, and syncpilot_migration_finalized when the tables were replaced (the media files that the other site does not have are removed there)
+	 * @since   0.3.2  The end of the migration is written to the log of both sites (close_migration())
 	 */
 	function ajax_finalize_migration() {
 
@@ -714,6 +776,8 @@ class SyncPilot extends SyncPilot_Base {
 		// an empty answer is a success: only then the last thing is done that cannot be undone
 		if ( '' === trim( (string) $return ) )
 			do_action( 'syncpilot_migration_finalized', $_POST['intent'] );
+
+		$this->close_migration( '' === trim( (string) $return ) ? 'finished' : 'failed' );
 
 		$result = $this->end_ajax( $return );
 
@@ -1054,6 +1118,9 @@ class SyncPilot extends SyncPilot_Base {
 				return $result;
 			}
 		}
+
+		SyncPilot_Logger::tally( array( 'chunks_imported' => 1, 'queries_run' => $this->chunk_queries, 'bytes_imported' => strlen( $chunk ) ) );
+
 		return true;
 	}
 
@@ -1314,9 +1381,42 @@ class SyncPilot extends SyncPilot_Base {
 	}
 
 	/**
+	 * The options of a migration for the log: which tables, with media files or not, backup, how many rows of find and
+	 * replace. Names, numbers and yes/no only: never the texts of the find and replace rows or the names of post types.
+	 * @since   0.3.2
+	 *
+	 * @param   array $form  The fields of the form, see parse_migration_form_data()
+	 *
+	 * @return  array
+	 */
+	function describe_migration_scope( $form ) {
+
+		$replace = isset( $form['replace_old'] ) && is_array( $form['replace_old'] ) ? array_filter( $form['replace_old'], 'strlen' ) : array();
+
+		$scope = array(
+			'tables'              => $form['table_migrate_option'] ?? '',
+			'tables_chosen'       => is_array( $form['select_tables'] ?? null ) ? count( $form['select_tables'] ) : 0,
+			'replace_rows'        => count( $replace ),
+			'replace_guids'       => ! empty( $form['replace_guids'] ),
+			'media_files'         => ! empty( $form['media_files'] ),
+			'remove_media'        => ! empty( $form['remove_local_media'] ),
+			'backup'              => ! empty( $form['create_backup'] ) ? ( $form['backup_option'] ?? 'yes' ) : false,
+			'gzip'                => ! empty( $form['gzip_file'] ),
+			'exclude_spam'        => ! empty( $form['exclude_spam'] ),
+			'exclude_transients'  => ! empty( $form['exclude_transients'] ),
+			'keep_active_plugins' => ! empty( $form['keep_active_plugins'] ),
+			'post_types'          => is_array( $form['select_post_types'] ?? null ) ? count( $form['select_post_types'] ) : 0,
+		);
+
+		return $scope;
+	}
+
+	/**
 	 * Start a migration: check the connection data, ask the other site to agree and set up the dump
 	 * @since   0.0.1
+	 * @since   0.3.2  "Remote site agreed" has what is different on the two sites (differences)
 	 * @since   0.3.0  An answer of the other site that cannot be read is logged (RemoteAnswerUnreadable, site 1). Makes the ID of the migration and writes it with the environment of this site (event "Migration started") and of the other site (event "Remote site agreed"); the browser gets the ID as migration_id
+	 * @since   0.3.2  "Migration started" has the options of the migration (scope, see describe_migration_scope())
 	 */
 	function ajax_initiate_migration() {
 
@@ -1326,9 +1426,11 @@ class SyncPilot extends SyncPilot_Base {
 
 		// the ID that both sites write in their logs, from here to the end of the migration
 		SyncPilot_Logger::set_migration_id( SyncPilot_Logger::new_migration_id() );
+		SyncPilot_Logger::tally( array(), true );
 		SyncPilot_Logger::event( 'Migration started', array(
 			'intent'      => $_POST['intent'],
 			'stage'       => $_POST['stage'] ?? '',
+			'scope'       => $this->describe_migration_scope( $this->form_data ),
 			'environment' => SyncPilot_Logger::environment(),
 		) );
 
@@ -1410,7 +1512,10 @@ class SyncPilot extends SyncPilot_Base {
 			}
 
 			// what the other site says about itself is for the log, not for the browser
-			SyncPilot_Logger::event( 'Remote site agreed', array( 'environment' => $return['environment'] ?? null ) );
+			SyncPilot_Logger::event( 'Remote site agreed', array(
+				'environment' => $return['environment'] ?? null,
+				'differences' => SyncPilot_Logger::environment_differences( SyncPilot_Logger::environment(), $return['environment'] ?? null ),
+			) );
 			unset( $return['environment'] );
 
 			if ( $_POST['intent'] == 'pull' ) {
@@ -1461,6 +1566,7 @@ class SyncPilot extends SyncPilot_Base {
 				// the signature is right and the migration is allowed: the other site learns the environment of this site, and it is in the log here
 				$return['environment'] = SyncPilot_Logger::environment();
 
+				SyncPilot_Logger::tally( array(), true );
 				SyncPilot_Logger::event( 'Migration requested by remote site', array( 'intent' => 'pull' === $_POST['intent'] ? 'pull' : 'push', 'environment' => $return['environment'] ) );
 			}
 
@@ -2863,6 +2969,26 @@ class SyncPilot extends SyncPilot_Base {
 	}
 
 	/**
+	 * Count the chunk that this request has read from the table for the totals at the end of the migration (the backup of
+	 * the receiving site is not part of them)
+	 * @since   0.3.2
+	 *
+	 * @return  void
+	 */
+	function tally_chunk_read() {
+
+		if ( 'backup' === ( $_POST['stage'] ?? '' ) || empty( $this->chunk_stats['started'] ) )
+			return;
+
+		SyncPilot_Logger::tally( array(
+			'chunks_read' => 1,
+			'rows_read'   => $this->chunk_stats['rows'],
+			'bytes_read'  => strlen( $this->current_chunk ),
+			'tables_read' => -1 === $this->row_tracker ? 1 : 0,
+		) );
+	}
+
+	/**
 	 * Called in the $this->stow function once our chunk buffer is full, will transfer the SQL to the remote server for importing
 	 * @since   0.0.1
 	 * @since   0.3.1  Writes the entry of the chunk for the log before it goes on (verbose only, see log_chunk_exported())
@@ -2870,6 +2996,7 @@ class SyncPilot extends SyncPilot_Base {
 	function transfer_chunk() {
 
 		$this->log_chunk_exported();
+		$this->tally_chunk_read();
 
 		if( $_POST['intent'] == 'savefile' || $_POST['stage'] == 'backup' ) {
 
@@ -3295,6 +3422,7 @@ class SyncPilot extends SyncPilot_Base {
 	 * Cancel a migration: remove what it made so far. An export deletes its file; a push asks the other site to delete its
 	 * backup or temporary tables (a signed request); a pull deletes the backup or the temporary tables of this site
 	 * @since   0.2.8
+	 * @since   0.3.2  The end is written to the log of both sites (close_migration()); stopped is set when the migration stopped itself
 	 */
 	function ajax_cancel_migration() {
 
@@ -3336,6 +3464,8 @@ class SyncPilot extends SyncPilot_Base {
 
 			default:
 		}
+
+		$this->close_migration( ! empty( $_POST['stopped'] ) ? 'stopped' : 'cancelled' );
 
 		exit;
 	}
@@ -3444,6 +3574,9 @@ class SyncPilot extends SyncPilot_Base {
 
 		// whether the migration was without errors is for this site (it decides about the removal of media files)
 		unset( $data['media_clean'] );
+
+		// that the migration stops itself (and is not cancelled by the user) is for the log of this site
+		unset( $data['stopped'] );
 
 		return $data;
 	}

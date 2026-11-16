@@ -20,7 +20,7 @@ This is a side project maintained by one person in their spare time — not a pr
 - **Saved profiles** for migrations that are repeated
 - **Pause, resume and cancel** a running migration
 - **Automatic find & replace** of URLs and file paths in content, widgets, menus and settings, serialization safe
-- **Log of every migration**: a log file of its own with the course of each migration, the errors with their reason and the environment of both sites (versions, limits); both sites write the same migration ID. It holds names, sizes and numbers, never values of the database or keys
+- **Log of every migration**: a log file of its own with the course of each migration, the options it was started with, the errors with their reason, the environment of both sites (versions, limits, what differs) and at the end how long it took and how much each site read and imported; both sites write the same migration ID. It holds names, sizes and numbers, never values of the database or keys
 - **Signed requests**: every request is verified with HMAC, data can be sent over SSL
 - Detects server limits (e.g. `max_allowed_packet`) and adapts the chunk size
 
@@ -57,7 +57,7 @@ On the first load SyncPilot copies the settings of WP Sync DB (API key, pull/pus
 
 The Diagnostics tab shows the diagnostic info of the site and its log, with the choice of the log level and a button to clear it.
 
-- **Levels**: *Off*, *Errors* (default) and *Verbose* (for troubleshooting). Errors writes every error (also a database query that failed, with its kind and table but never its values) and three entries per migration (started, other site agreed, requested by the other site). Verbose adds the warnings and notices of PHP, every request to the other site with its duration and size, and every chunk of a table: where it began, how many rows, its size, how long it took, the peak of the memory and the largest value (table, column, row and size, never the value).
+- **Levels**: *Off*, *Errors* (default) and *Verbose* (for troubleshooting). Errors writes every error (also a database query that failed, with its kind and table but never its values) and the course of every migration: started (with its options), other site agreed (with what differs between the two environments), requested by the other site, and the end on both sites (finished, cancelled, stopped or failed, with the duration and the totals of tables, rows and bytes; numbers only). Verbose adds the warnings and notices of PHP, every request to the other site with its duration and size, and every chunk of a table: where it began, how many rows, its size, how long it took, the peak of the memory and the largest value (table, column, row and size, never the value).
 - **An entry** is one line of JSON: time (UTC), level, source (`admin`, `remote`, `cli`), migration ID, action, a short English message, a help code and facts (`"help":130,"site":3` is the third place in the code that reports code 130).
 - **Never in it**: values of the database, keys, signatures, passwords, tokens. The beginning of an answer of the other site is cleaned (no tags, long tokens replaced, nothing from serialized data or SQL).
 - **A firewall in the way is named**: when the answer of the other site, or of this site to your browser, does not come from WordPress (no `X-Robots-Tag`, which `admin-ajax.php` always sends), the message says that a firewall or a proxy has probably blocked the request, gives its reference numbers (Attack ID, Message ID...) for the administrator of that server, and the log has help code 153.
@@ -66,7 +66,7 @@ The Diagnostics tab shows the diagnostic info of the site and its log, with the 
 
 ## Status
 
-Version 0.3.1 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged (see [changelog.txt](changelog.txt)).
+Version 0.3.2 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged (see [changelog.txt](changelog.txt)).
 
 **What the 0.2.x versions were for.** Mostly groundwork, not new features. The admin script of WP Sync DB was one big file without any test. It is split into small modules and a short start-up script now, built with esbuild, checked with ESLint and covered by browser tests that click through the admin page. That was necessary to maintain the code at all, and to make the project really forkable: the parts can be developed one at a time without touching everything. You still have to understand how they work together, but not all of it at once. Besides that: fixes for PHP 8.2+ and WordPress 6.7, the first security fixes, several fixes found by pulling real sites (media files, cancelling), and one small feature (a find and replace row for http/https).
 
@@ -74,7 +74,7 @@ Version 0.3.1 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed an
 
 **What is tested.** Pull, push, export, backup, media files, pause, cancel and saved profiles, automatically on two test sites (PHP 8.4) and by hand with pulls from live sites; also the cases that go wrong (an exception, a fatal error, the memory and the time limit, an answer that is cut or empty, a firewall that answers instead of WordPress, folders that cannot be written). Multisite and WP-CLI are not verified yet.
 
-**What comes next.** 0.3.2: download of the log, filter by migration, the entries of the other site in one view. After that the media check before the tables are migrated (so that nothing is started that cannot end) and a migration that stops when a file cannot be copied. 0.4.0: import of a database dump. Use it only between sites you control and only on a trusted connection.
+**What comes next.** 0.3.3: the media check before the tables are migrated (so that nothing is started that cannot end) and a migration that stops when a file cannot be copied. 0.4.0: import of a database dump. 0.5.x: the overhaul of the admin page, with the log in boxes per migration, its download and the entries of the other site. Use it only between sites you control and only on a trusted connection.
 
 ## Development
 

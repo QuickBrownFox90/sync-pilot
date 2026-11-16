@@ -160,6 +160,10 @@ function cancel_on_server( reason ) {
         nonce         : syncpilot_nonces.cancel_migration,
     };
 
+    // the log says whether the user cancelled or the migration stopped itself
+    if ( reason )
+        request_data.stopped = 1;
+
     // connection_data is null (not undefined) until a connection to another site was checked, so an export has none
     if ( connection_data )
         request_data.temp_prefix = connection_data.temp_prefix;
