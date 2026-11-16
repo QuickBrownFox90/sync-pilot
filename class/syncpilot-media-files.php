@@ -29,10 +29,12 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		// internal AJAX handlers
 		add_action( 'wp_ajax_syncpilot_mf_determine_media_to_migrate', array( $this, 'ajax_determine_media_to_migrate' ) );
 		add_action( 'wp_ajax_syncpilot_mf_migrate_media', array( $this, 'ajax_migrate_media' ) );
+		add_action( 'wp_ajax_syncpilot_mf_media_preflight', array( $this, 'ajax_media_preflight' ) );
 
 		// external AJAX handlers
 		add_action( 'wp_ajax_nopriv_syncpilot_mf_get_remote_media_listing', array( $this, 'respond_to_get_remote_media_listing' ) );
 		add_action( 'wp_ajax_nopriv_syncpilot_mf_push_request', array( $this, 'respond_to_push_request' ) );
+		add_action( 'wp_ajax_nopriv_syncpilot_mf_get_media_write_state', array( $this, 'respond_to_get_media_write_state' ) );
 		add_action( 'wp_ajax_nopriv_syncpilot_mf_remove_local_attachments', array( $this, 'respond_to_remove_local_attachments' ) );
 	}
 
@@ -707,6 +709,119 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 	}
 
 	/**
+	 * The check of the two folders that every media file goes through, before the first table is sent: the uploads folder
+	 * and the temporary folder. The files themselves are not known yet (they are worked out after the tables, from the
+	 * temporary tables), so their folders and the free space are checked later by check_media_write().
+	 * @since   0.3.3
+	 *
+	 * @param   array  $state  From media_write_state(), of the site that writes
+	 * @param   string $where  "this site" or "remote site": the site that writes
+	 *
+	 * @return  array  The problems as texts for the user, none when all is fine
+	 */
+	function check_media_folders( $state, $where ) {
+
+		$problems = array();
+		$context  = array( 'where' => $where, 'phase' => 'preflight' );
+		$label    = ( 'this site' === $where ) ? __( 'this site', self::TEXT_DOMAIN ) : __( 'the remote site', self::TEXT_DOMAIN );
+
+		if ( empty( $state['uploads']['writable'] ) ) {
+			$this->log_error( SyncPilot_HelpCode::MediaFolderNotWritable, ( $state['uploads'] ?? array() ) + $context + array( 'folder' => 'uploads' ), site: 3 );
+			$problems[] = sprintf( __( 'The folder for the media files cannot be written on %1$s: %2$s (#215)', self::TEXT_DOMAIN ), $label, 'uploads' );
+		}
+
+		if ( empty( $state['temp']['writable'] ) ) {
+			$this->log_error( SyncPilot_HelpCode::MediaTempNotWritable, ( $state['temp'] ?? array() ) + $context, site: 2 );
+			$problems[] = sprintf( __( 'The temporary folder cannot be written on %s (#216)', self::TEXT_DOMAIN ), $label );
+		}
+
+		SyncPilot_Logger::info( 'Media check before the tables', $context + array( 'problems' => count( $problems ) ) );
+
+		return $problems;
+	}
+
+	/**
+	 * The first check of a migration with media files, before the first table is sent: can the site that writes the files
+	 * write at all? A pull asks this site, a push asks the other site (a signed request). The answer is syncpilot_abort with
+	 * the reasons, as with the check after the tables (see ajax_determine_media_to_migrate()); an other site that does not
+	 * answer is not a reason to stop.
+	 * @since   0.3.3
+	 */
+	function ajax_media_preflight() {
+
+		$this->check_ajax_referer( 'media-preflight' );
+		$this->set_time_limit();
+
+		$problems = array();
+
+		if ( 'pull' === ( $_POST['intent'] ?? '' ) )
+			$problems = $this->check_media_folders( $this->media_write_state(), 'this site' );
+
+		else {
+
+			$data           = array( 'action' => 'syncpilot_mf_get_media_write_state', 'intent' => 'push' );
+			$data['sig']    = $this->create_signature( $data, $_POST['key'] );
+			$answer         = $this->read_remote_answer( $this->remote_post( trailingslashit( $_POST['url'] ) . 'wp-admin/admin-ajax.php', $data, __FUNCTION__ ) );
+
+			// the other site is not asked again later: what it says here is the check, an answer that is missing is not
+			$this->error = '';
+
+			if ( is_array( $answer ) && isset( $answer['media_write'] ) && is_array( $answer['media_write'] ) )
+				$problems = $this->check_media_folders( $answer['media_write'], 'remote site' );
+
+			else
+				SyncPilot_Logger::info( 'Media check before the tables skipped', array( 'reason' => 'no usable answer of the other site' ) );
+		}
+
+		$return = array( 'success' => 1 );
+
+		if ( $problems && apply_filters( 'syncpilot_media_check_stops_migration', true, $problems ) ) {
+
+			SyncPilot_Logger::event( 'Migration stopped by the media check', array( 'problems' => count( $problems ), 'phase' => 'preflight' ) );
+
+			$return = array(
+				'syncpilot_abort' => 1,
+				'body'            => implode( '<br />', $problems ) . '<br />' . __( 'The migration was stopped before anything was sent, nothing was changed. Fix the folders, or migrate again without the media files.', self::TEXT_DOMAIN ),
+			);
+		}
+
+		$result = $this->end_ajax( json_encode( $return ) );
+
+		return $result;
+	}
+
+	/**
+	 * Public endpoint: say whether this site can write media files, for a push of the other site (signed)
+	 * @since   0.3.3
+	 */
+	function respond_to_get_media_write_state() {
+
+		$filtered_post = $this->filter_post_elements( $_POST, array( 'action', 'intent' ) );
+
+		if ( ! $this->verify_signature( $filtered_post, $this->settings['key'] ) ) {
+
+			$this->log_error( SyncPilot_HelpCode::InvalidSignature, array( 'request' => $filtered_post ), site: 12 );
+
+			$result = $this->end_ajax( serialize( array( 'syncpilot_error' => 1, 'body' => $this->invalid_content_verification_error . ' (#114mf)' ) ) );
+
+			return $result;
+		}
+
+		if ( ! $this->media_request_allowed( 'push' ) ) {
+
+			$this->log_error( SyncPilot_HelpCode::PushNotAllowed, array(), site: 7 );
+
+			$result = $this->end_ajax( serialize( array( 'syncpilot_error' => 1, 'body' => sprintf( __( 'The connection succeeded but the remote site is configured to reject %s connections. You can change this in the "settings" tab on the remote site. (#110)', self::TEXT_DOMAIN ), __( 'push', self::TEXT_DOMAIN ) ) ) ) );
+
+			return $result;
+		}
+
+		$result = $this->end_ajax( serialize( array( 'media_write' => $this->media_write_state() ) ) );
+
+		return $result;
+	}
+
+	/**
 	 * Work out which media files the other site lacks (or has in an older version) and how large they are
 	 * @since   0.0.1
 	 * @since   0.3.1  Checks before the files are written whether they can be (check_media_write()) and stops the migration when not (syncpilot_abort); the media files that the other site does not have are no longer removed here, but at the end (remove_media_after_finalize())
@@ -1149,6 +1264,10 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 			'problem_migrating_media'	=> __( "A problem occurred when migrating the media files.", self::TEXT_DOMAIN ),
 			'media_files'				=> __( "Media Files", self::TEXT_DOMAIN ),
 			'migrating_media_files'		=> __( "Migrating media files", self::TEXT_DOMAIN ),
+			'checking'					=> __( "Checking the folders for the media files, please wait...", self::TEXT_DOMAIN ),
+			'file_failed_stopped'		=> __( "The migration was stopped before the database was replaced, nothing was changed in it. Media files that were copied already stay.", self::TEXT_DOMAIN ),
+			// 1: a media file that cannot be copied stops the migration (the filter switches it off)
+			'stop_on_file_error'		=> apply_filters( 'syncpilot_media_file_error_stops_migration', true ) ? '1' : '0',
 		) );
 
 	}
@@ -1273,6 +1392,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 
 		$nonces['migrate_media'] = wp_create_nonce( 'migrate-media' );
 		$nonces['determine_media_to_migrate'] = wp_create_nonce( 'determine-media-to-migrate' );
+		$nonces['media_preflight']            = wp_create_nonce( 'media-preflight' );
 
 		return $nonces;
 	}

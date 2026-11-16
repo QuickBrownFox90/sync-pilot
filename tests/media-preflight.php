@@ -71,6 +71,39 @@ $unknown = $state; $unknown['uploads_free'] = null; $unknown['temp_free'] = null
 $M->check_media_write( $unknown, $media, array( '2026/10/i.jpg' => 1000000000000 ), 'remote site' );
 $check( 'free space that is not known is not a problem', array() === $errors() );
 
+// 7. before the first table: only the two folders that every file goes through (the files are not known yet)
+$L::clear();
+$p = $M->check_media_folders( $state, 'this site' );
+$check( 'two folders that can be written: no problem, no error', array() === $p && array() === $errors() );
+$entries = $L::entries(); $info = end( $entries );
+$check( 'the check before the tables is in the log at verbose, with the phase', 'Media check before the tables' === $info['message'] && 'preflight' === $info['context']['phase'] && 0 === $info['context']['problems'], json_encode( $info ) );
+
+$L::clear();
+$p = $M->check_media_folders( $bad_state, 'remote site' );
+$e = $errors();
+$check( 'uploads folder and temporary folder that cannot be written: two texts with their codes, one entry each', 2 === count( $p ) && false !== strpos( $p[0], '#215' ) && false !== strpos( $p[1], '#216' ) && array( 215, 216 ) === array_column( $e, 'help' ), json_encode( array_column( $e, 'help' ) ) );
+$check( 'the entries say where and that it was before the tables (site numbers of their own)', 'remote site' === $e[0]['context']['where'] && 'preflight' === $e[0]['context']['phase'] && 3 === $e[0]['site'] && 2 === $e[1]['site'], json_encode( array_column( $e, 'site' ) ) );
+
+$L::clear();
+$M->check_media_folders( array(), 'remote site' );
+$check( 'a state without folders (nothing usable) is a problem, not a crash', 2 === count( $errors() ) );
+
+// 8. a file that cannot be copied stops the migration, unless the filter says otherwise (the browser reads it from the strings)
+$flag = function () use ( $M ) {
+    wp_deregister_script( 'sync-pilot-script' ); wp_register_script( 'sync-pilot-script', false );
+    $M->load_assets();
+    $data = wp_scripts()->get_data( 'sync-pilot-script', 'data' );
+    preg_match( '/"stop_on_file_error":"(\d)"/', (string) $data, $m );
+
+    return $m[1] ?? null;
+};
+$check( 'a file that cannot be copied stops the migration by default (stop_on_file_error 1)', '1' === $flag() );
+add_filter( 'syncpilot_media_file_error_stops_migration', '__return_false' );
+$check( 'the filter syncpilot_media_file_error_stops_migration switches it off (0)', '0' === $flag() );
+remove_all_filters( 'syncpilot_media_file_error_stops_migration' );
+$check( 'and without the filter it is on again', '1' === $flag() );
+wp_deregister_script( 'sync-pilot-script' );
+
 // put it back
 chmod( $base . '/2026/11', 0755 );
 $rm = function ( $dir ) use ( &$rm ) { foreach ( glob( $dir . '/{,.}[!.]*', GLOB_BRACE ) ?: array() as $f ) is_dir( $f ) ? $rm( $f ) : unlink( $f ); @rmdir( $dir ); };

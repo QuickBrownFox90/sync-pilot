@@ -11,8 +11,10 @@
 //   node tests/browser/push.mjs --yes --media --stray  with "remove the media files that the other site does not have": a file that only the
 //                                                      receiving site has must be gone at the end (and only then)
 //   node tests/browser/push.mjs --yes --media --stray --broken
-//                                                      one file cannot be written (a folder is where it goes): the migration ends with
-//                                                      an error, so the stray file must stay and the log says why
+//                                                      one file cannot be written (a link that leads nowhere is where it goes): the
+//                                                      migration stops before the database is replaced, so the stray file must stay
+//   node tests/browser/push.mjs --yes --pull --media --broken
+//                                                      one file cannot be downloaded (its mode on the other site is 000): the same
 //   node tests/browser/push.mjs --yes --media --unwritable
 //                                                      the uploads folder of the receiving site cannot be written: the migration must
 //                                                      stop before the database is replaced and remove its temporary tables
@@ -52,14 +54,17 @@ const verbose   = process.argv.includes( '--verbose' );
 const backup    = process.argv.includes( '--backup' );
 const cancel    = process.argv.includes( '--cancel' );
 const broken    = process.argv.includes( '--broken' );
-const stray     = process.argv.includes( '--stray' ) || broken;
+const stray     = process.argv.includes( '--stray' ) || ( broken && ! process.argv.includes( '--pull' ) );
 const unwritable = process.argv.includes( '--unwritable' );
+
+// both end before the tables are replaced: the media check stops the migration (the folders before the first table, a file that cannot be written after them)
+const stops      = unwritable || broken;
 const strayFile = 'sp-test-stray-remove-me.jpg';
 
 // the removal takes every file that the sending site does not know: in a pull that would be files of the first test site. A push
 // removes them from the second one, which has none besides the file of the test
 if ( stray && pull ) {
-    console.log( '--stray and --broken are for a push: a pull would remove the files of the first test site that the second one does not have.' );
+    console.log( '--stray is for a push: a pull would remove the files of the first test site that the second one does not have.' );
     process.exit( 1 );
 }
 
@@ -195,8 +200,13 @@ if ( stray )
 
 // a link that leads nowhere where a file of the push goes: it is not in the list of the files (its size cannot be read), so the
 // file is sent, and it cannot be written
-if ( brokenDir )
+if ( brokenDir && ! pull )
     wp( receiver, 'symlink( "/nonexistent-sp-test/file", wp_upload_dir()["basedir"] . "/' + brokenDir + '" );' );
+
+// a pull: the file is on the other site and the web server cannot read it, so the download fails (the folder allows to replace the
+// file by a copy that only its owner may read; the original belongs to the web server)
+if ( brokenDir && pull )
+    wp( sender, '$f = wp_upload_dir()["basedir"] . "/' + brokenDir + '"; $c = file_get_contents( $f ); unlink( $f ); file_put_contents( $f, $c ); chmod( $f, 0 );' );
 
 if ( unwritable )
     wp( receiver, 'chmod( wp_upload_dir()["basedir"], 0555 );' );
@@ -365,28 +375,53 @@ try {
             check( 'the migration stops with a message that names the folder (#215)', failed && /#215/.test( text + ' ' + await browser.ev( `jQuery('.progress-text').text()` ) ), text );
 
         else if ( broken )
-            check( 'the migration ends with the message "completed with some errors"', failed && /Fehler|error/i.test( text ), text );
+            check( 'the migration stops with the message that a file could not be written, and that it was stopped before the database was replaced', failed && /Migration angehalten|stopped/i.test( text ) && /move the temp file|Could not download|nicht ersetzt|before the database was replaced|bevor die Datenbank/.test( text + ' ' + await browser.ev( `jQuery('.progress-text').text()` ) ), text );
 
         else
             check( `the ${ pull ? 'pull' : 'push' } runs to the end without an error message`, finished && ! failed, text );
 
-        // with media files the bar starts again at 0 for the files, so it only has to rise within each part
-        check( 'the progress bar moves', widths.some( w => w > 0 && w < 100 ) && ( withMedia || backup || widths.every( ( w, i ) => i === 0 || w >= widths[i - 1] ) ), `${ widths.length } samples, highest ${ Math.max( ...widths ) }%` );
+        // with media files the bar starts again at 0 for the files, so it only has to rise within each part (an unwritable folder stops it before the first table)
+        if ( ! unwritable )
+            check( 'the progress bar moves', widths.some( w => w > 0 && w < 100 ) && ( withMedia || backup || widths.every( ( w, i ) => i === 0 || w >= widths[i - 1] ) ), `${ widths.length } samples, highest ${ Math.max( ...widths ) }%` );
+
         check( 'no error in the page', browser.takeProblems().length === 0, browser.takeProblems().join( ' | ' ) );
 
-        if ( unwritable ) {
+        if ( stops ) {
 
             section( 'the migration was stopped before anything was replaced' );
 
             const left = Object.keys( counts( receiver ) ).filter( t => t.startsWith( '_mig_' ) || t.startsWith( '_old_' ) );
-            const log  = JSON.parse( wp( config.wp, 'echo json_encode( array_map( "json_decode", SyncPilot_Logger::lines() ) );' ) );
+            const all  = JSON.parse( wp( config.wp, 'echo json_encode( array_map( "json_decode", SyncPilot_Logger::lines() ) );' ) );
+
+            // the log also holds the entries of earlier runs (the folder belongs to the web server): only what came after the start of this migration
+            const log  = all.slice( all.map( e => e.message ).lastIndexOf( 'Migration started' ) );
             const stop = log.filter( e => e.message === 'Migration stopped by the media check' ).pop();
             const folder = log.filter( e => 215 === e.help ).pop();
 
             check( 'the marker row of the receiving site is still there (the tables were not replaced)', marked() === '1' );
             check( 'no temporary tables are left on the receiving site', left.length === 0, left.join( ', ' ) );
-            check( 'the log says it: help code 215 with the folder and "Migration stopped by the media check"', stop && folder && 'uploads' === folder.context.folder && false === folder.context.writable, JSON.stringify( folder?.context ) );
-            check( 'it was the site that writes: ' + ( pull ? 'this site' : 'the remote site' ), folder?.context.where === ( pull ? 'this site' : 'remote site' ) );
+
+            if ( unwritable ) {
+
+                const tableRequests = browser.requests.filter( r => /syncpilot_migrate_table/.test( r ) ).length;
+
+                check( 'it was stopped before the first table was sent', 0 === tableRequests, tableRequests + ' requests' );
+                check( 'the check before the tables is in the log (phase preflight)', stop?.context.phase === 'preflight' && folder?.context.phase === 'preflight', JSON.stringify( [ stop?.context, folder?.context.phase ] ) );
+            }
+
+            if ( broken && ! pull ) {
+
+                const strayKept = wp( receiver, 'echo (int) is_file( wp_upload_dir()["basedir"] . "/' + strayFile + '" );' ) === '1';
+
+                check( 'the file that only the receiving site has is still there (nothing is removed)', strayKept );
+                check( 'the tables were sent first (the file is only known after them), not stopped by the check of the folders', browser.requests.some( r => /syncpilot_migrate_table/.test( r ) ) && ! stop );
+            }
+
+            if ( unwritable )
+                check( 'the log says it: help code 215 with the folder and "Migration stopped by the media check"', stop && folder && 'uploads' === folder.context.folder && false === folder.context.writable, JSON.stringify( folder?.context ) );
+
+            if ( unwritable )
+                check( 'it was the site that writes: ' + ( pull ? 'this site' : 'the remote site' ), folder?.context.where === ( pull ? 'this site' : 'remote site' ) );
 
             const end    = log.filter( e => e.message === 'Migration stopped' ).pop();
             const theirs = JSON.parse( wp( config.remoteWp, 'echo json_encode( array_map( "json_decode", SyncPilot_Logger::lines() ) );' ) ).filter( e => e.message === 'Migration stopped' ).pop();
@@ -394,7 +429,7 @@ try {
             check( 'both sites end the migration with "Migration stopped" (not "cancelled")', end?.context.outcome === 'stopped' && theirs?.migration === end.migration, JSON.stringify( [ end?.context, theirs?.context ] ) );
         }
 
-        if ( ! unwritable ) {
+        if ( ! stops ) {
 
             section( 'the other site afterwards' );
 
@@ -578,8 +613,11 @@ try {
     if ( unwritable )
         wp( receiver, 'chmod( wp_upload_dir()["basedir"], ' + uploadsMode + ' );' );
 
-    if ( brokenDir )
+    if ( brokenDir && ! pull )
         wp( receiver, '@unlink( wp_upload_dir()["basedir"] . "/' + brokenDir + '" );' );
+
+    if ( brokenDir && pull )
+        wp( sender, '@chmod( wp_upload_dir()["basedir"] . "/' + brokenDir + '", 0644 );' );
 
     if ( stray )
         wp( receiver, '@unlink( wp_upload_dir()["basedir"] . "/' + strayFile + '" );' );

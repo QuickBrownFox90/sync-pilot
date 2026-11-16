@@ -1689,6 +1689,12 @@ function syncpilot_parse_json( maybe_json ) {
         state.dump_url = data.dump_url;
         state.dump_filename = data.dump_filename;
         state.migration_id = data.migration_id || "";
+        if (media_files_chosen()) {
+          media_preflight(function() {
+            start_tables(table_rows, total_size);
+          });
+          return;
+        }
         start_tables(table_rows, total_size);
       }
     });
@@ -2333,6 +2339,72 @@ var media_successfully_determined;
             $( '.media-files-options' ).hide();
         }
 
+        // the first check of a migration with media files, before the first table is sent: can the site that writes them
+        // write at all? proceed() goes on with the tables; the migration stops (syncpilot_abort) when the answer says so
+        window.media_preflight = function ( proceed ) {
+
+            connection_info = $.trim( $( '.pull-push-connection-info' ).val() ).split( '\n' );
+
+            $( '.progress-text' ).html( syncpilot_mf_strings.checking );
+
+            // a request is under way: Cancel waits for its answer instead of cancelling twice
+            migration_request_running( true );
+
+            $.ajax( {
+                url      : ajaxurl,
+                type     : 'POST',
+                dataType : 'text',
+                cache    : false,
+                data     : {
+                    action : 'syncpilot_mf_media_preflight',
+                    intent : migration_type(),
+                    url    : connection_info[0],
+                    key    : connection_info[1],
+                    nonce  : syncpilot_nonces.media_preflight,
+                },
+                error : function ( jqXHR, textStatus, errorThrown ) {
+
+                    $( '.progress-title' ).html( syncpilot_mf_strings.migration_failed );
+
+                    $( '.progress-text' ).html( syncpilot_mf_strings.error_determining +
+                        ' (#101mf)' + media_firewall_note( jqXHR ) );
+
+                    $( '.progress-text' ).addClass( 'migration-error' );
+                    console.log( jqXHR );
+                    console.log( textStatus );
+                    console.log( errorThrown );
+                    migration_error = true;
+                    migration_complete_events();
+                },
+                success : function ( data ) {
+
+                    migration_request_running( false );
+
+                    var answer = null;
+
+                    try {
+                        answer = JSON.parse( data.trim() );
+                    } catch ( e ) {
+                        answer = null;
+                    }
+
+                    if ( ! answer ) {
+                        migration_failed( data );
+
+                        return;
+                    }
+
+                    if ( answer.syncpilot_abort == 1 ) {
+                        stop_migration( answer.body );
+
+                        return;
+                    }
+
+                    proceed();
+                }
+            } );
+        };
+
         determine_media_to_migrate = function () {
 
             connection_info = $.trim( $( '.pull-push-connection-info' ).val() ).split(
@@ -2429,6 +2501,14 @@ var media_successfully_determined;
             }
 
             if ( typeof data.syncpilot_error != 'undefined' && data.syncpilot_error == 1 ) {
+
+                // the list of the media files could not be made: the same as a file that cannot be copied
+                if ( syncpilot_mf_strings.stop_on_file_error == '1' ) {
+                    stop_migration( data.body + '<br />' + syncpilot_mf_strings.file_failed_stopped );
+
+                    return;
+                }
+
                 non_fatal_errors += data.body;
 
                 next_step_in_migration = {
@@ -2557,6 +2637,14 @@ var media_successfully_determined;
                     }
 
                     if ( typeof data.syncpilot_error != 'undefined' && data.syncpilot_error == 1 ) {
+
+                        // a file that cannot be copied stops the migration: the tables are still in the temporary tables
+                        if ( syncpilot_mf_strings.stop_on_file_error == '1' ) {
+                            stop_migration( data.body + '<br />' + syncpilot_mf_strings.file_failed_stopped );
+
+                            return;
+                        }
+
                         non_fatal_errors += data.body;
                     }
 

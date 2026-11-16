@@ -85,6 +85,7 @@ export function request_problem( jqXHR, textStatus, errorThrown, status_label, r
  * Send the request that starts the migration (an export file is made, or the other site is asked to). Its answer starts the
  * loop over the tables
  * @since   0.2.7
+ * @since   0.3.3  With media files the loop starts after the first check of the folders (media_preflight())
  * @param   {object} table_rows  The number of rows by the name of the table (of the first stage)
  * @param   {number} total_size  The sum of the rows
  */
@@ -127,6 +128,15 @@ export function initiate_migration( table_rows, total_size ) {
             state.dump_url      = data.dump_url;
             state.dump_filename = data.dump_filename;
             state.migration_id  = data.migration_id || '';
+
+            // with media files the site that writes them is looked at before the first table is sent
+            if ( media_files_chosen() ) {
+                media_preflight( function () {
+                    start_tables( table_rows, total_size );
+                } );
+
+                return;
+            }
 
             start_tables( table_rows, total_size );
         }

@@ -1367,3 +1367,15 @@ msgstr "Die Remote-Website hat nicht über WordPress geantwortet (HTTP %s): Eine
 #: class/syncpilot-base.php
 msgid "(#153 - scope: %s)"
 msgstr "(#153 - Bereich: %s)"
+
+#: class/syncpilot-media-files.php
+msgid "The migration was stopped before anything was sent, nothing was changed. Fix the folders, or migrate again without the media files."
+msgstr "Die Migration wurde angehalten, bevor etwas gesendet wurde, es wurde nichts verändert. Behebe das Problem mit den Ordnern oder migriere erneut ohne die Mediendateien."
+
+#: class/syncpilot-media-files.php
+msgid "Checking the folders for the media files, please wait..."
+msgstr "Die Ordner für die Mediendateien werden geprüft, bitte warten..."
+
+#: class/syncpilot-media-files.php
+msgid "The migration was stopped before the database was replaced, nothing was changed in it. Media files that were copied already stay."
+msgstr "Die Migration wurde angehalten, bevor die Datenbank ersetzt wurde, an ihr wurde nichts verändert. Mediendateien, die schon kopiert wurden, bleiben bestehen."

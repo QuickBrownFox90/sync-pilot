@@ -14,7 +14,7 @@ This is a side project maintained by one person in their spare time — not a pr
 
 - **Pull and push** a database between two WordPress installs: a pull replaces the database of this site with the one of a remote site, a push replaces the remote database with this one
 - **Selective sync**: choose which tables are migrated
-- **Media files sync** between installs. Before the first file is written the receiving site is checked (folders that cannot be written, the temporary folder, free space): if a file cannot be written, the migration stops before the database is replaced. Optionally files that do not exist on the other side are removed, **at the very end and only when everything went well**. SyncPilot makes no backup of media files, so removing cannot be undone: use it only when you know you need it
+- **Media files sync** between installs. The site that writes the files is checked twice: before the first table is sent (the uploads folder and the temporary folder can be written) and before the database is replaced (the folder of every file, free space). A problem, or a file that cannot be copied, stops the migration before the database is replaced; files that were copied already stay. Optionally files that do not exist on the other side are removed, **at the very end and only when everything went well**. SyncPilot makes no backup of media files, so removing cannot be undone: use it only when you know you need it
 - **Export** the database as an SQL file, without ssh or phpMyAdmin
 - **Backup** of the database that is replaced, before a pull or a push
 - **Saved profiles** for migrations that are repeated
@@ -66,15 +66,15 @@ The Diagnostics tab shows the diagnostic info of the site and its log, with the 
 
 ## Status
 
-Version 0.3.2 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged (see [changelog.txt](changelog.txt)).
+Version 0.3.3 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged (see [changelog.txt](changelog.txt)).
 
 **What the 0.2.x versions were for.** Mostly groundwork, not new features. The admin script of WP Sync DB was one big file without any test. It is split into small modules and a short start-up script now, built with esbuild, checked with ESLint and covered by browser tests that click through the admin page. That was necessary to maintain the code at all, and to make the project really forkable: the parts can be developed one at a time without touching everything. You still have to understand how they work together, but not all of it at once. Besides that: fixes for PHP 8.2+ and WordPress 6.7, the first security fixes, several fixes found by pulling real sites (media files, cancelling), and one small feature (a find and replace row for http/https).
 
-**What 0.3.x is.** The logging: a failed migration says what went wrong and where, on both sites, without reading server logs. The patches that follow are the first fixes from using it on real sites: telemetry per chunk at the level verbose, the failed database query that was not logged before, the check before the media files are written (it stops the migration before the database is replaced), the removal of media files only at the very end and only when nothing went wrong, and a firewall or a proxy that answers instead of WordPress is named, with the reference numbers of its block page, instead of "check the connection data".
+**What 0.3.x is.** The logging: a failed migration says what went wrong and where, on both sites, without reading server logs. The patches that follow are the first fixes from using it on real sites: telemetry per chunk at the level verbose, the failed database query that was not logged before, the check of the folders for the media files (before the first table is sent and before the database is replaced) and a media file that cannot be copied, both stop the migration before the database is replaced, the removal of media files only at the very end and only when nothing went wrong, and a firewall or a proxy that answers instead of WordPress is named, with the reference numbers of its block page, instead of "check the connection data".
 
 **What is tested.** Pull, push, export, backup, media files, pause, cancel and saved profiles, automatically on two test sites (PHP 8.4) and by hand with pulls from live sites; also the cases that go wrong (an exception, a fatal error, the memory and the time limit, an answer that is cut or empty, a firewall that answers instead of WordPress, folders that cannot be written). Multisite and WP-CLI are not verified yet.
 
-**What comes next.** 0.3.3: the media check before the tables are migrated (so that nothing is started that cannot end) and a migration that stops when a file cannot be copied. 0.4.0: import of a database dump. 0.5.x: the overhaul of the admin page, with the log in boxes per migration, its download and the entries of the other site. Use it only between sites you control and only on a trusted connection.
+**What comes next.** 0.4.0: import of a database dump. 0.5.x: the overhaul of the admin page, with the log in boxes per migration, its download and the entries of the other site. Use it only between sites you control and only on a trusted connection.
 
 ## Development
 
@@ -104,7 +104,7 @@ The tests run on two test installations of WordPress with wp-cli, named in `test
 - `npm run test:browser`: the three views, the dialogs, the settings, an export
 - `npm run test:controls`: pause, resume, cancel, saving and deleting profiles
 - `npm run test:connection`: the connection box and saved profiles
-- `node tests/browser/push.mjs --yes`: a complete push to the second site. Options: `--pull` (the other direction), `--media`, `--backup`, `--cancel` (cancel while it runs), `--full` (all tables), `--verbose` (the log level verbose on both sites; checks the entries of the chunks). `--media --unwritable`, `--media --stray` and `--media --stray --broken` check that the media check stops the migration and that files are removed only at the end, and only when all went well. Both databases are put back from a reference backup before and after.
+- `node tests/browser/push.mjs --yes`: a complete push to the second site. Options: `--pull` (the other direction), `--media`, `--backup`, `--cancel` (cancel while it runs), `--full` (all tables), `--verbose` (the log level verbose on both sites; checks the entries of the chunks). `--media --unwritable`, `--media --stray`, `--media --stray --broken` and `--pull --media --broken` check that the media check and a file that cannot be copied stop the migration and that files are removed only at the end, and only when all went well. Both databases are put back from a reference backup before and after.
 - `npm run test:guard`: an exception, a fatal error, the memory limit and the time limit in a request. It copies a mu-plugin from `tests/fault/` into the test site and removes it again
 - `npm run test:faults`: the other site answers wrongly (a web server error, a firewall, an empty or a cut answer, a closed connection, no answer); a proxy in `tests/fault/` spoils the answers, and the log has to say what happened
 - `php tests/help-codes.php`: the help codes and every place that reports one (no WordPress needed)
