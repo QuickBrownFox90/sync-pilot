@@ -104,6 +104,14 @@ remove_all_filters( 'syncpilot_media_file_error_stops_migration' );
 $check( 'and without the filter it is on again', '1' === $flag() );
 wp_deregister_script( 'sync-pilot-script' );
 
+// 9. the removal of media files leaves the folder of SyncPilot alone (log, backups, exports), whatever the type of a file in it
+mkdir( $base . '/sync-pilot/logs', 0755, true );
+file_put_contents( $base . '/sync-pilot/export.sql.gz', 'x' ); file_put_contents( $base . '/sync-pilot/logs/notes.txt', 'x' ); file_put_contents( $base . '/stray.jpg', 'x' );
+chmod( $base . '/2026/11', 0755 );
+$removal = $M->remove_local_attachments( array() );
+$check( 'a stray media file is removed', ! file_exists( $base . '/stray.jpg' ) && $removal['removed'] >= 1, json_encode( $removal ) );
+$check( 'a gzip export and a text file in the folder sync-pilot stay', file_exists( $base . '/sync-pilot/export.sql.gz' ) && file_exists( $base . '/sync-pilot/logs/notes.txt' ) );
+
 // put it back
 chmod( $base . '/2026/11', 0755 );
 $rm = function ( $dir ) use ( &$rm ) { foreach ( glob( $dir . '/{,.}[!.]*', GLOB_BRACE ) ?: array() as $f ) is_dir( $f ) ? $rm( $f ) : unlink( $f ); @rmdir( $dir ); };

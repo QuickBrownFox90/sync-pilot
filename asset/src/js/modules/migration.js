@@ -3,7 +3,7 @@
 // the finalizing and the end follow as steps (execute_next_step, call_stack), which are still in script.js.
 
 import { state } from './state.js';
-import { choose_tables, draw_table_chunks } from './progress.js';
+import { choose_tables, draw_table_chunks, table_row_count } from './progress.js';
 import { firewall_note } from './helpers.js';
 
 const $ = jQuery;
@@ -374,7 +374,7 @@ function count_progress( row_information ) {
         run.overall_table_progress = 0;
         run.last_progress          = 0;
 
-        run.progress_size += parseInt( run.table_rows[state.tables_to_migrate[run.index]] );
+        run.progress_size += table_row_count( run.table_rows, state.tables_to_migrate[run.index] );
 
         run.index++;
         row_information.current_row  = '';

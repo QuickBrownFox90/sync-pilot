@@ -18,6 +18,7 @@
 //   node tests/browser/push.mjs --yes --media --unwritable
 //                                                      the uploads folder of the receiving site cannot be written: the migration must
 //                                                      stop before the database is replaced and remove its temporary tables
+//   node tests/browser/push.mjs --yes --shot-progress  a picture of the progress box while the tables run (in the folder of the shots)
 //   node tests/browser/push.mjs --yes --pull           the other direction: the second site is pulled into the first one
 //                                                      (it permits pulls for the time of the test); the media files of
 //                                                      the first site are the ones that are taken away and come back
@@ -348,13 +349,20 @@ try {
         await browser.click( '.migrate-db-button', 800 );
 
         const end    = Date.now() + ( full ? 540000 : 150000 );
-        let finished = false, failed = false, text = '';
+        let finished = false, failed = false, text = '', shotDone = false;
 
         while ( Date.now() < end ) {
 
             const s = await browser.ev( `({ done : jQuery('.close-progress-content').is(':visible'), error : jQuery('.progress-text').hasClass('migration-error'), text : jQuery('.progress-title').text().trim() + ' | ' + jQuery('.progress-text').text().trim().slice(0, 100) })` );
 
             text = s.text;
+
+            // --shot-progress: a picture of the box while the tables run (with many tables the bar has to stay readable)
+            if ( process.argv.includes( '--shot-progress' ) && ! shotDone && ! s.done ) {
+                await wait( 1500 );
+                await browser.shot( 'push-progress' );
+                shotDone = true;
+            }
 
             if ( s.error ) { failed = true; break; }
 
@@ -515,6 +523,11 @@ try {
             check( 'the other site wrote "Migration requested by remote site" with the same ID', requested?.migration === id && 'remote' === requested.src, requested?.migration );
             check( 'its entry has the environment of the other site', missing( requested?.context?.environment ).length === 0, missing( requested?.context?.environment ).join( ', ' ) );
             check( 'this site wrote the environment of the other site as well ("Remote site agreed", the same ID)', agreed?.migration === id && missing( agreed?.context?.environment ).length === 0 && agreed.context.environment.php === requested?.context?.environment?.php, agreed?.migration );
+
+            // what the differences say about this site is what the start entry says (a request of the migration changes the time limit of PHP)
+            const diffs = agreed?.context?.differences || {};
+
+            check( 'the differences give the values of this site as the start entry has them', Object.keys( diffs ).every( k => JSON.stringify( diffs[k][0] ) === JSON.stringify( started?.context?.environment?.[k] ) ), JSON.stringify( Object.keys( diffs ).filter( k => JSON.stringify( diffs[k][0] ) !== JSON.stringify( started?.context?.environment?.[k] ) ) ) );
             check( 'no key, no address and no path in the entries of the migration', ! JSON.stringify( [ started, agreed, requested ] ).match( new RegExp( [ key, '/www/', config.site.replace( /^https?:\/\//, '' ), config.remoteSite.replace( /^https?:\/\//, '' ) ].map( t => t.replace( /[.*+?^${}()|[\]\\]/g, '\\$&' ) ).join( '|' ) ) ) );
 
             // the options of the migration are in the start entry, as names and numbers
@@ -534,6 +547,30 @@ try {
             check( 'the other site wrote it too, with the same ID', closedOther?.migration === id && 'remote' === closedOther.src && 'finished' === closedOther.context.outcome, JSON.stringify( closedOther?.context ) );
             check( 'the site that read the tables counts tables, rows and bytes', reading?.context.tables_read > 0 && reading.context.rows_read > 0 && reading.context.bytes_read > 0, JSON.stringify( reading?.context ) );
             check( 'the site that imported them counts chunks, queries and bytes', importing?.context.chunks_imported > 0 && importing.context.queries_run > 0 && importing.context.bytes_imported > 0, JSON.stringify( importing?.context ) );
+
+            // the totals must be the whole migration, not what is left after the tables of the site were replaced (the options table of a
+            // site holds what the site keeps between its requests, and a full migration replaces it): the duration is the time between its
+            // first and its last entry, and the importing site has counted at least what the other site has read
+            const timeBetween = ( list, from, to ) => ( Date.parse( to.t ) - Date.parse( from.t ) ) / 1000;
+            const firstOwn    = pull ? started : requested;
+            const closedHere  = pull ? closedOwn : closedOther;
+            const elapsed     = firstOwn && closedHere ? timeBetween( null, firstOwn, closedHere ) : NaN;
+
+            check( 'the importing site has the duration of the whole migration', Math.abs( elapsed - closedHere?.context.duration_s ) <= 2, `${ closedHere?.context.duration_s } s counted, ${ elapsed } s between its entries` );
+            check( 'and at least as many bytes as the other site has read', importing?.context.bytes_imported >= reading?.context.bytes_read, `${ importing?.context.bytes_imported } imported, ${ reading?.context.bytes_read } read` );
+
+            // the site that controls the migration says how long the parts took (the other site does not see them)
+            const parts = closedOwn?.context;
+
+            check( 'the site that controls the migration has the seconds of the tables and of replacing them, adding up to the duration', Number.isInteger( parts?.tables_s ) && Number.isInteger( parts?.finalize_s ) && parts.tables_s + ( parts.media_s || 0 ) + parts.finalize_s === parts.duration_s, JSON.stringify( parts ) );
+
+            if ( withMedia )
+                check( 'with media files: their seconds, number and size', Number.isInteger( parts?.media_s ) && parts.media_files > 0 && parts.media_bytes > 0, JSON.stringify( parts ) );
+
+            else
+                check( 'without media files: no seconds, no number', ! ( 'media_s' in parts ) && ! ( 'media_files' in parts ), JSON.stringify( parts ) );
+
+            check( 'the other site does not see the parts', ! ( 'tables_s' in ( closedOther?.context || {} ) ) );
             check( 'the totals are numbers and names, no value', ! /INSERT|CREATE|UPDATE/.test( JSON.stringify( [ closedOwn, closedOther ] ) ) );
 
             if ( verbose ) {

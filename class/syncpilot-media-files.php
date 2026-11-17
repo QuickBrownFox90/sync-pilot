@@ -825,11 +825,15 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 	 * Work out which media files the other site lacks (or has in an older version) and how large they are
 	 * @since   0.0.1
 	 * @since   0.3.1  Checks before the files are written whether they can be (check_media_write()) and stops the migration when not (syncpilot_abort); the media files that the other site does not have are no longer removed here, but at the end (remove_media_after_finalize())
+	 * @since   0.3.4  Notes when the media files begin and how many files and bytes there are, for the end entry of the log
 	 */
 	function ajax_determine_media_to_migrate() {
 
 		$this->check_ajax_referer( 'determine-media-to-migrate' );
 		$this->set_time_limit();
+
+		// the moment the media files begin, for the seconds of the parts in the end entry of the log
+		SyncPilot_Logger::tally( array(), false, array( 'media_at' => time() ) );
 
 		$local_attachments   = $this->get_local_attachments();
 		$local_media         = $this->get_local_media();
@@ -879,6 +883,9 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 
 			return $result;
 		}
+
+		// how much there is to copy, for the end entry of the log
+		SyncPilot_Logger::tally( array( 'media_files' => count( $this->files_to_migrate ), 'media_bytes' => array_sum( $this->files_to_migrate ) ) );
 
 		$return['files_to_migrate']   = $this->files_to_migrate;
 		$return['total_size']         = array_sum( $this->files_to_migrate );
@@ -1088,6 +1095,7 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 	 * Remove the local media files that the other site does not have
 	 * @since   0.0.1
 	 * @since   0.3.1  Gives the number of files that were removed and the files that could not be removed (the first 20); it is called at the end of the migration only (remove_media_after_finalize(), respond_to_remove_local_attachments())
+	 * @since   0.3.4  Leaves the folder sync-pilot of the uploads folder alone (the log, the backups and the exports): a file of an allowed type in it, such as an export .sql.gz, was removed with the media files
 	 *
 	 * @param   array $remote_attachments  The attachments of the other site
 	 *
@@ -1109,6 +1117,10 @@ class SyncPilot_Media_Files extends SyncPilot_Base {
 		foreach( $temp_local_media as $local_media_file ) {
 			// don't remove folders
 			if( false === is_file( $upload_dir . $local_media_file ) )
+				continue;
+
+			// the folder of SyncPilot itself (the log, the backups and the exports) is not a media file, whatever its type
+			if ( 0 === strpos( $local_media_file, 'sync-pilot/' ) )
 				continue;
 
 			$filetype = wp_check_filetype( $local_media_file );

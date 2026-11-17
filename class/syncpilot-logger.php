@@ -131,55 +131,158 @@ class SyncPilot_Logger {
 
 	/**
 	 * The totals of a migration on this site are kept between its requests (every request is a run of PHP of its own) in a
-	 * transient named by the ID of the migration. Only numbers and the time of the start; nothing at the level off or without an ID.
+	 * small file next to the log, named by the ID of the migration. Not in the database: a migration replaces the tables
+	 * of the site that receives the data, and with the options table the totals would be gone at the end. If the folder cannot
+	 * be written, a transient keeps them (which a full migration loses). Only numbers and the time of the start; nothing at
+	 * the level off or without an ID.
 	 * @since   0.3.2
+	 * @since   0.3.4  In a file, not in a transient: the options table is replaced by a migration of all tables, and the end of a pull or of a push had only what was counted after that. The parameter $set
 	 *
 	 * @param   array $add   Name => number to add to the total of that name; nothing sets only the time of the start
 	 * @param   bool  $start The migration starts here: the time is noted
+	 * @param   array $set   Name => number that replaces the value of that name (the time a phase began, see close_migration())
 	 */
-	static function tally( $add = array(), $start = false ) {
+	static function tally( $add = array(), $start = false, $set = array() ) {
 
-		if ( '' === self::$migration_id || 'off' === self::level() || ! function_exists( 'get_transient' ) )
+		if ( '' === self::$migration_id || 'off' === self::level() )
 			return;
 
-		$key   = 'syncpilot_tally_' . self::$migration_id;
-		$tally = get_transient( $key );
-		$tally = is_array( $tally ) ? $tally : array();
+		$tally = self::tally_read();
 
-		if ( $start || ! isset( $tally['started'] ) )
+		if ( $start || ! isset( $tally['started'] ) ) {
 			$tally['started'] = time();
+			self::remove_old_tallies();
+		}
 
 		foreach ( $add as $name => $number )
 			$tally[ $name ] = ( $tally[ $name ] ?? 0 ) + (int) $number;
 
-		set_transient( $key, $tally, DAY_IN_SECONDS );
+		foreach ( $set as $name => $number )
+			$tally[ $name ] = (int) $number;
+
+		self::tally_write( $tally );
+	}
+
+	/**
+	 * The file of the totals of this migration
+	 * @since   0.3.4
+	 *
+	 * @return  string|false  The path; false when the folder of the log cannot be written
+	 */
+	protected static function tally_file() {
+
+		$dir = self::dir();
+
+		return $dir ? $dir . DS . 'tally-' . self::$migration_id . '.json' : false;
+	}
+
+	/**
+	 * @since   0.3.4
+	 *
+	 * @return  array  The totals so far, none when there are none
+	 */
+	protected static function tally_read() {
+
+		$file = self::tally_file();
+
+		if ( $file && is_file( $file ) ) {
+
+			$tally = json_decode( (string) @file_get_contents( $file ), true );
+
+			return is_array( $tally ) ? $tally : array();
+		}
+
+		$tally = function_exists( 'get_transient' ) ? get_transient( 'syncpilot_tally_' . self::$migration_id ) : false;
+
+		return is_array( $tally ) ? $tally : array();
+	}
+
+	/**
+	 * @since   0.3.4
+	 *
+	 * @param   array $tally  The totals
+	 */
+	protected static function tally_write( $tally ) {
+
+		$file = self::tally_file();
+
+		if ( $file && false !== @file_put_contents( $file, wp_json_encode( $tally ), LOCK_EX ) )
+			return;
+
+		if ( function_exists( 'set_transient' ) )
+			set_transient( 'syncpilot_tally_' . self::$migration_id, $tally, DAY_IN_SECONDS );
+	}
+
+	/**
+	 * The totals of a migration that never ended (the browser was closed) stay for a week, for whoever looks for the reason
+	 * @since   0.3.4
+	 */
+	protected static function remove_old_tallies() {
+
+		$dir = self::dir();
+
+		if ( ! $dir )
+			return;
+
+		foreach ( (array) glob( $dir . DS . 'tally-*.json' ) as $file ) {
+			if ( filemtime( $file ) < time() - WEEK_IN_SECONDS )
+				@unlink( $file );
+		}
 	}
 
 	/**
 	 * The end of a migration on this site, with the totals that this site has seen: how long it took, tables, rows and
-	 * bytes that it read or imported. Written at the levels errors and verbose; the totals are removed.
+	 * bytes that it read or imported. The site that controls the migration also says how long each part took: the tables
+	 * (`tables_s`, with the backup), the media files (`media_s`) and the replacing of the tables (`finalize_s`); the other site
+	 * does not see the parts. Written at the levels errors and verbose; the totals are removed.
 	 * @since   0.3.2
+	 * @since   0.3.4  The totals are read from their file (see tally()). The seconds of the parts of the migration
 	 *
-	 * @param   string $outcome  finished, cancelled or stopped
+	 * @param   string $outcome  finished, cancelled, stopped or failed
 	 * @param   array  $context  More facts, see clean()
 	 */
 	static function close_migration( $outcome, $context = array() ) {
 
-		if ( '' === self::$migration_id || 'off' === self::level() || ! function_exists( 'get_transient' ) )
+		if ( '' === self::$migration_id || 'off' === self::level() )
 			return;
 
-		$key   = 'syncpilot_tally_' . self::$migration_id;
-		$tally = get_transient( $key );
-		$tally = is_array( $tally ) ? $tally : array();
+		$tally = self::tally_read();
 		$start = $tally['started'] ?? null;
+		$file  = self::tally_file();
+		$now   = time();
 
-		unset( $tally['started'] );
-		delete_transient( $key );
+		// the moments the parts began are not totals
+		$media    = $tally['media_at'] ?? null;
+		$finalize = $tally['finalize_at'] ?? null;
+
+		unset( $tally['started'], $tally['media_at'], $tally['finalize_at'] );
+
+		if ( $file )
+			@unlink( $file );
+
+		if ( function_exists( 'delete_transient' ) )
+			delete_transient( 'syncpilot_tally_' . self::$migration_id );
 
 		$facts = array( 'outcome' => $outcome );
 
-		if ( null !== $start )
-			$facts['duration_s'] = max( 0, time() - (int) $start );
+		if ( null !== $start ) {
+
+			$facts['duration_s'] = max( 0, $now - (int) $start );
+
+			// the tables end where the media files begin, or where the tables are replaced, or where the migration ends
+			if ( null !== $media || null !== $finalize ) {
+
+				$tables_end = $media ?? $finalize;
+
+				$facts['tables_s'] = max( 0, (int) $tables_end - (int) $start );
+
+				if ( null !== $media )
+					$facts['media_s'] = max( 0, (int) ( $finalize ?? $now ) - (int) $media );
+
+				if ( null !== $finalize )
+					$facts['finalize_s'] = max( 0, $now - (int) $finalize );
+			}
+		}
 
 		self::event( 'finished' === $outcome ? 'Migration finished' : 'Migration ' . $outcome, $facts + $tally + $context );
 	}

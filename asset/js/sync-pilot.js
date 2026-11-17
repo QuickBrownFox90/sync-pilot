@@ -997,14 +997,18 @@ function syncpilot_parse_json( maybe_json ) {
     }
     return table_rows;
   }
+  function table_row_count(table_rows, table) {
+    var rows = parseInt(table_rows[table], 10);
+    return isNaN(rows) ? 1 : rows;
+  }
   function draw_table_chunks(tables_to_migrate, table_rows) {
     var total_size = 0;
     $13.each(tables_to_migrate, function(index, value) {
-      total_size += parseInt(table_rows[value]);
+      total_size += table_row_count(table_rows, value);
     });
     var last_element = "";
     $13.each(tables_to_migrate, function(index, value) {
-      var percent2 = table_rows[value] / total_size * 100;
+      var percent2 = table_row_count(table_rows, value) / total_size * 100;
       var percent_rounded2 = Math.round(percent2 * 1e3) / 1e3;
       $13(".progress-tables").append('<div class="progress-chunk ' + value + '_chunk" style="width: ' + percent_rounded2 + '%;" title="' + value + '"><span>' + value + "</span></div>");
       $13(".progress-tables-hover-boxes").append(
@@ -1019,8 +1023,8 @@ function syncpilot_parse_json( maybe_json ) {
       if ($13(this).width() < 1 && tables_to_migrate[index] != last_element) {
         $13(this).hide();
         $13(".progress-chunk-hover[data-table=" + tables_to_migrate[index] + "]").hide();
-        table_rows[last_element] = Number(table_rows[last_element]);
-        table_rows[last_element] += Number(table_rows[tables_to_migrate[index]]);
+        table_rows[last_element] = table_row_count(table_rows, last_element);
+        table_rows[last_element] += table_row_count(table_rows, tables_to_migrate[index]);
         table_rows[tables_to_migrate[index]] = 0;
       }
       var element = this;
@@ -1035,8 +1039,8 @@ function syncpilot_parse_json( maybe_json ) {
     });
     $13(".progress-content").css(box_style);
     var percent_rounded = 0;
-    if (table_rows[last_element] != 0) {
-      var percent = table_rows[last_element] / total_size * 100;
+    if (table_row_count(table_rows, last_element) != 0) {
+      var percent = table_row_count(table_rows, last_element) / total_size * 100;
       percent_rounded = Math.round(percent * 1e3) / 1e3;
     }
     $13(".progress-tables .progress-chunk:last").css(
@@ -1829,7 +1833,7 @@ function syncpilot_parse_json( maybe_json ) {
       run.progress_size -= run.overall_table_progress;
       run.overall_table_progress = 0;
       run.last_progress = 0;
-      run.progress_size += parseInt(run.table_rows[state.tables_to_migrate[run.index]]);
+      run.progress_size += table_row_count(run.table_rows, state.tables_to_migrate[run.index]);
       run.index++;
       row_information.current_row = "";
       row_information.primary_keys = "";

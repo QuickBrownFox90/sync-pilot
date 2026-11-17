@@ -69,6 +69,22 @@ export function choose_tables( stage ) {
 }
 
 /**
+ * The number of rows of a table for the progress; a table that has no number (or none that is a number) counts as 1, like
+ * a table without rows, so that the percent can never become NaN. 0 stays 0: the rows of a block that is too narrow to be
+ * seen are added to the last table, and its own number is set to 0
+ * @since   0.3.4
+ * @param   {object} table_rows  The number of rows by the name of the table
+ * @param   {string} table       The name of the table
+ * @return  {number}
+ */
+export function table_row_count( table_rows, table ) {
+
+    var rows = parseInt( table_rows[table], 10 );
+
+    return isNaN( rows ) ? 1 : rows;
+}
+
+/**
  * Draw one block in the bar for each table, as wide as its share of the rows, and the boxes that show the name when the
  * mouse is over it. Blocks narrower than 1px are hidden and their rows are added to the last table
  * @since   0.2.6
@@ -81,14 +97,14 @@ export function draw_table_chunks( tables_to_migrate, table_rows ) {
     var total_size = 0;
 
     $.each( tables_to_migrate, function ( index, value ) {
-        total_size += parseInt( table_rows[value] );
+        total_size += table_row_count( table_rows, value );
     } );
 
     var last_element = '';
 
     $.each( tables_to_migrate, function ( index, value ) {
 
-        var percent         = table_rows[value] / total_size * 100;
+        var percent         = table_row_count( table_rows, value ) / total_size * 100;
         var percent_rounded = Math.round( percent * 1000 ) / 1000;
 
         $( '.progress-tables' ).append( '<div class="progress-chunk ' +
@@ -122,10 +138,9 @@ export function draw_table_chunks( tables_to_migrate, table_rows ) {
             $( '.progress-chunk-hover[data-table=' + tables_to_migrate[
                 index] + ']' ).hide();
 
-            table_rows[last_element] = Number( table_rows[last_element] );
+            table_rows[last_element] = table_row_count( table_rows, last_element );
 
-            table_rows[last_element] += Number( table_rows[
-                tables_to_migrate[index]] );
+            table_rows[last_element] += table_row_count( table_rows, tables_to_migrate[index] );
 
             table_rows[tables_to_migrate[index]] = 0;
         }
@@ -147,8 +162,8 @@ export function draw_table_chunks( tables_to_migrate, table_rows ) {
 
     var percent_rounded = 0;
 
-    if ( table_rows[last_element] != 0 ) {
-        var percent = table_rows[last_element] / total_size * 100;
+    if ( table_row_count( table_rows, last_element ) != 0 ) {
+        var percent = table_row_count( table_rows, last_element ) / total_size * 100;
 
         percent_rounded = Math.round( percent * 1000 ) / 1000;
     }

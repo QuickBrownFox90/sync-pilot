@@ -100,7 +100,7 @@ $L::tally( array( 'chunks_read' => 1, 'rows_read' => 5 ) );
 $L::close_migration( 'finished', array( 'intent' => 'push' ) );
 $e = $last();
 $check( 'the end is an event with the totals of all requests and the duration', 'Migration finished' === $e['message'] && 'event' === $e['level'] && 2 === $e['context']['chunks_read'] && 15 === $e['context']['rows_read'] && isset( $e['context']['duration_s'] ) && 'finished' === $e['context']['outcome'], wp_json_encode( $e['context'] ) );
-$check( 'the totals are gone afterwards', false === get_transient( 'syncpilot_tally_test-totals-1' ) );
+$check( 'the totals are gone afterwards', false === get_transient( 'syncpilot_tally_test-totals-1' ) && array() === glob( $L::dir() . '/tally-test-totals-1.json' ) );
 $L::close_migration( 'cancelled' );
 $check( 'cancelled and stopped have their own message', 'Migration cancelled' === $last()['message'] );
 $n = count( $L::lines() );
@@ -110,8 +110,40 @@ $check( 'without an ID of a migration nothing is written', $n === count( $L::lin
 $L::set_migration_id( 'test-totals-2' );
 update_option( 'syncpilot_settings', array_merge( (array) $settings_before, array( 'log_level' => 'off' ) ) );
 $L::tally( array( 'chunks_read' => 1 ) );
-$check( 'at the level off nothing is kept', false === get_transient( 'syncpilot_tally_test-totals-2' ) );
+$check( 'at the level off nothing is kept', false === get_transient( 'syncpilot_tally_test-totals-2' ) && array() === glob( $L::dir() . '/tally-test-totals-2.json' ) );
 update_option( 'syncpilot_settings', $settings_before );
+$L::set_migration_id( '' );
+
+echo "\n-- the parts of a migration in the end entry\n";
+$L::clear();
+$now = time();
+$L::set_migration_id( 'test-phases-1' );
+$L::tally( array(), true, array( 'started' => $now - 100 ) );
+$L::tally( array( 'media_files' => 12, 'media_bytes' => 3400 ), false, array( 'media_at' => $now - 60, 'finalize_at' => $now - 10 ) );
+$L::close_migration( 'finished' );
+$c = $last()['context'];
+$check( 'tables, media files and replacing the tables have their seconds, and they add up to the duration', 40 === $c['tables_s'] && 50 === $c['media_s'] && 10 === $c['finalize_s'] && $c['tables_s'] + $c['media_s'] + $c['finalize_s'] === $c['duration_s'], wp_json_encode( $c ) );
+$check( 'the media files have their number and size, the moments of the parts are not in the entry', 12 === $c['media_files'] && 3400 === $c['media_bytes'] && ! isset( $c['media_at'] ) && ! isset( $c['finalize_at'] ) && ! isset( $c['started'] ), wp_json_encode( $c ) );
+
+$L::set_migration_id( 'test-phases-2' );
+$L::tally( array(), true, array( 'started' => $now - 30 ) );
+$L::tally( array(), false, array( 'finalize_at' => $now - 5 ) );
+$L::close_migration( 'finished' );
+$c = $last()['context'];
+$check( 'without media files: the tables and the replacing only', 25 === $c['tables_s'] && 5 === $c['finalize_s'] && ! isset( $c['media_s'] ), wp_json_encode( $c ) );
+
+$L::set_migration_id( 'test-phases-3' );
+$L::tally( array( 'chunks_read' => 1 ), true, array( 'started' => $now - 20 ) );
+$L::close_migration( 'cancelled' );
+$c = $last()['context'];
+$check( 'a migration that ends during the tables has no parts, only the duration', 20 === $c['duration_s'] && ! isset( $c['tables_s'] ) && ! isset( $c['media_s'] ) && ! isset( $c['finalize_s'] ), wp_json_encode( $c ) );
+
+$L::set_migration_id( 'test-phases-4' );
+$L::tally( array(), true, array( 'started' => $now - 90 ) );
+$L::tally( array(), false, array( 'media_at' => $now - 40 ) );
+$L::close_migration( 'stopped' );
+$c = $last()['context'];
+$check( 'a migration that stops during the media files: the media seconds run to its end', 50 === $c['tables_s'] && 40 === $c['media_s'] && ! isset( $c['finalize_s'] ), wp_json_encode( $c ) );
 $L::set_migration_id( '' );
 
 echo "\n-- the environments of two sites are compared\n";

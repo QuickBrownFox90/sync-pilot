@@ -731,12 +731,16 @@ class SyncPilot extends SyncPilot_Base {
 	 * @since   0.0.1
 	 * @since   0.3.1  Two actions around it: syncpilot_before_finalize_migration, and syncpilot_migration_finalized when the tables were replaced (the media files that the other site does not have are removed there)
 	 * @since   0.3.2  The end of the migration is written to the log of both sites (close_migration())
+	 * @since   0.3.4  Notes the moment it begins for the seconds of the parts of the migration in that entry
 	 */
 	function ajax_finalize_migration() {
 
 		$this->check_ajax_referer( 'finalize-migration' );
 
 		global $wpdb;
+
+		// the moment the tables are replaced, for the seconds of the parts in the end entry of the log
+		SyncPilot_Logger::tally( array(), false, array( 'finalize_at' => time() ) );
 
 		do_action( 'syncpilot_before_finalize_migration' );
 
@@ -1415,6 +1419,7 @@ class SyncPilot extends SyncPilot_Base {
 	 * Start a migration: check the connection data, ask the other site to agree and set up the dump
 	 * @since   0.0.1
 	 * @since   0.3.2  "Remote site agreed" has what is different on the two sites (differences)
+	 * @since   0.3.4  The environment of this site is taken once, before the requests to the other site: the time limit in "differences" was 0 (the request sets it) and not the limit of the site
 	 * @since   0.3.0  An answer of the other site that cannot be read is logged (RemoteAnswerUnreadable, site 1). Makes the ID of the migration and writes it with the environment of this site (event "Migration started") and of the other site (event "Remote site agreed"); the browser gets the ID as migration_id
 	 * @since   0.3.2  "Migration started" has the options of the migration (scope, see describe_migration_scope())
 	 */
@@ -1427,11 +1432,15 @@ class SyncPilot extends SyncPilot_Base {
 		// the ID that both sites write in their logs, from here to the end of the migration
 		SyncPilot_Logger::set_migration_id( SyncPilot_Logger::new_migration_id() );
 		SyncPilot_Logger::tally( array(), true );
+
+		// taken once, before the requests to the other site: set_time_limit() changes the time limit that is read from PHP
+		$environment = SyncPilot_Logger::environment();
+
 		SyncPilot_Logger::event( 'Migration started', array(
 			'intent'      => $_POST['intent'],
 			'stage'       => $_POST['stage'] ?? '',
 			'scope'       => $this->describe_migration_scope( $this->form_data ),
-			'environment' => SyncPilot_Logger::environment(),
+			'environment' => $environment,
 		) );
 
 		if ( $_POST['intent'] == 'savefile' ) {
@@ -1514,7 +1523,7 @@ class SyncPilot extends SyncPilot_Base {
 			// what the other site says about itself is for the log, not for the browser
 			SyncPilot_Logger::event( 'Remote site agreed', array(
 				'environment' => $return['environment'] ?? null,
-				'differences' => SyncPilot_Logger::environment_differences( SyncPilot_Logger::environment(), $return['environment'] ?? null ),
+				'differences' => SyncPilot_Logger::environment_differences( $environment, $return['environment'] ?? null ),
 			) );
 			unset( $return['environment'] );
 
@@ -1911,15 +1920,23 @@ class SyncPilot extends SyncPilot_Base {
 		return $this->settings['profiles'][$profile_id];
 	}
 
+	/**
+	 * The number of rows of every table of the database, by the name of the table. A table without a row counts as 1 (the
+	 * progress of the migration is worked out from these numbers).
+	 * @since   0.0.1
+	 * @since   0.3.4  The columns have names of their own: MySQL 8 gives the columns of INFORMATION_SCHEMA in capitals (TABLE_NAME), so $result['table_name'] was not there, no table had a number and the progress was NaN%
+	 *
+	 * @return  array  name of the table => number of rows
+	 */
 	function get_table_row_count() {
 
 		global $wpdb;
 
-		$results = $wpdb->get_results( $wpdb->prepare( 'SELECT table_name, TABLE_ROWS FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = %s', DB_NAME ), ARRAY_A );
+		$results = $wpdb->get_results( $wpdb->prepare( 'SELECT TABLE_NAME AS "name", TABLE_ROWS AS "row_count" FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = %s', DB_NAME ), ARRAY_A );
 		$return  = array();
 
-		foreach( $results as $results )
-			$return[$results['table_name']] = ( $results['TABLE_ROWS'] == 0 ? 1 : $results['TABLE_ROWS'] );
+		foreach ( $results as $result )
+			$return[ $result['name'] ] = ( (int) $result['row_count'] === 0 ? 1 : $result['row_count'] );
 
 		return $return;
 	}
