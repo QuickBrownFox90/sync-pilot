@@ -49,6 +49,7 @@
 
 <script type='text/javascript'>
 	var syncpilot_default_profile = <?php echo ( $is_default_profile ? 'true' : 'false' ); ?>;
+	var syncpilot_loaded_import_file = <?php echo json_encode( (string) ( $loaded_profile['import_file'] ?? '' ) ); ?>;
 	<?php if( isset( $loaded_profile['select_tables'] ) && ! empty( $loaded_profile['select_tables'] ) ) : ?>
 		var syncpilot_loaded_tables = <?php echo json_encode( $loaded_profile['select_tables'] ); ?>;
 	<?php endif; ?>
@@ -72,6 +73,33 @@
 
 		<div class="option-section">
 			<ul class="option-group migrate-selection">
+				<li class="pull-list">
+					<label for="pull">
+					<input id="pull" type="radio" value="pull" name="action"<?php echo ( $loaded_profile['action'] == 'pull' ? ' checked="checked"' : ''  ); ?> />
+					<?php _e( 'Pull', self::TEXT_DOMAIN ); ?><span class="option-description"><?php _e( 'Replace this site\'s db with remote db', self::TEXT_DOMAIN ); ?></span>
+					</label>
+					<ul>
+						<li></li>
+					</ul>
+				</li>
+				<li class="push-list">
+					<label for="push">
+					<input id="push" type="radio" value="push" name="action"<?php echo ( $loaded_profile['action'] == 'push' ? ' checked="checked"' : ''  ); ?> />
+					<?php _e( 'Push', self::TEXT_DOMAIN ); ?><span class="option-description"><?php _e( 'Replace remote db with this site\'s db', self::TEXT_DOMAIN ); ?></span>
+					</label>
+					<ul>
+						<li></li>
+					</ul>
+				</li>
+				<li class="import-list">
+					<label for="import">
+					<input id="import" type="radio" value="import" name="action"<?php echo ( $loaded_profile['action'] == 'import' ? ' checked="checked"' : ''  ); ?> />
+					<?php _e( 'Import', self::TEXT_DOMAIN ); ?><span class="option-description"><?php _e( 'Replace this site\'s db with a dump file', self::TEXT_DOMAIN ); ?></span>
+					</label>
+					<ul>
+						<li></li>
+					</ul>
+				</li>
 				<li>
 					<label for="savefile">
 					<input id="savefile" type="radio" value="savefile" name="action"<?php echo ( $loaded_profile['action'] == 'savefile' ? ' checked="checked"' : ''  ); ?> />
@@ -94,24 +122,6 @@
 						<?php endif; ?>
 					</ul>
 				</li>
-				<li class="pull-list">
-					<label for="pull">
-					<input id="pull" type="radio" value="pull" name="action"<?php echo ( $loaded_profile['action'] == 'pull' ? ' checked="checked"' : ''  ); ?> />
-					<?php _e( 'Pull', self::TEXT_DOMAIN ); ?><span class="option-description"><?php _e( 'Replace this site\'s db with remote db', self::TEXT_DOMAIN ); ?></span>
-					</label>
-					<ul>
-						<li></li>
-					</ul>
-				</li>
-				<li class="push-list">
-					<label for="push">
-					<input id="push" type="radio" value="push" name="action"<?php echo ( $loaded_profile['action'] == 'push' ? ' checked="checked"' : ''  ); ?> />
-					<?php _e( 'Push', self::TEXT_DOMAIN ); ?><span class="option-description"><?php _e( 'Replace remote db with this site\'s db', self::TEXT_DOMAIN ); ?></span>
-					</label>
-					<ul>
-						<li></li>
-					</ul>
-				</li>
 			</ul>
 
 			<div class="connection-info-wrapper clearfix">
@@ -131,6 +141,30 @@
 					<input type="password" name="auth_password" class="auth-password auth-credentials" placeholder="<?php esc_attr_e( 'Password', self::TEXT_DOMAIN ); ?>" autocomplete="off" />
 				</div>
 				<input class="button connect-button" type="submit" value="<?php esc_attr_e( 'Connect', self::TEXT_DOMAIN ); ?>" name="Connect" autocomplete="off" />
+			</div>
+
+			<div class="import-file-wrapper clearfix">
+				<div class="field-heading">
+					<label class="field-title import-file-title"><?php _e( 'Dump file', self::TEXT_DOMAIN ); ?></label>
+					<a href="#" class="general-helper import-file-helper js-action-link"></a>
+
+					<div class="import-file-info helper-message">
+						<p><?php _e( 'The dump (.sql or .sql.gz) replaces the tables of this site that it holds. It is checked completely before anything is changed, and the tables are replaced at the end, like after a pull.', self::TEXT_DOMAIN ); ?></p>
+						<p><?php _e( 'Put the file into the folder shown here (SFTP, or a copy on a local site) and refresh the list.', self::TEXT_DOMAIN ); ?></p>
+					</div>
+				</div>
+				<p class="import-folder"><?php _e( 'Folder', self::TEXT_DOMAIN ); ?>: <code class="import-folder-path"></code> <a href="#" class="js-action-link import-refresh"><?php _e( 'Refresh the list', self::TEXT_DOMAIN ); ?></a></p>
+				<p class="import-folder-note inline-message warning" style="display: none;"></p>
+				<ul class="import-files"></ul>
+				<p class="import-no-files"></p>
+				<label for="import-other-prefix" class="import-other-prefix">
+					<input id="import-other-prefix" type="checkbox" value="1" name="import_other_prefix"<?php $this->maybe_checked( $loaded_profile['import_other_prefix'] ); ?> />
+					<?php printf( __( 'The tables of the dump may have another prefix than "%s" (this site ignores them until its prefix is changed in wp-config.php)', self::TEXT_DOMAIN ), esc_html( $wpdb->base_prefix ) ); ?>
+				</label>
+				<label for="import-strict-collations" class="import-other-prefix">
+					<input id="import-strict-collations" type="checkbox" value="1" name="import_strict_collations"<?php $this->maybe_checked( $loaded_profile['import_strict_collations'] ); ?> />
+					<?php _e( 'Stop when the dump has a collation that this database does not know (otherwise a similar one is used, for example utf8mb4_unicode_520_ci for utf8mb4_uca1400_ai_ci)', self::TEXT_DOMAIN ); ?>
+				</label>
 			</div>
 
 			<div class="notification-message warning-notice ssl-notice inline-message">
@@ -169,6 +203,8 @@
 					<div class="option-heading find-heading"><?php _e( 'Find', self::TEXT_DOMAIN ); ?></div>
 					<div class="option-heading replace-heading"><?php _e( 'Replace', self::TEXT_DOMAIN ); ?></div>
 				</div>
+
+				<p class="import-replace-hint option-description"><?php _e( 'Old: the address and the file path as they are in the dump. New: this site.', self::TEXT_DOMAIN ); ?></p>
 
 				<p class="no-replaces-message"><?php _e( 'Doesn\'t look we have any replaces yet, <a href="#" class="js-action-link add-replace">add one?</a>', self::TEXT_DOMAIN ); ?></p>
 
@@ -254,7 +290,7 @@
 
 			</div>
 
-			<div class="option-section">
+			<div class="option-section hide-for-import">
 				<?php $tables = $this->get_table_sizes(); ?>
 				<div class="header-expand-collapse clearfix">
 					<div class="expand-collapse-arrow collapsed">&#x25BC;</div>
@@ -300,7 +336,7 @@
 				</div>
 			</div>
 
-			<div class="option-section" style="display: block;">
+			<div class="option-section hide-for-import" style="display: block;">
 				<label for="exclude-post-types" class="exclude-post-types-checkbox checkbox-label">
 				<input type="checkbox" id="exclude-post-types" value="1" autocomplete="off" name="exclude_post_types"<?php $this->maybe_checked( $loaded_profile['exclude_post_types'] ); ?> />
 				<?php _e( 'Exclude Post Types', self::TEXT_DOMAIN ); ?>
@@ -349,7 +385,7 @@
 								<?php printf( __( 'Although the <a href="%s" target="_blank">WordPress Codex emphasizes</a> that GUIDs should not be changed, this is limited to sites that are already live. If the site has never been live, I recommend replacing the GUIDs. For example, you may be developing a new site locally at dev.somedomain.com and want to migrate the site live to somedomain.com.', self::TEXT_DOMAIN ), 'http://codex.wordpress.org/Changing_The_Site_URL#Important_GUID_Note' ); ?>
 							</div>
 						</li>
-						<li>
+						<li class="hide-for-import">
 							<label for="exclude-spam">
 							<input id="exclude-spam" type="checkbox" autocomplete="off" value="1" name="exclude_spam"<?php $this->maybe_checked( $loaded_profile['exclude_spam'] ); ?> />
 							<?php _e( 'Exclude spam comments', self::TEXT_DOMAIN ); ?>
@@ -361,7 +397,7 @@
 							<?php _e( 'Do not migrate the \'active_plugins\' setting (i.e. which plugins are activated/deactivated)', self::TEXT_DOMAIN ); ?>
 							</label>
 						</li>
-						<li>
+						<li class="hide-for-import">
 							<label for="exclude-transients">
 							<input id="exclude-transients" type="checkbox" value="1" autocomplete="off" name="exclude_transients"<?php $this->maybe_checked( $loaded_profile['exclude_transients'] ); ?> />
 							<?php printf( __( 'Exclude <a href="%s" target="_blank">transients</a> (temporary cached data)', self::TEXT_DOMAIN ), esc_url( 'https://codex.wordpress.org/Transients_API' ) ); ?>
@@ -379,7 +415,7 @@
 					<span class="option-description backup-description"><?php _e( 'An SQL file will be saved to', self::TEXT_DOMAIN ); ?> <span class="uploads-dir"><?php echo $this->get_short_uploads_dir(); ?></span></span>
 				</label>
 
-				<div class="indent-wrap expandable-content">
+				<div class="indent-wrap expandable-content backup-tables-options">
 					<ul>
 						<li>
 							<label for="backup-only-with-prefix">

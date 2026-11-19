@@ -1379,3 +1379,171 @@ msgstr "Die Ordner für die Mediendateien werden geprüft, bitte warten..."
 #: class/syncpilot-media-files.php
 msgid "The migration was stopped before the database was replaced, nothing was changed in it. Media files that were copied already stay."
 msgstr "Die Migration wurde angehalten, bevor die Datenbank ersetzt wurde, an ihr wurde nichts verändert. Mediendateien, die schon kopiert wurden, bleiben bestehen."
+
+#: template/migrate.php
+msgid "Import"
+msgstr "Import"
+
+#: class/syncpilot.php
+msgid "Replace this site's db with a dump file"
+msgstr "Datenbank dieser Website durch eine Dump-Datei ersetzen"
+
+#: template/migrate.php
+msgid "Dump file"
+msgstr "Dump-Datei"
+
+#: template/migrate.php
+msgid "The dump (.sql or .sql.gz) replaces the tables of this site that it holds. It is checked completely before anything is changed, and the tables are replaced at the end, like after a pull."
+msgstr "Der Dump (.sql oder .sql.gz) ersetzt die Tabellen dieser Website, die er enthält. Er wird vollständig geprüft, bevor etwas verändert wird, und die Tabellen werden am Ende ersetzt, wie nach einem Pull."
+
+#: template/migrate.php
+msgid "Put the file into the folder shown here (SFTP, or a copy on a local site) and refresh the list."
+msgstr "Lege die Datei in den hier gezeigten Ordner (SFTP oder eine Kopie auf einer lokalen Website) und aktualisiere die Liste."
+
+#: template/migrate.php
+msgid "Folder"
+msgstr "Ordner"
+
+#: template/migrate.php
+msgid "Refresh the list"
+msgstr "Liste aktualisieren"
+
+#: template/migrate.php
+msgid "The tables of the dump may have another prefix than \"%s\" (this site ignores them until its prefix is changed in wp-config.php)"
+msgstr "Die Tabellen des Dumps dürfen einen anderen Präfix als \"%s\" haben (diese Website ignoriert sie, bis ihr Präfix in der wp-config.php geändert wird)"
+
+#: template/migrate.php
+msgid "Old: the address and the file path as they are in the dump. New: this site."
+msgstr "Alt: die Adresse und der Dateipfad, wie sie im Dump stehen. Neu: diese Website."
+
+#: class/syncpilot.php
+msgid "Please choose a dump file to import."
+msgstr "Bitte wähle eine Dump-Datei zum Importieren."
+
+#: class/syncpilot.php
+msgid "Import complete"
+msgstr "Import abgeschlossen"
+
+#: class/syncpilot.php
+msgid "Importing, please wait..."
+msgstr "Import läuft, bitte warten..."
+
+#: class/syncpilot.php
+msgid "Unpacking the dump"
+msgstr "Dump wird entpackt"
+
+#: class/syncpilot.php
+msgid "Checking the dump"
+msgstr "Dump wird geprüft"
+
+#: class/syncpilot.php
+msgid "Loading the dump"
+msgstr "Dump wird geladen"
+
+#: class/syncpilot.php
+msgid "Replacing values"
+msgstr "Werte werden ersetzt"
+
+#: template/migrate.php
+msgid "tables"
+msgstr "Tabellen"
+
+#: class/syncpilot.php
+msgid "There is no dump in the folder yet. Put a .sql or .sql.gz file there (SFTP, a local copy) and refresh the list."
+msgstr "Im Ordner liegt noch kein Dump. Lege eine .sql- oder .sql.gz-Datei dort ab (SFTP, eine lokale Kopie) und aktualisiere die Liste."
+
+#: class/syncpilot.php
+msgid "The folder cannot be written, a dump can only be read from it."
+msgstr "Der Ordner ist nicht beschreibbar, aus ihm kann nur ein Dump gelesen werden."
+
+#: class/syncpilot.php
+msgid "The list of the dumps could not be read."
+msgstr "Die Liste der Dumps konnte nicht gelesen werden."
+
+#: class/syncpilot.php
+msgid "the name is not accepted (letters, digits, space and . _ ( ) - only)"
+msgstr "der Name wird nicht akzeptiert (nur Buchstaben, Ziffern, Leerzeichen und . _ ( ) -)"
+
+#: class/syncpilot.php
+msgid "not a .sql or .sql.gz file"
+msgstr "keine .sql- oder .sql.gz-Datei"
+
+#: class/syncpilot.php
+msgid "a link, not read"
+msgstr "ein Link, wird nicht gelesen"
+
+#: class/syncpilot-import.php
+msgid "cannot be read"
+msgstr "kann nicht gelesen werden"
+
+#: template/migrate.php
+msgid "empty"
+msgstr "leer"
+
+#: class/syncpilot.php
+msgid "Removing the temporary tables of the import"
+msgstr "Die temporären Tabellen des Imports werden entfernt"
+
+#: class/syncpilot-import.php
+msgid "This file is not a dump in the folder for dumps. (#301)"
+msgstr "Diese Datei ist kein Dump im Ordner für Dumps. (#301)"
+
+#: class/syncpilot-import.php
+msgid "The import cannot go on: what it knows about the file is gone. Start it again. (#306)"
+msgstr "Der Import kann nicht weitergehen: sein Stand zur Datei ist verloren. Starte ihn erneut. (#306)"
+
+#: class/syncpilot-import.php
+msgid "The dump has a statement that is not allowed: %1$s (%2$s). Nothing was changed. (#302)"
+msgstr "Der Dump enthält eine nicht erlaubte Anweisung: %1$s (%2$s). Es wurde nichts verändert. (#302)"
+
+#: class/syncpilot-import.php
+msgid "The dump has a statement that is not allowed: %1$s (%2$s). (#302)"
+msgstr "Der Dump enthält eine nicht erlaubte Anweisung: %1$s (%2$s). (#302)"
+
+#: class/syncpilot-import.php
+msgid "This database does not know %s, which the dump uses. Nothing was changed. (#303)"
+msgstr "Diese Datenbank kennt %s nicht, das der Dump verwendet. Es wurde nichts verändert. (#303)"
+
+#: class/syncpilot-import.php
+msgid "The tables of the dump begin with \"%1$s\", the tables of this site with \"%2$s\". Nothing was changed. (#305)"
+msgstr "Die Tabellen des Dumps beginnen mit \"%1$s\", die Tabellen dieser Website mit \"%2$s\". Es wurde nichts verändert. (#305)"
+
+#: class/syncpilot-import.php
+msgid "The dump has a statement that is larger than the import reads."
+msgstr "Der Dump enthält eine Anweisung, die größer ist, als der Import liest."
+
+#: class/syncpilot-import.php
+msgid "The dump ends inside a text: the file is cut off."
+msgstr "Der Dump endet mitten in einem Text: die Datei ist abgeschnitten."
+
+#: class/syncpilot-import.php
+msgid "The dump is a gzip file and PHP has no zlib."
+msgstr "Der Dump ist eine gzip-Datei und PHP hat kein zlib."
+
+#: class/syncpilot-import.php
+msgid "The gzip file is damaged."
+msgstr "Die gzip-Datei ist beschädigt."
+
+#: class/syncpilot-import.php
+msgid "The gzip file cannot be unpacked: the disk is full or the folder cannot be written."
+msgstr "Die gzip-Datei kann nicht entpackt werden: die Platte ist voll oder der Ordner ist nicht beschreibbar."
+
+#: class/syncpilot-import.php
+msgid "The dump cannot be read."
+msgstr "Der Dump kann nicht gelesen werden."
+
+#: class/syncpilot-import.php
+msgid "Nothing was changed. (#304)"
+msgstr "Es wurde nichts verändert. (#304)"
+
+#: class/syncpilot-import.php
+msgid "The database refused a statement of the dump: %s (#152)"
+msgstr "Die Datenbank hat eine Anweisung des Dumps abgelehnt: %s (#152)"
+
+#: class/syncpilot-import.php
+msgid "The database refused a query of the replace: %s (#152)"
+msgstr "Die Datenbank hat eine Abfrage beim Ersetzen abgelehnt: %s (#152)"
+
+#: template/migrate.php
+msgid "Stop when the dump has a collation that this database does not know (otherwise a similar one is used, for example utf8mb4_unicode_520_ci for utf8mb4_uca1400_ai_ci)"
+msgstr "Anhalten, wenn der Dump eine Collation enthält, die diese Datenbank nicht kennt (sonst wird eine ähnliche verwendet, zum Beispiel utf8mb4_unicode_520_ci für utf8mb4_uca1400_ai_ci)"

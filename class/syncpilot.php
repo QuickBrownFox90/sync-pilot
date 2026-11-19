@@ -151,7 +151,10 @@ class SyncPilot extends SyncPilot_Base {
 			'backup_option',
 			'select_backup',
 			'exclude_transients',
-			'exclude_post_types'
+			'exclude_post_types',
+			'import_file',
+			'import_other_prefix',
+			'import_strict_collations'
 		);
 
 		$this->default_profile = array(
@@ -175,7 +178,9 @@ class SyncPilot extends SyncPilot_Base {
 			'exclude_spam' => '0',
 			'keep_active_plugins' => '0',
 			'create_backup' => '0',
-			'exclude_post_types' =>'0'
+			'exclude_post_types' =>'0',
+			'import_other_prefix' => '0',
+			'import_strict_collations' => '0'
 		);
 
 		if ( is_multisite() )
@@ -402,6 +407,22 @@ class SyncPilot extends SyncPilot_Base {
 		return $form_data;
 	}
 
+	/**
+	 * Take the form of a migration for the find and replace of the values (the import does this after the dump is loaded; the
+	 * form_data of a push or pull is set by the request itself)
+	 * @since   0.4.0
+	 *
+	 * @param   string $data  The serialized form, as the browser sends it
+	 *
+	 * @return  array  The fields of the form
+	 */
+	function set_migration_form_data( $data ) {
+
+		$this->form_data = $this->parse_migration_form_data( $data );
+
+		return $this->form_data;
+	}
+
 	function plugin_action_links( $links ) {
 		$link = sprintf( '<a href="%s">%s</a>', network_admin_url( $this->plugin_base ), __( 'Settings', self::TEXT_DOMAIN ) );
 
@@ -493,6 +514,11 @@ class SyncPilot extends SyncPilot_Base {
 			SyncPilot_Logger::import_legacy_log();
 	}
 
+	/**
+	 * Print the diagnostic info of this site as text
+	 * @since   0.0.1
+	 * @since   0.4.0  The action syncpilot_diagnostic_info lets other parts add their lines (the folder of the dumps)
+	 */
 	function output_diagnostic_info() {
 		global $table_prefix;
 		global $wpdb;
@@ -598,6 +624,10 @@ class SyncPilot extends SyncPilot_Base {
 		else
 			echo 'Disabled';
 		echo "\r\n";
+		echo "\r\n";
+
+		do_action( 'syncpilot_diagnostic_info' );
+
 		echo "\r\n";
 
 		echo "Active Plugins:\r\n";
@@ -732,6 +762,7 @@ class SyncPilot extends SyncPilot_Base {
 	 * @since   0.3.1  Two actions around it: syncpilot_before_finalize_migration, and syncpilot_migration_finalized when the tables were replaced (the media files that the other site does not have are removed there)
 	 * @since   0.3.2  The end of the migration is written to the log of both sites (close_migration())
 	 * @since   0.3.4  Notes the moment it begins for the seconds of the parts of the migration in that entry
+	 * @since   0.4.0  An import replaces the tables like a pull
 	 */
 	function ajax_finalize_migration() {
 
@@ -746,7 +777,8 @@ class SyncPilot extends SyncPilot_Base {
 
 		$return = '';
 
-		if ( $_POST['intent'] == 'pull' ) {
+		// an import replaces the tables of this site like a pull does
+		if ( in_array( $_POST['intent'], array( 'pull', 'import' ), true ) ) {
 			$return = $this->finalize_migration();
 		}
 
@@ -816,6 +848,7 @@ class SyncPilot extends SyncPilot_Base {
 	 * Replace the tables of the site with the migrated ones
 	 * @since   0.0.1
 	 * @since   0.3.0  The fallback option of the log is kept like the old log option; a table name that is not valid and temporary tables that are missing are logged (TableNameInvalid, TempTablesMissing)
+	 * @since   0.4.0  After an import the other site is not told (there is none)
 	 */
 	function finalize_migration() {
 		global $wpdb;
@@ -926,9 +959,10 @@ class SyncPilot extends SyncPilot_Base {
 		}
 
 		$type = ( isset( $_POST['type'] ) ? 'push' : 'pull' );
-		$location = ( isset( $_POST['location'] ) ? $_POST['location'] : $_POST['url'] );
+		$location = ( isset( $_POST['location'] ) ? $_POST['location'] : ( $_POST['url'] ?? '' ) );
 
-		if ( ! isset( $_POST['location'] ) ) {
+		// nothing to tell the other site after an import: there is none
+		if ( ! isset( $_POST['location'] ) && 'import' !== ( $_POST['intent'] ?? '' ) ) {
 
 			$data           = array();
 			$data['action'] = 'syncpilot_fire_migration_complete';
@@ -3204,6 +3238,23 @@ class SyncPilot extends SyncPilot_Base {
 			'block_page_gives'						=> __( "The block page gives: %s.", self::TEXT_DOMAIN ),
 			'media_not_removed'						=> __( "The media files that the other site does not have were not removed, because the migration had errors.", self::TEXT_DOMAIN ),
 			'backing_up'							=> __( "Backing up", self::TEXT_DOMAIN ),
+			'import_choose_file'					=> __( "Please choose a dump file to import.", self::TEXT_DOMAIN ),
+			'import_complete'						=> __( "Import complete", self::TEXT_DOMAIN ),
+			'import_please_wait'					=> __( "Importing, please wait...", self::TEXT_DOMAIN ),
+			'import_unpacking'						=> __( "Unpacking the dump", self::TEXT_DOMAIN ),
+			'import_scanning'						=> __( "Checking the dump", self::TEXT_DOMAIN ),
+			'import_loading'						=> __( "Loading the dump", self::TEXT_DOMAIN ),
+			'import_replacing'						=> __( "Replacing values", self::TEXT_DOMAIN ),
+			'import_tables'							=> __( "tables", self::TEXT_DOMAIN ),
+			'import_no_files'						=> __( "There is no dump in the folder yet. Put a .sql or .sql.gz file there (SFTP, a local copy) and refresh the list.", self::TEXT_DOMAIN ),
+			'import_folder_not_writable'			=> __( "The folder cannot be written, a dump can only be read from it.", self::TEXT_DOMAIN ),
+			'import_list_problem'					=> __( "The list of the dumps could not be read.", self::TEXT_DOMAIN ),
+			'import_reason_name'					=> __( "the name is not accepted (letters, digits, space and . _ ( ) - only)", self::TEXT_DOMAIN ),
+			'import_reason_extension'				=> __( "not a .sql or .sql.gz file", self::TEXT_DOMAIN ),
+			'import_reason_symlink'					=> __( "a link, not read", self::TEXT_DOMAIN ),
+			'import_reason_unreadable'				=> __( "cannot be read", self::TEXT_DOMAIN ),
+			'import_reason_empty'					=> __( "empty", self::TEXT_DOMAIN ),
+			'removing_import_temp_tables'			=> __( "Removing the temporary tables of the import", self::TEXT_DOMAIN ),
 			'migrating'								=> __( "Migrating", self::TEXT_DOMAIN ),
 			'status'								=> __( "Status", self::TEXT_DOMAIN ),
 			'response'								=> __( "Response", self::TEXT_DOMAIN ),
@@ -3440,6 +3491,7 @@ class SyncPilot extends SyncPilot_Base {
 	 * backup or temporary tables (a signed request); a pull deletes the backup or the temporary tables of this site
 	 * @since   0.2.8
 	 * @since   0.3.2  The end is written to the log of both sites (close_migration()); stopped is set when the migration stopped itself
+	 * @since   0.4.0  An import removes its state, the temporary tables and the backup that is made
 	 */
 	function ajax_cancel_migration() {
 
@@ -3477,6 +3529,16 @@ class SyncPilot extends SyncPilot_Base {
 
 				else
 					$this->delete_temporary_tables( $_POST['temp_prefix'] );
+			break;
+
+			case 'import' :
+				// the state and the temporary tables of the import, and the backup when it is made
+				global $syncpilot_import;
+
+				$syncpilot_import->cleanup();
+
+				if ( $_POST['stage'] == 'backup' && ! empty( $_POST['dump_filename'] ) )
+					$this->delete_export_file( $_POST['dump_filename'], true );
 			break;
 
 			default:

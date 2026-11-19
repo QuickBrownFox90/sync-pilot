@@ -16,6 +16,7 @@ This is a side project maintained by one person in their spare time — not a pr
 - **Selective sync**: choose which tables are migrated
 - **Media files sync** between installs. The site that writes the files is checked twice: before the first table is sent (the uploads folder and the temporary folder can be written) and before the database is replaced (the folder of every file, free space). A problem, or a file that cannot be copied, stops the migration before the database is replaced; files that were copied already stay. Optionally files that do not exist on the other side are removed, **at the very end and only when everything went well**. SyncPilot makes no backup of media files, so removing cannot be undone: use it only when you know you need it
 - **Export** the database as an SQL file, without ssh or phpMyAdmin
+- **Import** of a database dump (`.sql` or `.sql.gz`) that lies in a folder of the site: it is checked completely before anything is changed, loaded into temporary tables, the values are replaced (serialized data stays valid) and the tables are exchanged at the end, like after a pull; with a backup, pause and cancel, and a log. See the section on the import below
 - **Backup** of the database that is replaced, before a pull or a push
 - **Saved profiles** for migrations that are repeated
 - **Pause, resume and cancel** a running migration
@@ -43,6 +44,22 @@ Once installed, future updates appear in the standard WordPress update flow — 
 
 Both sites need SyncPilot. A remote site that still runs WP Sync DB cannot be reached, because all request names were renamed on purpose.
 
+## Import of a dump
+
+**Tools → SyncPilot → Import** replaces the tables that a dump holds with the data of the dump. The dump is a `.sql` or `.sql.gz` file, from SyncPilot, `wp db export`, mysqldump or another tool.
+
+1. Put the file into the folder that the page shows (`uploads/sync-pilot/imports-<random name>/`, closed to the web server; the filter `syncpilot_import_dir` moves it, for example outside of the web root). On a local site a copy is enough, otherwise SFTP. Refresh the list and choose the file.
+2. Fill the rows of find and replace as for a pull: the old values (the address and the path as they are in the dump) and the new ones (this site). The option for the backup is the one of the other migrations; it saves the tables of this site that the dump replaces.
+3. Start. The dump is unpacked (gzip), **checked completely** (every statement; nothing is changed if one is not allowed, a collation is not known or the prefix differs), the backup is made, the dump is loaded into temporary tables, the values are replaced, and at the end the tables are exchanged. Pause and cancel work as for the other migrations, a cancel removes everything that the import made.
+
+What to know:
+
+- Only `DROP TABLE`, `CREATE TABLE`, `INSERT` and the `SET` of the session are run. Everything else in a dump (`UPDATE`, `DELETE`, `GRANT`, triggers, views, `LOAD DATA`...) is refused, with its kind in the message.
+- A collation that this database does not know (a dump of MariaDB 11 has `utf8mb4_uca1400_ai_ci`, one of MySQL 8 `utf8mb4_0900_ai_ci`) is replaced by a similar one, usually `utf8mb4_unicode_520_ci`; a checkbox stops the import instead.
+- The import does not change the media files. Use a pull for them.
+- The tables of the dump must have the prefix of this site, unless a checkbox allows another one.
+- A browser that is closed during an import leaves the temporary tables and its state; they are removed by the next migration or a cancel.
+
 ## Updates
 
 SyncPilot looks for new versions in the releases of its GitHub repository and offers them **like any other plugin update** (Plugins, "Check for updates" in the row of the plugin forces a new look). It asks GitHub in the admin and in cron, at most once a day, and never for a visitor of the site.
@@ -57,7 +74,7 @@ On the first load SyncPilot copies the settings of WP Sync DB (API key, pull/pus
 
 The Diagnostics tab shows the diagnostic info of the site and its log, with the choice of the log level and a button to clear it.
 
-- **Levels**: *Off*, *Errors* (default) and *Verbose* (for troubleshooting). Errors writes every error (also a database query that failed, with its kind and table but never its values) and the course of every migration: started (with its options), other site agreed (with what differs between the two environments), requested by the other site, and the end on both sites (finished, cancelled, stopped or failed, with the duration, the seconds of its parts (tables, media files, replacing the tables) and the totals of tables, rows and bytes; numbers only). Verbose adds the warnings and notices of PHP, every request to the other site with its duration and size, and every chunk of a table: where it began, how many rows, its size, how long it took, the peak of the memory and the largest value (table, column, row and size, never the value).
+- **Levels**: *Off*, *Errors* (default) and *Verbose* (for troubleshooting). Errors writes every error (also a database query that failed, with its kind and table but never its values) and the course of every migration: started (with its options), other site agreed (with what differs between the two environments), requested by the other site, and the end on both sites (finished, cancelled, stopped or failed, with the duration, the seconds of its parts (tables, media files, replacing the tables) and the totals of tables, rows and bytes; numbers only). Verbose adds the warnings and notices of PHP, every request to the other site with its duration and size, and every chunk of a table: where it began, how many rows, its size, how long it took, the peak of the memory and the largest value (table, column, row and size, never the value). An import writes Import scanned, Import loaded and Import replaced (statements, tables, bytes, seconds) in between.
 - **An entry** is one line of JSON: time (UTC), level, source (`admin`, `remote`, `cli`), migration ID, action, a short English message, a help code and facts (`"help":130,"site":3` is the third place in the code that reports code 130).
 - **Never in it**: values of the database, keys, signatures, passwords, tokens. The beginning of an answer of the other site is cleaned (no tags, long tokens replaced, nothing from serialized data or SQL).
 - **A firewall in the way is named**: when the answer of the other site, or of this site to your browser, does not come from WordPress (no `X-Robots-Tag`, which `admin-ajax.php` always sends), the message says that a firewall or a proxy has probably blocked the request, gives its reference numbers (Attack ID, Message ID...) for the administrator of that server, and the log has help code 153.
@@ -66,15 +83,17 @@ The Diagnostics tab shows the diagnostic info of the site and its log, with the 
 
 ## Status
 
-Version 0.3.4 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged (see [changelog.txt](changelog.txt)).
+Version 0.4.0 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged (see [changelog.txt](changelog.txt)).
 
 **What the 0.2.x versions were for.** Mostly groundwork, not new features. The admin script of WP Sync DB was one big file without any test. It is split into small modules and a short start-up script now, built with esbuild, checked with ESLint and covered by browser tests that click through the admin page. That was necessary to maintain the code at all, and to make the project really forkable: the parts can be developed one at a time without touching everything. You still have to understand how they work together, but not all of it at once. Besides that: fixes for PHP 8.2+ and WordPress 6.7, the first security fixes, several fixes found by pulling real sites (media files, cancelling), and one small feature (a find and replace row for http/https).
 
 **What 0.3.x is.** The logging: a failed migration says what went wrong and where, on both sites, without reading server logs. The patches that follow are the first fixes from using it on real sites: telemetry per chunk at the level verbose, the failed database query that was not logged before, the check of the folders for the media files (before the first table is sent and before the database is replaced) and a media file that cannot be copied, both stop the migration before the database is replaced, the removal of media files only at the very end and only when nothing went wrong, and a firewall or a proxy that answers instead of WordPress is named, with the reference numbers of its block page, instead of "check the connection data". The progress bar belongs to the same idea (what is going on right now): it shows a percent on every database, also on MySQL 8 and with hundreds of tables.
 
-**What is tested.** Pull, push, export, backup, media files, pause, cancel and saved profiles, automatically on two test sites (PHP 8.4) and by hand with pulls from live sites; also the cases that go wrong (an exception, a fatal error, the memory and the time limit, an answer that is cut or empty, a firewall that answers instead of WordPress, folders that cannot be written). Multisite and WP-CLI are not verified yet.
+**What 0.4.0 is.** The import of a database dump, built to be safe: it reads the dump statement by statement from any place, so a dump of any size is handled in many short requests, and checks all of it before the first table is made. The replace of the import does not unserialize serialized values (the function of a pull and a push builds them again and copies every object that is used twice: a graph of 764 bytes with a depth of 18 needs 669 MB there, and every level doubles it); it rewrites the text, so references stay and the memory is the size of the text. The choice of the form is Pull, Push, Import, Export.
 
-**What comes next.** 0.4.0: import of a database dump. 0.5.x: the overhaul of the admin page, with the log in boxes per migration, its download and the entries of the other site. Use it only between sites you control and only on a trusted connection.
+**What is tested.** Pull, push, export, import (also a gzip dump, with a backup and a cancel), backup, media files, pause, cancel and saved profiles, automatically on two test sites (PHP 8.4) and by hand with pulls and imports of live sites, multisites among them; also the cases that go wrong (an exception, a fatal error, the memory and the time limit, an answer that is cut or empty, a firewall that answers instead of WordPress, folders that cannot be written). WP-CLI is not verified yet, multisite only by hand.
+
+**What comes next.** 0.4.1: the find and replace of the import and the handling of collations also for pull and push. 0.4.2: the upload of a dump in the browser (with the choice to remove it after the import). 0.5.x: the overhaul of the admin page, with the log in boxes per migration, its download and the entries of the other site. Use it only between sites you control and only on a trusted connection.
 
 ## Development
 
@@ -82,7 +101,7 @@ Edit only `asset/src`. The built files in `asset/css` and `asset/js` are committ
 
 ### Layout
 
-- `class/`: the plugin in PHP: `syncpilot.php` (the admin page and the requests), `syncpilot-base.php` (what both parts share), `syncpilot-media-files.php`, `syncpilot-logger.php` (the log), `syncpilot-help-code.php` (the codes of the errors and their texts), `syncpilot-request-guard.php` (what ends a request without an answer), `syncpilot-updater.php`
+- `class/`: the plugin in PHP: `syncpilot.php` (the admin page and the requests), `syncpilot-base.php` (what both parts share), `syncpilot-media-files.php`, `syncpilot-import.php` (the import of a dump: folder, checks, loading, replace), `syncpilot-dump-reader.php` (reads a dump statement by statement), `syncpilot-logger.php` (the log), `syncpilot-help-code.php` (the codes of the errors and their texts), `syncpilot-request-guard.php` (what ends a request without an answer), `syncpilot-updater.php`
 - `asset/src/css/`: the admin styles as modules, built into `asset/css/styles.css`
 - `asset/src/js/`: `script.js` (start-up), `modules/` (one file per feature), `common.js` and `media-files.js` (plain scripts); built into `asset/js/sync-pilot.js` and a `.min` file, which the plugin loads unless `SCRIPT_DEBUG` is on
 - `tests/`: PHP checks and browser tests
@@ -105,10 +124,11 @@ The tests run on two test installations of WordPress with wp-cli, named in `test
 - `npm run test:controls`: pause, resume, cancel, saving and deleting profiles
 - `npm run test:connection`: the connection box and saved profiles
 - `node tests/browser/push.mjs --yes`: a complete push to the second site. Options: `--pull` (the other direction), `--media`, `--backup`, `--cancel` (cancel while it runs), `--full` (all tables), `--verbose` (the log level verbose on both sites; checks the entries of the chunks). `--shot-progress` takes a picture of the progress box while the tables run. `--media --unwritable`, `--media --stray`, `--media --stray --broken` and `--pull --media --broken` check that the media check and a file that cannot be copied stop the migration and that files are removed only at the end, and only when all went well. Both databases are put back from a reference backup before and after.
+- `node tests/browser/import.mjs --yes`: the import of the database of the second site into the first one, clicked through (the first site is put back afterwards). Options: `--gzip` (a gzip dump, with a backup), `--backup`, `--cancel` (cancel while the dump is loaded), `--shots`. The folder for the dumps is not writable for the user of the command, so the test sets another one with a temporary mu-plugin
 - `npm run test:guard`: an exception, a fatal error, the memory limit and the time limit in a request. It copies a mu-plugin from `tests/fault/` into the test site and removes it again
 - `npm run test:faults`: the other site answers wrongly (a web server error, a firewall, an empty or a cut answer, a closed connection, no answer); a proxy in `tests/fault/` spoils the answers, and the log has to say what happened
 - `php tests/help-codes.php`: the help codes and every place that reports one (no WordPress needed)
-- `wp eval-file wp-content/plugins/sync-pilot/tests/logger.php`, `tests/media-preflight.php` (the check of the folders for the media files) and `tests/table-rows.php` (the number of rows per table, answered like MySQL 8) run on a test site
+- `wp eval-file wp-content/plugins/sync-pilot/tests/logger.php`, `tests/media-preflight.php` (the check of the folders for the media files) and `tests/table-rows.php` (the number of rows per table, answered like MySQL 8) run on a test site; so do the checks of the import: `tests/import.php` (the folder), `tests/import-reader.php` (the reader, the statements that are allowed, the collations, a real dump), `tests/import-load.php` (scan and load in short requests with a new connection each, and what stops the import), `tests/import-replace.php` (the replace for every kind of value, gzip, a real dump compared with the function of a push or a pull), `tests/import-serialized.php` and `tests/import-memory.php` (shared objects, a memory limit)
 
 ### Logging in the code
 

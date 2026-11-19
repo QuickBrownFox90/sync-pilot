@@ -11,7 +11,7 @@
 //   waf200     the same page with the status 200
 //   basic      HTTP 401 with a request for a user name and a password
 //   empty      HTTP 200 and nothing in the body
-//   truncate   the real answer, cut in the middle
+//   truncate   the real answer, cut after its first bytes
 //   notice     a PHP notice in front of the real answer
 //   redirect   HTTP 302 to another page of the proxy, which is a normal web page
 //   reset      the connection is closed without an answer
@@ -99,8 +99,10 @@ export async function startProxy( target ) {
             if ( 'empty' === proxy.mode )
                 body = Buffer.alloc( 0 );
 
+            // cut inside the first line: the middle of the answer depends on the data of the site (the length of a number in the
+            // environment) and can fall right behind a closing bracket, where the cut text still looks like serialized data
             if ( 'truncate' === proxy.mode )
-                body = body.subarray( 0, Math.floor( body.length / 2 ) );
+                body = body.subarray( 0, Math.min( 24, Math.floor( body.length / 2 ) ) );
 
             if ( 'notice' === proxy.mode )
                 body = Buffer.concat( [ Buffer.from( '<br />\n<b>Notice</b>:  Undefined variable: x in <b>/var/www/site/wp-content/plugins/other/other.php</b> on line <b>12</b><br />\n' ), body ] );

@@ -10,6 +10,10 @@ const $ = jQuery;
 
 // Where the loop is: the table it works on (an index in state.tables_to_migrate), the rows of the tables, the sum of the rows
 // and how much of it is done. initiate_migration() sets it, the stage "migrate" after a backup starts it again
+// What happens when the tables of the backup are done, if the migration is not one that goes on with the tables (an import:
+// it loads the dump next); set by set_after_backup()
+var after_backup = null;
+
 const run = {
     table_rows             : {},
     total_size             : 0,
@@ -36,6 +40,15 @@ export function init_migration() {
         if ( state.migration_id && 'string' === typeof options.data && options.data.indexOf( 'action=syncpilot_' ) !== -1 )
             options.data += '&migration_id=' + encodeURIComponent( state.migration_id );
     } );
+}
+
+/**
+ * Say what follows the backup instead of the tables of the migration (the import loads its dump)
+ * @since   0.4.0
+ * @param   {function|null} fn  Called when the last table of the backup is done; null for the usual follow-up
+ */
+export function set_after_backup( fn ) {
+    after_backup = fn;
 }
 
 /**
@@ -146,10 +159,11 @@ export function initiate_migration( table_rows, total_size ) {
 /**
  * Start the loop at the first table
  * @since   0.2.7
+ * @since   0.4.0  Exported: the import starts the backup of its tables with it
  * @param   {object} table_rows  The number of rows by the name of the table
  * @param   {number} total_size  The sum of the rows
  */
-function start_tables( table_rows, total_size ) {
+export function start_tables( table_rows, total_size ) {
 
     run.table_rows             = table_rows;
     run.total_size             = total_size;
@@ -172,12 +186,19 @@ function start_tables( table_rows, total_size ) {
  * One request for the table the loop is at, from the row it says (a big table is sent in several requests). When the
  * tables of the backup are done, the tables of the migration follow; after the last one the final steps
  * @since   0.2.7
+ * @since   0.4.0  An import goes on with its own step after the backup (set_after_backup())
  * @param   {string} current_row   The row to start at; '-1' for the beginning of the table
  * @param   {string} primary_keys  The values of the primary keys of the row, for a table that is sorted by them
  */
 function migrate_table_recursive( current_row, primary_keys ) {
 
     if ( run.index >= state.tables_to_migrate.length ) {
+
+        if ( state.stage == 'backup' && after_backup ) {
+            after_backup();
+
+            return;
+        }
 
         if ( state.stage == 'backup' ) {
             start_migrate_stage();

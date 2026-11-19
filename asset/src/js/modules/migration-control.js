@@ -130,6 +130,13 @@ function removing_text() {
 
         else
             progress_msg = syncpilot_i10n.removing_remote_temp_tables;
+    } else if ( 'import' == state.migration_intent ) {
+
+        if ( 'backup' == state.stage )
+            progress_msg = syncpilot_i10n.removing_local_backup;
+
+        else
+            progress_msg = syncpilot_i10n.removing_import_temp_tables;
     }
 
     return progress_msg;

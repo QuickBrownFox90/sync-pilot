@@ -4,7 +4,7 @@
  * Description: Export, push, and pull to migrate your WordPress databases and media files.
  * Author: Patrick Mauersberger
  * Author URI: http://dev.patrick-mauersberger.de
- * Version: 0.3.4
+ * Version: 0.4.0
  * Requires PHP: 8.2
  * Requires at least: 6.0
  * License: GPL-2.0
@@ -18,7 +18,7 @@
  * Delicious Brains.
  */
 
-$GLOBALS['syncpilot_meta']['sync-pilot']['version'] = '0.3.4';
+$GLOBALS['syncpilot_meta']['sync-pilot']['version'] = '0.4.0';
 $GLOBALS['syncpilot_meta']['sync-pilot']['folder'] = basename( plugin_dir_path( __FILE__ ) );
 
 // Define the directory seperator if it isn't already
@@ -31,6 +31,11 @@ if ( ! defined( 'DS' ) ) {
 		define( 'DS', '/' );
 }
 
+/**
+ * Load the plugin: the updater always, the rest only in the admin and in WP-CLI
+ * @since   0.0.1
+ * @since   0.4.0  Loads the import (SyncPilot_Import) and keeps it in $syncpilot_import
+ */
 function syncpilot_loaded() {
 
 	// the update checks of WordPress also run in cron, so the updater is registered before the quick exit; it asks GitHub
@@ -48,14 +53,17 @@ function syncpilot_loaded() {
 	require_once 'class/syncpilot-base.php';
 	require_once 'class/syncpilot.php';
 	require_once 'class/syncpilot-media-files.php';
+	require_once 'class/syncpilot-dump-reader.php';
+	require_once 'class/syncpilot-import.php';
 
 	// carry over settings and profiles of WP Sync DB before they are read
 	SyncPilot_Base::migrate_legacy_settings();
 
-	global $syncpilot, $syncpilot_media_files;
+	global $syncpilot, $syncpilot_media_files, $syncpilot_import;
 
-	$syncpilot = new SyncPilot( __FILE__ );
+	$syncpilot             = new SyncPilot( __FILE__ );
 	$syncpilot_media_files = new SyncPilot_Media_Files( __FILE__ );
+	$syncpilot_import      = new SyncPilot_Import( __FILE__ );
 }
 
 add_action( 'plugins_loaded', 'syncpilot_loaded' );

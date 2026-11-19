@@ -23,11 +23,20 @@ export function tables_are_chosen() {
  * The checks before a migration starts: the tables are chosen, and the new URL and the new file path are filled in (the
  * field that is missing gets the warning and the focus)
  * @since   0.2.6
+ * @since   0.4.0  An import needs a dump instead of tables
  * @return  {boolean}  True when the migration may start
  */
 export function form_is_valid() {
 
-    if ( ! tables_are_chosen() ) {
+    // an import has no choice of tables (all the tables of the dump), but it needs a dump
+    if ( $( '#import' ).is( ':checked' ) ) {
+
+        if ( ! $( 'input[name=import_file]:checked' ).length ) {
+            syncpilot_alert( syncpilot_i10n.import_choose_file );
+
+            return false;
+        }
+    } else if ( ! tables_are_chosen() ) {
         return false;
     }
 

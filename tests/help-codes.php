@@ -28,8 +28,9 @@ foreach ( $cases as $case ) {
 	if ( preg_match( '/[.!?:]$/', $text ) )                                        $wrong[] = $case->name . ': ends with punctuation';
 	if ( isset( $seen[ $text ] ) )                                                 $wrong[] = $case->name . ': same text as ' . $seen[ $text ];
 	$seen[ $text ] = $case->name;
-	if ( ! preg_match( '/^[1-2]\d\d$/', (string) $case->value ) )                  $wrong[] = $case->name . ': number outside 1xx / 2xx';
-	if ( ( $case->value >= 200 ) !== ( 0 === strpos( $case->name, 'Media' ) ) )    $wrong[] = $case->name . ': media in 2xx only, and only media';
+	if ( ! preg_match( '/^[1-3]\d\d$/', (string) $case->value ) )                  $wrong[] = $case->name . ': number outside 1xx / 2xx / 3xx';
+	if ( ( $case->value >= 200 && $case->value < 300 ) !== ( 0 === strpos( $case->name, 'Media' ) ) ) $wrong[] = $case->name . ': media in 2xx only, and only media';
+	if ( ( $case->value >= 300 ) !== ( 0 === strpos( $case->name, 'Import' ) ) )                       $wrong[] = $case->name . ': import in 3xx only, and only import';
 }
 $check( 'every log text: English, short, no code, no number, no fact, no punctuation at the end, its own text', array() === $wrong, implode( '; ', $wrong ) );
 

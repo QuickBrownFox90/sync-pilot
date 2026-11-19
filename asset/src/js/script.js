@@ -16,6 +16,7 @@ import { choose_tables, draw_table_chunks, create_overlay, show_progress_box, sl
 import { profile_has_name, is_new_profile, send_profile, add_profile_to_list } from './modules/save-profile.js';
 import { prepare_connection, init_connection } from './modules/connection.js';
 import { init_migration, initiate_migration } from './modules/migration.js';
+import { init_import, start_import } from './modules/import.js';
 import { init_migration_end } from './modules/migration-end.js';
 import { init_migration_control } from './modules/migration-control.js';
 import { get_default_profile_name } from './modules/helpers.js';
@@ -56,6 +57,7 @@ import { get_default_profile_name } from './modules/helpers.js';
         init_settings();
         init_tabs();
         init_migration();
+        init_import();
         init_migration_end();
         init_migration_control();
 
@@ -112,6 +114,22 @@ import { get_default_profile_name } from './modules/helpers.js';
 
             if ( $( '#create-backup' ).is( ':checked' ) == false ) {
                 state.stage = 'migrate';
+            }
+
+            // an import has its own steps: the dump is scanned first, the tables are known after that
+            if ( state.migration_intent == 'import' ) {
+
+                state.completed_msg = syncpilot_i10n.import_complete;
+
+                show_progress_box( progress_content_original, syncpilot_i10n.import_please_wait );
+                slide_in_progress_box();
+                setup_counter();
+
+                state.currently_migrating = true;
+
+                start_import();
+
+                return;
             }
 
             var connection_info = $.trim( $( '.pull-push-connection-info' ).val() )

@@ -259,6 +259,48 @@
 .syncpilot .push-list ul {
   margin-bottom: 0px;
 }
+.syncpilot .import-file-wrapper {
+  display: none;
+  width: 670px;
+}
+.syncpilot .import-folder,
+.syncpilot .import-no-files {
+  margin: 6px 0;
+}
+.syncpilot .option-group .import-files {
+  display: block;
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+}
+.syncpilot .option-group .import-files li {
+  margin: 0 0 4px;
+}
+.syncpilot .option-group .import-files label {
+  font-size: 13px;
+}
+.syncpilot .import-files .option-description {
+  margin-left: 6px;
+}
+.syncpilot .import-file-unusable {
+  color: #888888;
+}
+.syncpilot .import-other-prefix {
+  display: block;
+  margin-top: 8px;
+}
+.syncpilot .import-replace-hint {
+  display: none;
+  margin: 4px 0 8px;
+}
+.syncpilot #migrate-form.is-import .hide-for-import,
+.syncpilot #migrate-form.is-import .media-files-options,
+.syncpilot #migrate-form.is-import .backup-tables-options {
+  display: none !important;
+}
+.syncpilot #migrate-form.is-import .import-replace-hint {
+  display: block;
+}
 
 /* asset/src/css/search-replace.css */
 .syncpilot .find-heading,

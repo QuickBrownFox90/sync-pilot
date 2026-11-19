@@ -6,8 +6,8 @@
  * second place that reports 130. The sites are numbered by hand at the call (log_error( ..., site: 2 )), the enum does
  * not know them; tests/help-codes.php makes sure that none is used twice.
  *
- * Ranges: 1xx events of the server with an entry in the log, 2xx media files, 9xx only the browser (no entry in the
- * log). The numbers of the earlier versions (#111, #103mf...) are found by legacy().
+ * Ranges: 1xx events of the server with an entry in the log, 2xx media files, 3xx the import of a dump, 9xx only the
+ * browser (no entry in the log). The numbers of the earlier versions (#111, #103mf...) are found by legacy().
  *
  * The log text is English, short and complete in itself, without facts: names, sizes and numbers are the context of the
  * entry. It is never translated. The texts for the user and the help texts (translated) come later; they are read when
@@ -68,6 +68,14 @@ enum SyncPilot_HelpCode: int {
 	case MediaTempNotWritable    = 216;
 	case MediaDiskLow            = 217;
 	case MediaRemoveFailed       = 218;
+
+	// the import of a dump
+	case ImportFileInvalid       = 301;
+	case ImportStatementRefused  = 302;
+	case ImportCollationUnknown  = 303;
+	case ImportReadFailed        = 304;
+	case ImportPrefixDiffers     = 305;
+	case ImportStateLost         = 306;
 
 	// the numbers of the earlier versions: as the user saw them (#111, #103mf) without # => the code that means it now
 	const LEGACY = array(
@@ -134,6 +142,13 @@ enum SyncPilot_HelpCode: int {
 			self::MediaTempNotWritable   => array( 'log' => 'Temporary folder not writable' ),
 			self::MediaDiskLow           => array( 'log' => 'Not enough free disk space for media files' ),
 			self::MediaRemoveFailed      => array( 'log' => 'Removing media files failed' ),
+
+			self::ImportFileInvalid      => array( 'log' => 'Dump file not usable' ),
+			self::ImportStatementRefused => array( 'log' => 'Dump statement not allowed' ),
+			self::ImportCollationUnknown => array( 'log' => 'Dump collation not known to this database' ),
+			self::ImportReadFailed       => array( 'log' => 'Reading dump file failed' ),
+			self::ImportPrefixDiffers    => array( 'log' => 'Dump table prefix differs from this site' ),
+			self::ImportStateLost        => array( 'log' => 'State of the import not found' ),
 		};
 	}
 

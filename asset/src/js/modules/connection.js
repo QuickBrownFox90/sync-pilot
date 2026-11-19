@@ -22,6 +22,12 @@ var pull_select_backup;
 // the box with the connection info, which moves between the lists of the actions
 var connection_info_box;
 
+// the box for the choice of the dump of an import: it takes the place of the connection info under "Import"
+var import_file_box;
+
+// the action chosen before the last change, to turn the rows of find and replace back when the import is left
+var was_import = false;
+
 /**
  * The first part of the start of the page: the lists of tables as the page had them are kept, the options for the
  * backup are shown (hidden for an export), and a saved profile connects to the other site
@@ -84,8 +90,14 @@ function establish_remote_connection_from_saved_profile() {
     var action          = $( 'input[name=action]:checked' ).val();
     var connection_info = $.trim( $( '.pull-push-connection-info' ).val() ).split( '\n' );
 
-    if ( typeof syncpilot_default_profile == 'undefined' || syncpilot_default_profile == true || action == 'savefile' || state.doing_ajax )
+    if ( typeof syncpilot_default_profile == 'undefined' || syncpilot_default_profile == true || action == 'savefile' || action == 'import' || state.doing_ajax ) {
+
+        // the rows of a saved profile of an import are as they are used: this site is the new value, like after a pull
+        if ( action == 'import' )
+            state.last_replace_switch = 'pull';
+
         return;
+    }
 
     state.last_replace_switch = action;
 
@@ -350,15 +362,20 @@ export function init_connection() {
 
     // move around textarea depending on whether or not the push/pull options are selected
     connection_info_box = $( '.connection-info-wrapper' );
+    import_file_box     = $( '.import-file-wrapper' );
+    was_import          = $( '#import' ).is( ':checked' );
     move_connection_info_box();
 
     $( '.migrate-selection.option-group input[type=radio]' ).change( function () {
 
         move_connection_info_box();
 
-        if ( state.connection_established ) {
+        // the import has no connection: its rows are turned like those of a pull as soon as it is chosen, and back when it is left
+        if ( state.connection_established || $( '#import' ).is( ':checked' ) || was_import ) {
             change_replace_values();
         }
+
+        was_import = $( '#import' ).is( ':checked' );
     } );
 
     // hide second section if pull or push is selected with no connection established
@@ -444,6 +461,8 @@ export function init_connection() {
  * @since   0.2.8
  */
 function move_connection_info_box() {
+
+    import_file_box.hide();
 
     $( '.connection-status' ).hide();
     $( '.prefix-notice' ).hide();
@@ -543,6 +562,28 @@ function move_connection_info_box() {
             $( '.connection-status' ).show();
             $( '.step-two' ).hide();
         }
+    } else if ( $( '#import' ).is( ':checked' ) ) {
+
+        // the dump takes the place of the connection: nothing to connect to, the second step is open at once
+        $( '.import-list li' ).append( import_file_box );
+        import_file_box.show();
+
+        $( '.connection-status' ).hide();
+        $( '.step-two' ).show();
+        $( '.table-prefix' ).html( syncpilot_this_prefix );
+        $( '.directory-scope' ).text( syncpilot_i10n.scope_local );
+        $( '.uploads-dir' ).html( syncpilot_this_uploads_dir );
+
+        if ( state.profile_name_edited == false )
+            $( '.create-new-profile' ).val( '' );
+
+        if ( false == syncpilot_write_permission ) {
+            $( '#create-backup' ).prop( 'checked', false );
+            $( '#create-backup' ).attr( 'disabled', 'disabled' );
+            $( '#create-backup-label' ).addClass( 'disabled' );
+            $( '.backup-option-disabled' ).show();
+            $( '.upload-directory-location' ).html( syncpilot_this_upload_dir_long );
+        }
     } else if ( $( '#savefile' ).is( ':checked' ) ) {
 
         $( '.connection-status' ).hide();
@@ -592,6 +633,22 @@ function change_replace_values() {
         $( '.backup-tables-wrap' ).prepend( push_select_backup );
 
         state.last_replace_switch = 'push';
+    } else if ( $( '#import' ).is( ':checked' ) ) {
+
+        // this site is the new value, like after a pull; the lists of tables stay (they are hidden for an import)
+        if ( state.last_replace_switch == '' || state.last_replace_switch == 'push' ) {
+            $( '.replace-row' ).each( function () {
+
+                var old_val = $( '.old-replace-col input', this ).val();
+
+                $( '.old-replace-col input', this ).val( $(
+                    '.replace-right-col input', this ).val() );
+
+                $( '.replace-right-col input', this ).val( old_val );
+            } );
+        }
+
+        state.last_replace_switch = 'pull';
     } else if ( $( '#pull' ).is( ':checked' ) ) {
 
         if ( state.last_replace_switch == '' || state.last_replace_switch == 'push' ) {
