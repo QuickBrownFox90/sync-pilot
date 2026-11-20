@@ -289,6 +289,34 @@
   display: block;
   margin-top: 8px;
 }
+.syncpilot .import-source label {
+  margin-right: 16px;
+}
+.syncpilot .import-delete-file {
+  display: block;
+  margin-top: 8px;
+}
+.syncpilot .import-upload-bar {
+  width: 100%;
+  max-width: 480px;
+  height: 10px;
+  margin: 8px 0;
+  background: #e0e0e0;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.syncpilot .import-upload-bar-fill {
+  width: 0;
+  height: 100%;
+  background: #2ea2cc;
+}
+.syncpilot .import-upload-text {
+  margin: 4px 0;
+}
+.syncpilot .import-file-delete {
+  margin-left: 10px;
+  font-size: 12px;
+}
 .syncpilot .import-replace-hint {
   display: none;
   margin: 4px 0 8px;

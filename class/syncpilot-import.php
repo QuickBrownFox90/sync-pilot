@@ -18,6 +18,10 @@ class SyncPilot_Import extends SyncPilot_Base {
 	// the longest name of a dump that is accepted
 	const NAME_MAX = 150;
 
+	// the folder (in the folder of the dumps) for the parts of an upload that is not finished; an upload that is not finished after this many seconds is removed
+	const UPLOAD_FOLDER = '.upload';
+	const UPLOAD_MAX_AGE = 86400;
+
 	// the files that SyncPilot puts into the folder itself: they are no dumps and are not listed
 	const OWN_FILES = array( '.htaccess', 'index.php', 'web.config' );
 
@@ -43,6 +47,8 @@ class SyncPilot_Import extends SyncPilot_Base {
 		add_action( 'wp_ajax_syncpilot_import_start', array( $this, 'ajax_import_start' ) );
 		add_action( 'wp_ajax_syncpilot_import_step', array( $this, 'ajax_import_step' ) );
 		add_action( 'wp_ajax_syncpilot_import_cancel', array( $this, 'ajax_import_cancel' ) );
+		add_action( 'wp_ajax_syncpilot_import_upload', array( $this, 'ajax_import_upload' ) );
+		add_action( 'wp_ajax_syncpilot_import_delete', array( $this, 'ajax_import_delete' ) );
 	}
 
 	/**
@@ -59,6 +65,8 @@ class SyncPilot_Import extends SyncPilot_Base {
 		$nonces['import_start']  = wp_create_nonce( 'import-start' );
 		$nonces['import_step']   = wp_create_nonce( 'import-step' );
 		$nonces['import_cancel'] = wp_create_nonce( 'import-cancel' );
+		$nonces['import_upload'] = wp_create_nonce( 'import-upload' );
+		$nonces['import_delete'] = wp_create_nonce( 'import-delete' );
 
 		return $nonces;
 	}
@@ -189,7 +197,8 @@ class SyncPilot_Import extends SyncPilot_Base {
 	 * symlink (a link is never followed), unreadable, empty. Folders and the files of SyncPilot are not listed.
 	 * @since   0.4.0
 	 *
-	 * @return  array  Per file: name, bytes, modified (time), gzip, usable, reason ('' when it is usable)
+	 * @return  array  Per file: name, bytes, modified (time), gzip, uploaded (by the page, see is_uploaded_name()), usable, reason ('' when it is usable)
+	 * @since   0.4.2  Has uploaded
 	 */
 	static function files() {
 
@@ -232,6 +241,7 @@ class SyncPilot_Import extends SyncPilot_Base {
 				'bytes'    => (int) @filesize( $file ),
 				'modified' => (int) @filemtime( $file ),
 				'gzip'     => self::is_gzip_name( $name ),
+				'uploaded' => self::is_uploaded_name( $name ),
 				'usable'   => '' === $reason,
 				'reason'   => $reason,
 			);
@@ -811,6 +821,7 @@ class SyncPilot_Import extends SyncPilot_Base {
 				'unpack'       => '' !== $work,
 				'other_prefix' => ! empty( $_POST['other_prefix'] ),
 				'strict_collations' => ! empty( $_POST['strict_collations'] ),
+				'delete_file'  => ! empty( $_POST['delete_file'] ),
 				'replace_rows' => count( array_filter( (array) ( $this->import_form( (string) ( $_POST['form_data'] ?? '' ) )['replace_old'] ?? array() ), 'strlen' ) ),
 			),
 			'environment' => SyncPilot_Logger::environment(),
@@ -827,6 +838,7 @@ class SyncPilot_Import extends SyncPilot_Base {
 			'form_data'    => (string) ( $_POST['form_data'] ?? '' ),
 			'other_prefix' => ! empty( $_POST['other_prefix'] ),
 			'strict_collations' => ! empty( $_POST['strict_collations'] ),
+			'delete_file'  => ! empty( $_POST['delete_file'] ),
 			'started'      => time(),
 			'statements'   => 0,
 			'tables'       => array(),
@@ -1768,15 +1780,28 @@ class SyncPilot_Import extends SyncPilot_Base {
 	}
 
 	/**
-	 * The tables are replaced: the state of an import is not needed any more
+	 * The tables are replaced: the state of an import is not needed any more, and the dump is removed when the import was started with that choice
 	 * @since   0.4.0
+	 * @since   0.4.2  Removes the dump when the state says so (delete_file)
 	 *
 	 * @param   string $intent  What was migrated: pull, push or import
 	 */
 	function finalized( $intent ) {
 
-		if ( 'import' === $intent )
-			self::state_remove();
+		if ( 'import' !== $intent )
+			return;
+
+		$state = self::state_read();
+
+		self::state_remove();
+
+		// the dump is removed when the import was started with the choice, and only now: a cancel, a stop and an error leave it
+		if ( ! empty( $state['delete_file'] ) && ! empty( $state['file'] ) ) {
+
+			$deleted = self::delete( $state['file'] );
+
+			SyncPilot_Logger::event( $deleted ? 'Import file removed' : 'Import file could not be removed', array( 'uploaded' => self::is_uploaded_name( $state['file'] ) ) );
+		}
 	}
 
 	/**
@@ -1807,8 +1832,318 @@ class SyncPilot_Import extends SyncPilot_Base {
 	}
 
 	/**
+	 * Whether a name is the name of a dump that the page uploaded: the upload adds -u and eight hexadecimal characters before
+	 * the extension (invoice-u1a2b3c4d.sql.gz), so a file that was put into the folder by hand is told from one that came
+	 * with the page, and the page offers to remove only the latter after the import
+	 * @since   0.4.2
+	 *
+	 * @param   string $name  The name of the file
+	 *
+	 * @return  bool
+	 */
+	static function is_uploaded_name( $name ) {
+		return 1 === preg_match( '/-u[0-9a-f]{8}\.sql(\.gz)?$/', (string) $name );
+	}
+
+	/**
+	 * The name that a file gets in the folder when it is uploaded: what the browser calls it is cleaned (letters, digits and
+	 * . _ ( ) - are kept, anything else becomes a dash), cut to a length that leaves room for the rest, and gets the part that
+	 * makes it a name of an upload (see is_uploaded_name())
+	 * @since   0.4.2
+	 *
+	 * @param   string $original  The name of the file at the browser
+	 * @param   bool   $gzip      The browser compressed the file: .gz is added
+	 *
+	 * @return  string|false  false when it is no .sql or .sql.gz file
+	 */
+	static function uploaded_name( $original, $gzip = false ) {
+
+		$original = basename( str_replace( '\\', '/', (string) $original ) );
+
+		if ( ! preg_match( '/^(.*?)(\.sql)(\.gz)?$/is', $original, $m ) )
+			return false;
+
+		$base = trim( preg_replace( '/[^A-Za-z0-9._()-]+/', '-', $m[1] ), '-. ' );
+		$base = trim( preg_replace( '/\.{2,}/', '.', $base ), '.' );
+		$base = '' === $base ? 'dump' : substr( $base, 0, 100 );
+
+		// a second extension that a web server runs does not get through: it is part of the name, and is_valid_name() would refuse it
+		$name = $base . '-u' . bin2hex( random_bytes( 4 ) ) . '.sql' . ( ! empty( $m[3] ) || $gzip ? '.gz' : '' );
+
+		return self::is_valid_name( $name ) ? $name : 'dump-u' . bin2hex( random_bytes( 4 ) ) . '.sql' . ( ! empty( $m[3] ) || $gzip ? '.gz' : '' );
+	}
+
+	/**
+	 * The folder for the parts of the uploads, made when it is needed
+	 * @since   0.4.2
+	 *
+	 * @return  string|false
+	 */
+	static function upload_dir() {
+
+		$dir = self::dir();
+
+		if ( ! $dir )
+			return false;
+
+		$path = $dir . DS . self::UPLOAD_FOLDER;
+
+		return is_dir( $path ) || @wp_mkdir_p( $path ) ? $path : false;
+	}
+
+	/**
+	 * Remove the parts of uploads that were not finished and are older than a day
+	 * @since   0.4.2
+	 *
+	 * @return  int  The number of the files that were removed
+	 */
+	static function remove_stale_uploads() {
+
+		$path    = self::path() . DS . self::UPLOAD_FOLDER;
+		$removed = 0;
+
+		if ( ! is_dir( $path ) )
+			return 0;
+
+		foreach ( (array) @scandir( $path ) as $name ) {
+
+			if ( ! preg_match( '/^[0-9a-f]{24}\.part$/', $name ) )
+				continue;
+
+			if ( filemtime( $path . DS . $name ) < time() - (int) apply_filters( 'syncpilot_import_upload_max_age', self::UPLOAD_MAX_AGE ) && @unlink( $path . DS . $name ) )
+				$removed++;
+		}
+
+		return $removed;
+	}
+
+	/**
+	 * The answer to the browser for a failed upload (the caller has written the log: the kind of the failure, never the name
+	 * or the content)
+	 * @since   0.4.2
+	 *
+	 * @param   string $reason  disk, offset, name, empty, gzip, write, folder, chunk, id
+	 * @param   string $text    The text for the browser
+	 * @param   array  $extra   More for the browser (what the server has: received)
+	 *
+	 * @return  string|void
+	 */
+	protected function upload_reply( $reason, $text, $extra = array() ) {
+
+		$result = $this->end_ajax( json_encode( array_merge( array( 'syncpilot_error' => 1, 'body' => $text . ' (#307)', 'reason' => $reason ), $extra ) ) );
+
+		return $result;
+	}
+
+	/**
+	 * One part of an upload of a dump. The page sends the file in parts of the size of one request (the limit of the
+	 * request of the other transfers) as a file of the form, so a firewall sees binary data and the PHP limits for the size of a post are
+	 * the limits of the part, not of the dump. The parts are put one after the other into a file of the folder
+	 * `.upload` (the name is the ID that the page made); the part must begin where the file ends, so a part that was sent twice
+	 * or lost is told to the page (it says how many bytes there are), which goes on from there. The last part
+	 * (`last`) checks the file (it is not empty; a gzip file begins like one) and moves it into the folder of the dumps under the
+	 * name that uploaded_name() makes. With `cancel` the part is removed.
+	 * @since   0.4.2
+	 *
+	 * @return  string|void  The answer as JSON (only in tests, otherwise the request ends here)
+	 */
+	function ajax_import_upload() {
+
+		$this->check_ajax_referer( 'import-upload' );
+
+		$id = (string) ( $_POST['id'] ?? '' );
+
+		if ( ! preg_match( '/^[0-9a-f]{24}$/', $id ) ) {
+
+			$this->log_error( SyncPilot_HelpCode::ImportUploadFailed, array( 'reason' => 'id' ), site: 1 );
+
+			return $this->upload_reply( 'id', __( 'The upload has no valid ID.', self::TEXT_DOMAIN ) );
+		}
+
+		if ( false === ( $dir = self::upload_dir() ) ) {
+
+			$this->log_error( SyncPilot_HelpCode::ImportUploadFailed, array( 'reason' => 'folder' ), site: 2 );
+
+			return $this->upload_reply( 'folder', __( 'The folder for dumps cannot be written.', self::TEXT_DOMAIN ) );
+		}
+
+		$part = $dir . DS . $id . '.part';
+
+		if ( ! empty( $_POST['cancel'] ) ) {
+
+			if ( is_file( $part ) )
+				@unlink( $part );
+
+			$result = $this->end_ajax( json_encode( array( 'cancelled' => 1 ) ) );
+
+			return $result;
+		}
+
+		$offset   = (int) ( $_POST['offset'] ?? 0 );
+		$received = is_file( $part ) ? (int) filesize( $part ) : 0;
+
+		if ( 0 === $offset ) {
+
+			self::remove_stale_uploads();
+
+			// the first part: the disk has room for the file (the size is the one of the file at the browser; compressed it is less)
+			$size = max( 0, (int) ( $_POST['size'] ?? 0 ) );
+			$free = apply_filters( 'syncpilot_import_free_bytes', @disk_free_space( $dir ), $dir );
+
+			if ( false !== $free && $size && $free < $size + 67108864 ) {
+
+				$this->log_error( SyncPilot_HelpCode::ImportUploadFailed, array_merge( array( 'reason' => 'disk' ), array( 'free_bytes' => (int) $free, 'needed_bytes' => $size + 67108864 ) ), site: 3 );
+
+				return $this->upload_reply( 'disk', __( 'The disk has no room for this file.', self::TEXT_DOMAIN ), array( 'free_bytes' => (int) $free, 'needed_bytes' => $size + 67108864 ) );
+			}
+
+			// a part that begins again: what an earlier try left is dropped
+			if ( $received ) {
+
+				@unlink( $part );
+				$received = 0;
+			}
+		}
+
+		if ( $offset !== $received ) {
+
+			$this->log_error( SyncPilot_HelpCode::ImportUploadFailed, array_merge( array( 'reason' => 'offset' ), array( 'received' => $received, 'offset' => $offset ) ), site: 4 );
+
+			return $this->upload_reply( 'offset', __( 'The upload is out of step.', self::TEXT_DOMAIN ), array( 'received' => $received, 'offset' => $offset ) );
+		}
+
+		if ( ! isset( $_FILES['chunk']['tmp_name'] ) || ! is_string( $_FILES['chunk']['tmp_name'] ) || ! is_uploaded_file( $_FILES['chunk']['tmp_name'] ) ) {
+
+			$this->log_error( SyncPilot_HelpCode::ImportUploadFailed, array_merge( array( 'reason' => 'chunk' ), array( 'request_bytes' => (int) ( $_SERVER['CONTENT_LENGTH'] ?? 0 ), 'received' => $received ) ), site: 5 );
+
+			return $this->upload_reply( 'chunk', __( 'The server received no part of the file.', self::TEXT_DOMAIN ), array( 'request_bytes' => (int) ( $_SERVER['CONTENT_LENGTH'] ?? 0 ), 'received' => $received ) );
+		}
+
+		$in  = @fopen( $_FILES['chunk']['tmp_name'], 'rb' );
+		$out = @fopen( $part, 'ab' );
+
+		if ( ! $in || ! $out ) {
+
+			if ( $in ) fclose( $in );
+			if ( $out ) fclose( $out );
+
+			$this->log_error( SyncPilot_HelpCode::ImportUploadFailed, array_merge( array( 'reason' => 'write' ), array( 'received' => $received ) ), site: 6 );
+
+
+			return $this->upload_reply( 'write', __( 'The part of the file could not be written.', self::TEXT_DOMAIN ), array( 'received' => $received ) );
+		}
+
+		$written = stream_copy_to_stream( $in, $out );
+
+		fclose( $in );
+
+		// a write that ends early (a disk that is full) is known when the file is closed
+		$closed = fclose( $out );
+
+		clearstatcache( true, $part );
+
+		$size = (int) @filesize( $part );
+
+		if ( false === $written || ! $closed || $size !== $received + (int) $written ) {
+
+			@unlink( $part );
+
+			$this->log_error( SyncPilot_HelpCode::ImportUploadFailed, array_merge( array( 'reason' => 'write' ), array( 'received' => $received ) ), site: 7 );
+
+
+			return $this->upload_reply( 'write', __( 'The part of the file could not be written.', self::TEXT_DOMAIN ), array( 'received' => $received ) );
+		}
+
+		if ( empty( $_POST['last'] ) ) {
+
+			$result = $this->end_ajax( json_encode( array( 'received' => $size ) ) );
+
+			return $result;
+		}
+
+		// the last part: the file is complete
+		$gzip = self::is_gzip_file( $part );
+		$name = self::uploaded_name( wp_unslash( (string) ( $_POST['name'] ?? '' ) ), $gzip && ! preg_match( '/\.gz$/i', (string) ( $_POST['name'] ?? '' ) ) );
+
+		if ( false === $name ) {
+
+			@unlink( $part );
+
+			$this->log_error( SyncPilot_HelpCode::ImportUploadFailed, array( 'reason' => 'name' ), site: 8 );
+
+
+			return $this->upload_reply( 'name', __( 'This is not a .sql or .sql.gz file.', self::TEXT_DOMAIN ) );
+		}
+
+		if ( 0 === $size ) {
+
+			@unlink( $part );
+
+			$this->log_error( SyncPilot_HelpCode::ImportUploadFailed, array( 'reason' => 'empty' ), site: 9 );
+
+
+			return $this->upload_reply( 'empty', __( 'The file is empty.', self::TEXT_DOMAIN ) );
+		}
+
+		// a name that says gzip is a gzip file, and the other way round: the import reads by content, a mistake is told here
+		if ( self::is_gzip_name( $name ) !== $gzip ) {
+
+			@unlink( $part );
+
+			$this->log_error( SyncPilot_HelpCode::ImportUploadFailed, array( 'reason' => 'gzip' ), site: 10 );
+
+
+			return $this->upload_reply( 'gzip', $gzip ? __( 'The file is a gzip file but is not named .sql.gz.', self::TEXT_DOMAIN ) : __( 'The file is named .sql.gz but is no gzip file.', self::TEXT_DOMAIN ) );
+		}
+
+		$target = self::dir() . DS . $name;
+
+		if ( file_exists( $target ) || ! @rename( $part, $target ) ) {
+
+			@unlink( $part );
+
+			$this->log_error( SyncPilot_HelpCode::ImportUploadFailed, array( 'reason' => 'write' ), site: 11 );
+
+
+			return $this->upload_reply( 'write', __( 'The file could not be put into the folder for dumps.', self::TEXT_DOMAIN ) );
+		}
+
+		SyncPilot_Logger::event( 'Dump uploaded', array( 'bytes' => $size, 'gzip' => $gzip ) );
+
+		$result = $this->end_ajax( json_encode( array( 'received' => $size, 'name' => $name, 'done' => 1 ) ) );
+
+		return $result;
+	}
+
+	/**
+	 * Remove a dump of the folder (the link of the list)
+	 * @since   0.4.2
+	 *
+	 * @return  string|void  The answer as JSON (only in tests, otherwise the request ends here)
+	 */
+	function ajax_import_delete() {
+
+		$this->check_ajax_referer( 'import-delete' );
+
+		$name = wp_unslash( (string) ( $_POST['file'] ?? '' ) );
+
+		// the import that is under way reads its dump until the end
+		$state = self::state_read();
+
+		if ( ! empty( $state['file'] ) && $state['file'] === $name )
+			return $this->import_error( __( 'This file is read by an import that is under way.', self::TEXT_DOMAIN ) );
+
+		$deleted = self::delete( $name );
+
+		$result = $this->end_ajax( json_encode( array( 'deleted' => $deleted ? 1 : 0 ) ) );
+
+		return $result;
+	}
+
+	/**
 	 * Answer the page with the dumps in the folder
 	 * @since   0.4.0
+	 * @since   0.4.2  Removes the parts of uploads that were not finished and are older than a day
 	 *
 	 * @return  void|string  The answer as JSON (only in tests, otherwise the request ends here)
 	 */
@@ -1817,6 +2152,8 @@ class SyncPilot_Import extends SyncPilot_Base {
 		$this->check_ajax_referer( 'import-list' );
 
 		$writable = false !== self::dir();
+
+		self::remove_stale_uploads();
 
 		$result = $this->end_ajax( json_encode( array(
 			'files'    => self::files(),

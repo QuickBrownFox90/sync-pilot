@@ -1397,8 +1397,8 @@ msgid "The dump (.sql or .sql.gz) replaces the tables of this site that it holds
 msgstr "Der Dump (.sql oder .sql.gz) ersetzt die Tabellen dieser Website, die er enthält. Er wird vollständig geprüft, bevor etwas verändert wird, und die Tabellen werden am Ende ersetzt, wie nach einem Pull."
 
 #: template/migrate.php
-msgid "Put the file into the folder shown here (SFTP, or a copy on a local site) and refresh the list."
-msgstr "Lege die Datei in den hier gezeigten Ordner (SFTP oder eine Kopie auf einer lokalen Website) und aktualisiere die Liste."
+msgid "Put the file into the folder shown here (SFTP, or a copy on a local site) and refresh the list, or upload it here: it is sent in parts of the size of one request, so the limits of PHP for an upload do not matter. A file that was uploaded here is removed after the import unless you change that."
+msgstr "Lege die Datei in den hier gezeigten Ordner (SFTP oder eine Kopie auf einer lokalen Website) und aktualisiere die Liste, oder lade sie hier hoch: Sie wird in Teilen von der Größe einer Anfrage gesendet, die PHP-Grenzen für einen Upload spielen also keine Rolle. Eine Datei, die hier hochgeladen wurde, wird nach dem Import entfernt, wenn du das nicht änderst."
 
 #: template/migrate.php
 msgid "Folder"
@@ -1566,3 +1566,123 @@ msgstr ""
 "Collation an, die sie auf dieser Seite haben, und die weicht nach einem Pull "
 "von einer neueren Datenbank von der anderen Seite ab. Braucht SyncPilot "
 "0.4.1 auf der anderen Seite."
+
+#: class/syncpilot-import.php
+msgid "Choose a file from the folder"
+msgstr "Eine Datei aus dem Ordner wählen"
+
+#: class/syncpilot-import.php
+msgid "Upload a file"
+msgstr "Eine Datei hochladen"
+
+#: class/syncpilot-import.php
+msgid "Compress a .sql file before the upload (it is smaller, and a firewall does not see SQL in it)"
+msgstr "Eine .sql-Datei vor dem Hochladen komprimieren (sie ist kleiner, und eine Firewall sieht kein SQL darin)"
+
+#: class/syncpilot-import.php
+msgid "Upload"
+msgstr "Hochladen"
+
+#: class/syncpilot-import.php
+msgid "Cancel the upload"
+msgstr "Hochladen abbrechen"
+
+#: class/syncpilot-import.php
+msgid "Remove the file after the import (not when it is cancelled or stops with an error)"
+msgstr "Die Datei nach dem Import entfernen (nicht bei Abbruch oder einem Fehler)"
+
+#: class/syncpilot-import.php
+msgid "Please choose a file to upload."
+msgstr "Bitte wähle eine Datei zum Hochladen."
+
+#: class/syncpilot-import.php
+msgid "Only a .sql or .sql.gz file can be uploaded."
+msgstr "Es kann nur eine .sql- oder .sql.gz-Datei hochgeladen werden."
+
+#: class/syncpilot-import.php
+msgid "Uploading"
+msgstr "Wird hochgeladen"
+
+#: class/syncpilot-import.php
+msgid "The file was uploaded and is chosen. The upload is checked when the import begins."
+msgstr "Die Datei wurde hochgeladen und ist gewählt. Sie wird geprüft, wenn der Import beginnt."
+
+#: class/syncpilot-import.php
+msgid "The upload was cancelled."
+msgstr "Das Hochladen wurde abgebrochen."
+
+#: class/syncpilot-import.php
+msgid "The upload stopped:"
+msgstr "Das Hochladen wurde angehalten:"
+
+#: class/syncpilot-import.php
+msgid "The upload cannot go on: the server lost the file that it had received. Try again."
+msgstr "Das Hochladen kann nicht weitergehen: Der Server hat die Datei verloren, die er schon hatte. Versuche es noch einmal."
+
+#: class/syncpilot-import.php
+msgid "compressed"
+msgstr "komprimiert"
+
+#: class/syncpilot-import.php
+msgid "Remove"
+msgstr "Entfernen"
+
+#: class/syncpilot-import.php
+msgid "Remove this file from the folder?"
+msgstr "Diese Datei aus dem Ordner entfernen?"
+
+#: class/syncpilot-import.php
+msgid "The file could not be removed."
+msgstr "Die Datei konnte nicht entfernt werden."
+
+#: class/syncpilot-import.php
+msgid "uploaded"
+msgstr "hochgeladen"
+
+#: class/syncpilot-import.php
+msgid "The upload has no valid ID."
+msgstr "Das Hochladen hat keine gültige ID."
+
+#: class/syncpilot-import.php
+msgid "The folder for dumps cannot be written."
+msgstr "In den Ordner für Dumps kann nicht geschrieben werden."
+
+#: class/syncpilot-import.php
+msgid "The disk has no room for this file."
+msgstr "Auf dem Datenträger ist kein Platz für diese Datei."
+
+#: class/syncpilot-import.php
+msgid "The upload is out of step."
+msgstr "Das Hochladen ist aus dem Takt geraten."
+
+#: class/syncpilot-import.php
+msgid "The server received no part of the file."
+msgstr "Der Server hat keinen Teil der Datei erhalten."
+
+#: class/syncpilot-import.php
+msgid "The part of the file could not be written."
+msgstr "Der Teil der Datei konnte nicht geschrieben werden."
+
+#: class/syncpilot-import.php
+msgid "This is not a .sql or .sql.gz file."
+msgstr "Das ist keine .sql- oder .sql.gz-Datei."
+
+#: class/syncpilot-import.php
+msgid "The file is empty."
+msgstr "Die Datei ist leer."
+
+#: class/syncpilot-import.php
+msgid "The file is a gzip file but is not named .sql.gz."
+msgstr "Die Datei ist eine gzip-Datei, heißt aber nicht .sql.gz."
+
+#: class/syncpilot-import.php
+msgid "The file is named .sql.gz but is no gzip file."
+msgstr "Die Datei heißt .sql.gz, ist aber keine gzip-Datei."
+
+#: class/syncpilot-import.php
+msgid "The file could not be put into the folder for dumps."
+msgstr "Die Datei konnte nicht in den Ordner für Dumps gelegt werden."
+
+#: class/syncpilot-import.php
+msgid "This file is read by an import that is under way."
+msgstr "Diese Datei wird von einem laufenden Import gelesen."

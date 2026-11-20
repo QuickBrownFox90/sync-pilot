@@ -17,6 +17,18 @@ var files_loaded = false;
 // the answer of the scan that has the list of the tables; the load goes on with it after the backup
 var scanned = null;
 
+// the upload that is under way: the ID of the server, a flag to stop it, and the request that is sent
+var upload = null;
+
+// the name that the server gave to the file that was uploaded last: it is chosen when the list is shown
+var uploaded_name = '';
+
+// the choice to remove the file was changed by hand: the list does not set it again
+var delete_touched = false;
+
+// how often a part of an upload is sent again after an error of the connection
+const UPLOAD_TRIES = 3;
+
 /**
  * Bind what the form of an import needs: the list of the dumps is asked for when the import is chosen, the link refreshes it
  * @since   0.4.0
@@ -30,6 +42,40 @@ export function init_import() {
     } );
 
     $( '.migrate-selection.option-group input[type=radio]' ).change( import_chosen_changed );
+
+    // the file comes from the folder or from an upload
+    $( 'input[name=import_source]' ).change( function () {
+
+        var from_upload = 'upload' === $( 'input[name=import_source]:checked' ).val();
+
+        $( '.import-from-upload' ).toggle( from_upload );
+        $( '.import-from-folder' ).toggle( ! from_upload );
+    } );
+
+    $( '.import-upload-start' ).click( start_upload );
+
+    $( '.import-upload-cancel' ).click( function ( e ) {
+
+        e.preventDefault();
+        cancel_upload();
+    } );
+
+    // a file that was uploaded is removed after the import, one that was put into the folder is not (the choice can be changed)
+    $( '#import-delete-file' ).change( function () {
+        delete_touched = true;
+    } );
+
+    $( 'body' ).on( 'change', 'input[name=import_file]', function () {
+
+        delete_touched = false;
+        $( '#import-delete-file' ).prop( 'checked', '1' === $( this ).attr( 'data-uploaded' ) );
+    } );
+
+    $( 'body' ).on( 'click', '.import-file-delete', function ( e ) {
+
+        e.preventDefault();
+        delete_file( $( this ).attr( 'data-file' ) );
+    } );
 
     import_chosen_changed();
 }
@@ -108,7 +154,10 @@ function load_files() {
  */
 function show_files( data ) {
 
-    var chosen = $( 'input[name=import_file]:checked' ).val() || ( typeof syncpilot_loaded_import_file != 'undefined' ? syncpilot_loaded_import_file : '' );
+    var chosen = uploaded_name || $( 'input[name=import_file]:checked' ).val() || ( typeof syncpilot_loaded_import_file != 'undefined' ? syncpilot_loaded_import_file : '' );
+
+    uploaded_name = '';
+
     var $list  = $( '.import-files' ).empty();
     var usable = $.grep( data.files, function ( file ) {
         return file.usable;
@@ -124,14 +173,15 @@ function show_files( data ) {
         if ( file.usable ) {
 
             var $label = $( '<label>' ).attr( 'for', 'import-file-' + n );
-            var $radio = $( '<input type="radio" name="import_file">' ).attr( { id : 'import-file-' + n, value : file.name } );
+            var $radio = $( '<input type="radio" name="import_file">' ).attr( { id : 'import-file-' + n, value : file.name, 'data-uploaded' : file.uploaded ? '1' : '0' } );
 
             if ( file.name === chosen || ( ! chosen && 1 === usable.length ) )
                 $radio.prop( 'checked', true );
 
             $label.append( $radio ).append( document.createTextNode( ' ' + file.name ) );
-            $label.append( $( '<span class="option-description">' ).text( format_size( file.bytes ) + ( file.gzip ? ' (gzip)' : '' ) + ', ' + new Date( file.modified * 1000 ).toLocaleString() ) );
+            $label.append( $( '<span class="option-description">' ).text( format_size( file.bytes ) + ( file.gzip ? ' (gzip)' : '' ) + ( file.uploaded ? ', ' + syncpilot_i10n.import_uploaded : '' ) + ', ' + new Date( file.modified * 1000 ).toLocaleString() ) );
             $item.append( $label );
+            $item.append( $( '<a href="#" class="js-action-link import-file-delete">' ).attr( 'data-file', file.name ).text( syncpilot_i10n.import_delete ) );
         } else {
             $item.addClass( 'import-file-unusable' ).text( file.name + ' - ' + syncpilot_i10n['import_reason_' + file.reason] );
         }
@@ -140,6 +190,373 @@ function show_files( data ) {
     } );
 
     $( '.import-no-files' ).text( usable.length ? '' : syncpilot_i10n.import_no_files );
+
+    // a file that is chosen at once (the only one, or the one that was uploaded) has its choice for the removal
+    var $now = $( 'input[name=import_file]:checked' );
+
+    if ( $now.length && ! delete_touched )
+        $( '#import-delete-file' ).prop( 'checked', '1' === $now.attr( 'data-uploaded' ) );
+}
+
+/**
+ * Show a text under the upload (and in the colour of an error when it is one)
+ * @since   0.4.2
+ * @param   {string}  text   The text
+ * @param   {boolean} error  It is an error
+ */
+function upload_text( text, error ) {
+    $( '.import-upload-text' ).text( text ).toggleClass( 'error', !! error ).toggleClass( 'notification-message', !! error );
+}
+
+/**
+ * Remove a file of the folder (the link behind it), after a question
+ * @since   0.4.2
+ * @param   {string} name  The name of the file
+ */
+function delete_file( name ) {
+
+    if ( ! window.confirm( syncpilot_i10n.import_delete_confirm + '\n' + name ) )
+        return;
+
+    $.ajax( {
+        url      : ajaxurl,
+        type     : 'POST',
+        dataType : 'json',
+        cache    : false,
+        data     : {
+            action : 'syncpilot_import_delete',
+            file   : name,
+            nonce  : syncpilot_nonces.import_delete,
+        },
+        success : function ( data ) {
+
+            if ( data && data.deleted )
+                load_files();
+            else
+                window.alert( ( data && data.body ) || syncpilot_i10n.import_delete_problem );
+        },
+        error : function () {
+            window.alert( syncpilot_i10n.import_delete_problem );
+        }
+    } );
+}
+
+/**
+ * The parts of a file for the upload, one after the other: a file as it is is cut with slice(), a .sql file is compressed
+ * (gzip, in the browser) and cut where the compressed data is as large as a part. Each call gives { blob, last } for the next part;
+ * the next part is read before the answer so that the last one is known (an empty last part would be sent for a file that
+ * ends at the border of a part).
+ * @since   0.4.2
+ * @param   {File}    file      The file
+ * @param   {number}  size      The size of a part
+ * @param   {boolean} compress  Compress it
+ * @return  {object}  next(): promise of { blob, last }, progress(): 0..1
+ */
+function upload_parts( file, size, compress ) {
+
+    if ( ! compress ) {
+
+        var at = 0;
+
+        return {
+            next : function () {
+
+                var blob = file.slice( at, at + size );
+
+                at += blob.size;
+
+                return Promise.resolve( { blob : blob, last : at >= file.size } );
+            },
+            progress : function () {
+                return file.size ? at / file.size : 1;
+            }
+        };
+    }
+
+    var read   = 0;
+    var source = file.stream()
+        .pipeThrough( new TransformStream( { transform : function ( piece, controller ) {
+
+            read += piece.length;
+            controller.enqueue( piece );
+        } } ) )
+        .pipeThrough( new CompressionStream( 'gzip' ) )
+        .getReader();
+    var held  = [];
+    var held_bytes = 0;
+    var ended = false;
+
+    function fill( wanted ) {
+
+        if ( ended || held_bytes >= wanted )
+            return Promise.resolve();
+
+        return source.read().then( function ( result ) {
+
+            if ( result.done ) {
+                ended = true;
+
+                return;
+            }
+
+            held.push( result.value );
+            held_bytes += result.value.length;
+
+            return fill( wanted );
+        } );
+    }
+
+    return {
+        next : function () {
+
+            // one byte more than a part: it is known whether something follows
+            return fill( size + 1 ).then( function () {
+
+                var all = new Uint8Array( held_bytes );
+                var pos = 0;
+
+                held.forEach( function ( piece ) {
+
+                    all.set( piece, pos );
+                    pos += piece.length;
+                } );
+
+                var take = Math.min( size, all.length );
+                var rest = all.subarray( take );
+
+                held       = rest.length ? [ rest ] : [];
+                held_bytes = rest.length;
+
+                return { blob : new Blob( [ all.subarray( 0, take ) ] ), last : ended && 0 === rest.length };
+            } );
+        },
+        progress : function () {
+            return file.size ? Math.min( 1, read / file.size ) : 1;
+        }
+    };
+}
+
+/**
+ * A random ID for an upload: 24 hexadecimal characters, which the server takes as the name of the part
+ * @since   0.4.2
+ * @return  {string}
+ */
+function upload_id() {
+
+    var bytes = new Uint8Array( 12 );
+
+    window.crypto.getRandomValues( bytes );
+
+    return Array.prototype.map.call( bytes, function ( b ) {
+        return ( '0' + b.toString( 16 ) ).slice( -2 );
+    } ).join( '' );
+}
+
+/**
+ * Send one part: the part is a file of the form, the rest are fields. It is sent again after an error of the connection (the
+ * server knows how much it has and tells it when a part came twice or not at all).
+ * @since   0.4.2
+ * @param   {object}   job   The upload: id, file, offset
+ * @param   {object}   part  The part: blob, last
+ * @param   {number}   tries How often it may be sent again
+ * @return  {Promise}  Resolves with the answer of the server, rejects with a text
+ */
+function send_part( job, part, tries ) {
+
+    return new Promise( function ( resolve, reject ) {
+
+        var form = new FormData();
+
+        form.append( 'action', 'syncpilot_import_upload' );
+        form.append( 'nonce', syncpilot_nonces.import_upload );
+        form.append( 'id', job.id );
+        form.append( 'offset', job.offset );
+        form.append( 'size', job.file.size );
+        form.append( 'name', job.file.name );
+        form.append( 'last', part.last ? 1 : 0 );
+        form.append( 'chunk', part.blob, 'part' );
+
+        job.request = $.ajax( {
+            url         : ajaxurl,
+            type        : 'POST',
+            data        : form,
+            processData : false,
+            contentType : false,
+            dataType    : 'text',
+            cache       : false,
+            timeout     : 0,
+            success     : function ( text ) {
+
+                var answer;
+
+                try {
+                    answer = JSON.parse( $.trim( text ) );
+                } catch ( variable ) {
+                    reject( '' === $.trim( text ) ? syncpilot_i10n.table_process_problem_empty_response : syncpilot_sanitize_html( text ) );
+
+                    return;
+                }
+
+                // the server has it already (the answer of the part before was lost): go on from there
+                if ( answer.syncpilot_error && 'offset' === answer.reason && answer.received === job.offset + part.blob.size ) {
+                    resolve( { received : answer.received, done : 0 } );
+
+                    return;
+                }
+
+                if ( answer.syncpilot_error ) {
+                    reject( syncpilot_sanitize_html( answer.body ) );
+
+                    return;
+                }
+
+                resolve( answer );
+            },
+            error : function ( jqXHR, textStatus ) {
+
+                if ( job.stopped ) {
+                    reject( '' );
+
+                    return;
+                }
+
+                if ( tries > 0 ) {
+                    setTimeout( function () {
+                        send_part( job, part, tries - 1 ).then( resolve, reject );
+                    }, 1000 );
+
+                    return;
+                }
+
+                reject( jqXHR.status + ' ' + jqXHR.statusText + ' ' + textStatus );
+            }
+        } );
+    } );
+}
+
+/**
+ * Upload the file that is chosen: part after part, the bar shows how far it is. A .sql file is compressed first when the box says
+ * so and the browser can (it is smaller, and what a firewall sees in a post is binary data). When it is done the list is read
+ * again and the new file is chosen.
+ * @since   0.4.2
+ */
+function start_upload() {
+
+    var input = $( '#import-upload-file' )[0];
+    var file  = input.files && input.files[0];
+
+    if ( upload ) {
+        return;
+    }
+
+    if ( ! file ) {
+        upload_text( syncpilot_i10n.import_upload_choose, true );
+
+        return;
+    }
+
+    if ( ! /\.sql(\.gz)?$/i.test( file.name ) ) {
+        upload_text( syncpilot_i10n.import_upload_name, true );
+
+        return;
+    }
+
+    var compress = $( '#import-upload-compress' ).is( ':checked' ) && /\.sql$/i.test( file.name ) && typeof CompressionStream != 'undefined' && typeof file.stream == 'function';
+    var size     = Math.max( 65536, parseInt( syncpilot_max_request, 10 ) || 1048576 );
+    var parts    = upload_parts( file, size, compress );
+    var job      = { id : upload_id(), file : file, offset : 0, stopped : false, request : null };
+
+    upload = job;
+
+    $( '.import-upload-start' ).prop( 'disabled', true );
+    $( '.import-upload-cancel' ).show();
+    $( '.import-upload-bar' ).show();
+    $( '.import-upload-bar-fill' ).width( '0%' );
+    upload_text( syncpilot_i10n.import_uploading + ( compress ? ' (' + syncpilot_i10n.import_upload_compressing + ')' : '' ) + ' ...', false );
+
+    function finish() {
+
+        upload = null;
+
+        $( '.import-upload-start' ).prop( 'disabled', false );
+        $( '.import-upload-cancel' ).hide();
+    }
+
+    function step() {
+
+        parts.next().then( function ( part ) {
+
+            if ( job.stopped )
+                return;
+
+            return send_part( job, part, UPLOAD_TRIES ).then( function ( answer ) {
+
+                job.offset = answer.received;
+
+                var percent = Math.floor( 100 * parts.progress() );
+
+                $( '.import-upload-bar-fill' ).width( percent + '%' );
+                upload_text( syncpilot_i10n.import_uploading + ' ' + percent + '% (' + format_size( job.offset ) + ')', false );
+
+                if ( answer.done || part.last && answer.name ) {
+
+                    finish();
+                    $( '.import-upload-bar' ).hide();
+                    upload_text( syncpilot_i10n.import_upload_done, false );
+
+                    // the file that came is chosen, the list shows it
+                    $( 'input[name=import_source][value=folder]' ).prop( 'checked', true ).trigger( 'change' );
+                    uploaded_name = answer.name;
+                    delete_touched = false;
+                    load_files();
+
+                    return;
+                }
+
+                return step();
+            } );
+        } ).catch( function ( text ) {
+
+            if ( job.stopped )
+                return;
+
+            finish();
+            upload_text( syncpilot_i10n.import_upload_problem + ' ' + text, true );
+        } );
+    }
+
+    step();
+}
+
+/**
+ * Stop the upload: the request that is sent is aborted and the server removes what it has of the file
+ * @since   0.4.2
+ */
+function cancel_upload() {
+
+    if ( ! upload )
+        return;
+
+    var job = upload;
+
+    job.stopped = true;
+
+    if ( job.request )
+        job.request.abort();
+
+    upload = null;
+
+    $( '.import-upload-start' ).prop( 'disabled', false );
+    $( '.import-upload-cancel' ).hide();
+    $( '.import-upload-bar' ).hide();
+    upload_text( syncpilot_i10n.import_upload_cancelled, false );
+
+    $.ajax( {
+        url      : ajaxurl,
+        type     : 'POST',
+        dataType : 'text',
+        data     : { action : 'syncpilot_import_upload', nonce : syncpilot_nonces.import_upload, id : job.id, cancel : 1 }
+    } );
 }
 
 /**
@@ -196,6 +613,7 @@ export function start_import() {
             form_data         : state.form_data,
             other_prefix      : $( '#import-other-prefix' ).is( ':checked' ) ? 1 : 0,
             strict_collations : $( '#import-strict-collations' ).is( ':checked' ) ? 1 : 0,
+            delete_file       : $( '#import-delete-file' ).is( ':checked' ) ? 1 : 0,
             nonce             : syncpilot_nonces.import_start,
         },
         error : function ( jqXHR, textStatus, errorThrown ) {

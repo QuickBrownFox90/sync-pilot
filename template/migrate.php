@@ -150,13 +150,39 @@
 
 					<div class="import-file-info helper-message">
 						<p><?php _e( 'The dump (.sql or .sql.gz) replaces the tables of this site that it holds. It is checked completely before anything is changed, and the tables are replaced at the end, like after a pull.', self::TEXT_DOMAIN ); ?></p>
-						<p><?php _e( 'Put the file into the folder shown here (SFTP, or a copy on a local site) and refresh the list.', self::TEXT_DOMAIN ); ?></p>
+						<p><?php _e( 'Put the file into the folder shown here (SFTP, or a copy on a local site) and refresh the list, or upload it here: it is sent in parts of the size of one request, so the limits of PHP for an upload do not matter. A file that was uploaded here is removed after the import unless you change that.', self::TEXT_DOMAIN ); ?></p>
 					</div>
 				</div>
+				<p class="import-source">
+					<label for="import-source-folder"><input id="import-source-folder" type="radio" name="import_source" value="folder" checked="checked" /> <?php _e( 'Choose a file from the folder', self::TEXT_DOMAIN ); ?></label>
+					<label for="import-source-upload"><input id="import-source-upload" type="radio" name="import_source" value="upload" /> <?php _e( 'Upload a file', self::TEXT_DOMAIN ); ?></label>
+				</p>
+
+				<div class="import-source-box import-from-upload" style="display: none;">
+					<p><input id="import-upload-file" type="file" accept=".sql,.gz,.sql.gz" /></p>
+					<label for="import-upload-compress" class="import-upload-compress">
+						<input id="import-upload-compress" type="checkbox" value="1" checked="checked" />
+						<?php _e( 'Compress a .sql file before the upload (it is smaller, and a firewall does not see SQL in it)', self::TEXT_DOMAIN ); ?>
+					</label>
+					<p>
+						<button type="button" class="button import-upload-start"><?php _e( 'Upload', self::TEXT_DOMAIN ); ?></button>
+						<a href="#" class="js-action-link import-upload-cancel" style="display: none;"><?php _e( 'Cancel the upload', self::TEXT_DOMAIN ); ?></a>
+					</p>
+					<div class="import-upload-bar" style="display: none;"><div class="import-upload-bar-fill"></div></div>
+					<p class="import-upload-text inline-message"></p>
+				</div>
+
+				<div class="import-source-box import-from-folder">
 				<p class="import-folder"><?php _e( 'Folder', self::TEXT_DOMAIN ); ?>: <code class="import-folder-path"></code> <a href="#" class="js-action-link import-refresh"><?php _e( 'Refresh the list', self::TEXT_DOMAIN ); ?></a></p>
 				<p class="import-folder-note inline-message warning" style="display: none;"></p>
 				<ul class="import-files"></ul>
 				<p class="import-no-files"></p>
+				</div>
+
+				<label for="import-delete-file" class="import-delete-file">
+					<input id="import-delete-file" type="checkbox" value="1" />
+					<?php _e( 'Remove the file after the import (not when it is cancelled or stops with an error)', self::TEXT_DOMAIN ); ?>
+				</label>
 				<label for="import-other-prefix" class="import-other-prefix">
 					<input id="import-other-prefix" type="checkbox" value="1" name="import_other_prefix"<?php $this->maybe_checked( $loaded_profile['import_other_prefix'] ); ?> />
 					<?php printf( __( 'The tables of the dump may have another prefix than "%s" (this site ignores them until its prefix is changed in wp-config.php)', self::TEXT_DOMAIN ), esc_html( $wpdb->base_prefix ) ); ?>

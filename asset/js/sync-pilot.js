@@ -1909,12 +1909,37 @@ function syncpilot_parse_json( maybe_json ) {
   var $18 = jQuery;
   var files_loaded = false;
   var scanned = null;
+  var upload = null;
+  var uploaded_name = "";
+  var delete_touched = false;
+  var UPLOAD_TRIES = 3;
   function init_import() {
     $18("body").on("click", ".import-refresh", function(e) {
       e.preventDefault();
       load_files();
     });
     $18(".migrate-selection.option-group input[type=radio]").change(import_chosen_changed);
+    $18("input[name=import_source]").change(function() {
+      var from_upload = "upload" === $18("input[name=import_source]:checked").val();
+      $18(".import-from-upload").toggle(from_upload);
+      $18(".import-from-folder").toggle(!from_upload);
+    });
+    $18(".import-upload-start").click(start_upload);
+    $18(".import-upload-cancel").click(function(e) {
+      e.preventDefault();
+      cancel_upload();
+    });
+    $18("#import-delete-file").change(function() {
+      delete_touched = true;
+    });
+    $18("body").on("change", "input[name=import_file]", function() {
+      delete_touched = false;
+      $18("#import-delete-file").prop("checked", "1" === $18(this).attr("data-uploaded"));
+    });
+    $18("body").on("click", ".import-file-delete", function(e) {
+      e.preventDefault();
+      delete_file($18(this).attr("data-file"));
+    });
     import_chosen_changed();
   }
   function import_chosen_changed() {
@@ -1956,7 +1981,8 @@ function syncpilot_parse_json( maybe_json ) {
     });
   }
   function show_files(data) {
-    var chosen = $18("input[name=import_file]:checked").val() || (typeof syncpilot_loaded_import_file != "undefined" ? syncpilot_loaded_import_file : "");
+    var chosen = uploaded_name || $18("input[name=import_file]:checked").val() || (typeof syncpilot_loaded_import_file != "undefined" ? syncpilot_loaded_import_file : "");
+    uploaded_name = "";
     var $list = $18(".import-files").empty();
     var usable = $18.grep(data.files, function(file) {
       return file.usable;
@@ -1967,18 +1993,244 @@ function syncpilot_parse_json( maybe_json ) {
       var $item = $18("<li>");
       if (file.usable) {
         var $label = $18("<label>").attr("for", "import-file-" + n);
-        var $radio = $18('<input type="radio" name="import_file">').attr({ id: "import-file-" + n, value: file.name });
+        var $radio = $18('<input type="radio" name="import_file">').attr({ id: "import-file-" + n, value: file.name, "data-uploaded": file.uploaded ? "1" : "0" });
         if (file.name === chosen || !chosen && 1 === usable.length)
           $radio.prop("checked", true);
         $label.append($radio).append(document.createTextNode(" " + file.name));
-        $label.append($18('<span class="option-description">').text(format_size(file.bytes) + (file.gzip ? " (gzip)" : "") + ", " + new Date(file.modified * 1e3).toLocaleString()));
+        $label.append($18('<span class="option-description">').text(format_size(file.bytes) + (file.gzip ? " (gzip)" : "") + (file.uploaded ? ", " + syncpilot_i10n.import_uploaded : "") + ", " + new Date(file.modified * 1e3).toLocaleString()));
         $item.append($label);
+        $item.append($18('<a href="#" class="js-action-link import-file-delete">').attr("data-file", file.name).text(syncpilot_i10n.import_delete));
       } else {
         $item.addClass("import-file-unusable").text(file.name + " - " + syncpilot_i10n["import_reason_" + file.reason]);
       }
       $list.append($item);
     });
     $18(".import-no-files").text(usable.length ? "" : syncpilot_i10n.import_no_files);
+    var $now = $18("input[name=import_file]:checked");
+    if ($now.length && !delete_touched)
+      $18("#import-delete-file").prop("checked", "1" === $now.attr("data-uploaded"));
+  }
+  function upload_text(text, error) {
+    $18(".import-upload-text").text(text).toggleClass("error", !!error).toggleClass("notification-message", !!error);
+  }
+  function delete_file(name) {
+    if (!window.confirm(syncpilot_i10n.import_delete_confirm + "\n" + name))
+      return;
+    $18.ajax({
+      url: ajaxurl,
+      type: "POST",
+      dataType: "json",
+      cache: false,
+      data: {
+        action: "syncpilot_import_delete",
+        file: name,
+        nonce: syncpilot_nonces.import_delete
+      },
+      success: function(data) {
+        if (data && data.deleted)
+          load_files();
+        else
+          window.alert(data && data.body || syncpilot_i10n.import_delete_problem);
+      },
+      error: function() {
+        window.alert(syncpilot_i10n.import_delete_problem);
+      }
+    });
+  }
+  function upload_parts(file, size, compress) {
+    if (!compress) {
+      var at = 0;
+      return {
+        next: function() {
+          var blob = file.slice(at, at + size);
+          at += blob.size;
+          return Promise.resolve({ blob, last: at >= file.size });
+        },
+        progress: function() {
+          return file.size ? at / file.size : 1;
+        }
+      };
+    }
+    var read = 0;
+    var source = file.stream().pipeThrough(new TransformStream({ transform: function(piece, controller) {
+      read += piece.length;
+      controller.enqueue(piece);
+    } })).pipeThrough(new CompressionStream("gzip")).getReader();
+    var held = [];
+    var held_bytes = 0;
+    var ended = false;
+    function fill(wanted) {
+      if (ended || held_bytes >= wanted)
+        return Promise.resolve();
+      return source.read().then(function(result) {
+        if (result.done) {
+          ended = true;
+          return;
+        }
+        held.push(result.value);
+        held_bytes += result.value.length;
+        return fill(wanted);
+      });
+    }
+    return {
+      next: function() {
+        return fill(size + 1).then(function() {
+          var all = new Uint8Array(held_bytes);
+          var pos = 0;
+          held.forEach(function(piece) {
+            all.set(piece, pos);
+            pos += piece.length;
+          });
+          var take = Math.min(size, all.length);
+          var rest = all.subarray(take);
+          held = rest.length ? [rest] : [];
+          held_bytes = rest.length;
+          return { blob: new Blob([all.subarray(0, take)]), last: ended && 0 === rest.length };
+        });
+      },
+      progress: function() {
+        return file.size ? Math.min(1, read / file.size) : 1;
+      }
+    };
+  }
+  function upload_id() {
+    var bytes = new Uint8Array(12);
+    window.crypto.getRandomValues(bytes);
+    return Array.prototype.map.call(bytes, function(b) {
+      return ("0" + b.toString(16)).slice(-2);
+    }).join("");
+  }
+  function send_part(job, part, tries) {
+    return new Promise(function(resolve, reject) {
+      var form = new FormData();
+      form.append("action", "syncpilot_import_upload");
+      form.append("nonce", syncpilot_nonces.import_upload);
+      form.append("id", job.id);
+      form.append("offset", job.offset);
+      form.append("size", job.file.size);
+      form.append("name", job.file.name);
+      form.append("last", part.last ? 1 : 0);
+      form.append("chunk", part.blob, "part");
+      job.request = $18.ajax({
+        url: ajaxurl,
+        type: "POST",
+        data: form,
+        processData: false,
+        contentType: false,
+        dataType: "text",
+        cache: false,
+        timeout: 0,
+        success: function(text) {
+          var answer;
+          try {
+            answer = JSON.parse($18.trim(text));
+          } catch (variable) {
+            reject("" === $18.trim(text) ? syncpilot_i10n.table_process_problem_empty_response : syncpilot_sanitize_html(text));
+            return;
+          }
+          if (answer.syncpilot_error && "offset" === answer.reason && answer.received === job.offset + part.blob.size) {
+            resolve({ received: answer.received, done: 0 });
+            return;
+          }
+          if (answer.syncpilot_error) {
+            reject(syncpilot_sanitize_html(answer.body));
+            return;
+          }
+          resolve(answer);
+        },
+        error: function(jqXHR, textStatus) {
+          if (job.stopped) {
+            reject("");
+            return;
+          }
+          if (tries > 0) {
+            setTimeout(function() {
+              send_part(job, part, tries - 1).then(resolve, reject);
+            }, 1e3);
+            return;
+          }
+          reject(jqXHR.status + " " + jqXHR.statusText + " " + textStatus);
+        }
+      });
+    });
+  }
+  function start_upload() {
+    var input = $18("#import-upload-file")[0];
+    var file = input.files && input.files[0];
+    if (upload) {
+      return;
+    }
+    if (!file) {
+      upload_text(syncpilot_i10n.import_upload_choose, true);
+      return;
+    }
+    if (!/\.sql(\.gz)?$/i.test(file.name)) {
+      upload_text(syncpilot_i10n.import_upload_name, true);
+      return;
+    }
+    var compress = $18("#import-upload-compress").is(":checked") && /\.sql$/i.test(file.name) && typeof CompressionStream != "undefined" && typeof file.stream == "function";
+    var size = Math.max(65536, parseInt(syncpilot_max_request, 10) || 1048576);
+    var parts = upload_parts(file, size, compress);
+    var job = { id: upload_id(), file, offset: 0, stopped: false, request: null };
+    upload = job;
+    $18(".import-upload-start").prop("disabled", true);
+    $18(".import-upload-cancel").show();
+    $18(".import-upload-bar").show();
+    $18(".import-upload-bar-fill").width("0%");
+    upload_text(syncpilot_i10n.import_uploading + (compress ? " (" + syncpilot_i10n.import_upload_compressing + ")" : "") + " ...", false);
+    function finish() {
+      upload = null;
+      $18(".import-upload-start").prop("disabled", false);
+      $18(".import-upload-cancel").hide();
+    }
+    function step() {
+      parts.next().then(function(part) {
+        if (job.stopped)
+          return;
+        return send_part(job, part, UPLOAD_TRIES).then(function(answer) {
+          job.offset = answer.received;
+          var percent = Math.floor(100 * parts.progress());
+          $18(".import-upload-bar-fill").width(percent + "%");
+          upload_text(syncpilot_i10n.import_uploading + " " + percent + "% (" + format_size(job.offset) + ")", false);
+          if (answer.done || part.last && answer.name) {
+            finish();
+            $18(".import-upload-bar").hide();
+            upload_text(syncpilot_i10n.import_upload_done, false);
+            $18("input[name=import_source][value=folder]").prop("checked", true).trigger("change");
+            uploaded_name = answer.name;
+            delete_touched = false;
+            load_files();
+            return;
+          }
+          return step();
+        });
+      }).catch(function(text) {
+        if (job.stopped)
+          return;
+        finish();
+        upload_text(syncpilot_i10n.import_upload_problem + " " + text, true);
+      });
+    }
+    step();
+  }
+  function cancel_upload() {
+    if (!upload)
+      return;
+    var job = upload;
+    job.stopped = true;
+    if (job.request)
+      job.request.abort();
+    upload = null;
+    $18(".import-upload-start").prop("disabled", false);
+    $18(".import-upload-cancel").hide();
+    $18(".import-upload-bar").hide();
+    upload_text(syncpilot_i10n.import_upload_cancelled, false);
+    $18.ajax({
+      url: ajaxurl,
+      type: "POST",
+      dataType: "text",
+      data: { action: "syncpilot_import_upload", nonce: syncpilot_nonces.import_upload, id: job.id, cancel: 1 }
+    });
   }
   function show_progress(answer) {
     var labels = { unpack: syncpilot_i10n.import_unpacking, scan: syncpilot_i10n.import_scanning, scanned: syncpilot_i10n.import_scanning, load: syncpilot_i10n.import_loading, loaded: syncpilot_i10n.import_loading, replace: syncpilot_i10n.import_replacing, replaced: syncpilot_i10n.import_replacing };
@@ -2011,6 +2263,7 @@ function syncpilot_parse_json( maybe_json ) {
         form_data: state.form_data,
         other_prefix: $18("#import-other-prefix").is(":checked") ? 1 : 0,
         strict_collations: $18("#import-strict-collations").is(":checked") ? 1 : 0,
+        delete_file: $18("#import-delete-file").is(":checked") ? 1 : 0,
         nonce: syncpilot_nonces.import_start
       },
       error: function(jqXHR, textStatus, errorThrown) {

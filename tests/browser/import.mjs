@@ -5,6 +5,8 @@
 //   node tests/browser/import.mjs --yes            import of a plain dump, no backup
 //   node tests/browser/import.mjs --yes --gzip     the same with a gzip dump (it is unpacked first) and a backup
 //   node tests/browser/import.mjs --yes --cancel   cancel while the dump is loaded: nothing is changed, nothing is left
+//   node tests/browser/import.mjs --yes --upload   the dump is uploaded in the page (in parts of 64 KB, compressed in the browser) and removed after the import
+//   node tests/browser/import.mjs --yes --upload --plain   the same without the compression (--gzip: a gzip file is uploaded as it is)
 //   node tests/browser/import.mjs --yes --shots    screenshots of the form and the progress box (folder: see lib.mjs)
 //
 // The first test site is overwritten (and put back), so --yes is required. The folder for the dumps of that site is not
@@ -28,6 +30,8 @@ const gzip   = process.argv.includes( '--gzip' );
 const backup = process.argv.includes( '--gzip' ) || process.argv.includes( '--backup' );
 const cancel = process.argv.includes( '--cancel' );
 const shots  = process.argv.includes( '--shots' );
+const upload = process.argv.includes( '--upload' );
+const plain  = process.argv.includes( '--plain' );
 
 const { check, section, finish } = checks();
 
@@ -39,7 +43,14 @@ const work      = join( uploads, 'syncpilot-import-test' );
 const importDir = join( work, 'imports' );
 const reference = join( tmpdir(), 'syncpilot-import-test-before.sql' );
 const muPlugin  = join( config.wp, 'wp-content', 'mu-plugins', 'syncpilot-test-import.php' );
+
+// the file that is imported is gzip when it is one, or when the page compressed it
+const inFolderGzip = gzip || ( process.argv.includes( '--upload' ) && ! process.argv.includes( '--plain' ) );
 const name      = gzip ? 'remote-site.sql.gz' : 'remote-site.sql';
+
+// an upload takes the file from a folder that is not the folder of the dumps
+const source    = join( work, 'source' );
+const dumpDir   = upload ? source : importDir;
 
 const dump  = ( path, file ) => execFileSync( 'wp', [ '--path=' + path, 'db', 'export', file, '--quiet' ], { stdio : [ 'ignore', 'pipe', 'ignore' ] } );
 const load  = ( path, file ) => execFileSync( 'wp', [ '--path=' + path, 'db', 'import', file ], { stdio : [ 'ignore', 'pipe', 'ignore' ] } );
@@ -62,14 +73,15 @@ const key        = wp( config.wp, 'echo get_option( "syncpilot_settings" )["key"
 
 rmSync( work, { recursive : true, force : true } );
 mkdirSync( importDir, { recursive : true } );
+mkdirSync( source, { recursive : true } );
 chmodSync( work, 0o777 ); chmodSync( importDir, 0o777 );
 
 section( 'preparation: a dump of the second site, a dump of the first to put it back' );
 
-dump( config.remoteWp, join( importDir, 'remote-site.sql' ) );
+dump( config.remoteWp, join( dumpDir, 'remote-site.sql' ) );
 
 if ( gzip )
-    execFileSync( 'gzip', [ '-f', join( importDir, 'remote-site.sql' ) ] );
+    execFileSync( 'gzip', [ '-f', join( dumpDir, 'remote-site.sql' ) ] );
 
 dump( config.wp, reference );
 writeFileSync( muPlugin, `<?php\n// SyncPilot test only: the folder for the dumps and a short time for a request of the import\nadd_filter( 'syncpilot_import_dir', fn() => ${ JSON.stringify( importDir ) } );\nadd_filter( 'syncpilot_import_step_seconds', fn() => 0.3 );\n` );
@@ -84,7 +96,7 @@ const statesBefore  = existsSync( join( logDir, 'logs' ) ) ? readdirSync( join( 
 const newStates     = () => readdirSync( join( logDir, 'logs' ) ).filter( f => f.startsWith( 'import-' ) && ! statesBefore.includes( f ) );
 const backupsBefore = existsSync( logDir ) ? readdirSync( logDir ).filter( f => /-backup-.*\.sql/.test( f ) ) : [];
 
-check( 'the dump is in the folder of the test', existsSync( join( importDir, name ) ) && statSync( join( importDir, name ) ).size > 100000, name );
+check( 'the dump is in the folder of the test', existsSync( join( dumpDir, name ) ) && statSync( join( dumpDir, name ) ).size > 100000, name );
 
 const browser = await launch();
 
@@ -99,17 +111,26 @@ try {
     check( 'the choices are pull, push, import and export, in that order', JSON.stringify( await browser.ev( `Array.from(document.querySelectorAll('input[name=action]')).map(i => i.value)` ) ) === '["pull","push","import","savefile"]' );
 
     await browser.click( '#import' );
-    await browser.waitFor( `document.querySelectorAll('.import-files li').length > 0`, 10000 );
+
+    if ( upload )
+        await wait( 1500 );
+    else
+        await browser.waitFor( `document.querySelectorAll('.import-files li').length > 0`, 10000 );
 
     check( 'the dump box is where the connection data are for pull and push, in the list of the import', await browser.ev( `!!document.querySelector('.import-list .import-file-wrapper') && getComputedStyle(document.querySelector('.import-file-wrapper')).display !== 'none'` ) );
     check( 'the connection box and the choice of tables are not shown', await browser.ev( `['.connection-info-wrapper', '.table-select-wrap', '.hide-for-import', '.media-files-options', '.connection-status'].every(s => Array.from(document.querySelectorAll(s)).every(e => e.offsetParent === null))` ) );
     check( 'the second step (find and replace, options) is open at once', await browser.ev( `document.querySelector('.step-two').offsetParent !== null && document.querySelector('#find-and-replace-sort').offsetParent !== null` ) );
-    check( 'the folder is shown, and the dump is in the list', await browser.ev( `document.querySelector('.import-folder-path').textContent.includes(${ JSON.stringify( importDir ) }) && Array.from(document.querySelectorAll('.import-files input[name=import_file]')).some(i => i.value === ${ JSON.stringify( name ) })` ) );
+    check( 'the folder is shown' + ( upload ? ', the list is empty' : ', and the dump is in the list' ), await browser.ev( `document.querySelector('.import-folder-path').textContent.includes(${ JSON.stringify( importDir ) }) && ` + ( upload ? `document.querySelectorAll('.import-files input[name=import_file]').length === 0` : `Array.from(document.querySelectorAll('.import-files input[name=import_file]')).some(i => i.value === ${ JSON.stringify( name ) })` ) ) );
+    check( 'the choice between the folder and the upload is there, the folder is the one that is shown', await browser.ev( `document.querySelector('#import-source-folder').checked && document.querySelector('.import-from-folder').offsetParent !== null && document.querySelector('.import-from-upload').offsetParent === null` ) );
     check( 'the rows of find and replace are turned: this site is the new value, the old value is empty', await browser.ev( `document.querySelector('#old-url').value === '' && document.querySelector('#new-url').value !== '' && document.querySelector('#old-path').value === '' && document.querySelector('#new-path').value !== ''` ) );
 
     // a single dump is chosen at once: take the choice away, an import without a dump does not start
-    check( 'a single dump that can be used is chosen at once', await browser.ev( `document.querySelectorAll('input[name=import_file]:checked').length === 1` ) );
-    await browser.ev( `document.querySelector('input[name=import_file]:checked').checked = false` );
+    if ( ! upload ) {
+        check( 'a single dump that can be used is chosen at once', await browser.ev( `document.querySelectorAll('input[name=import_file]:checked').length === 1` ) );
+        check( 'a file that was put into the folder is not removed after the import (the choice is off)', await browser.ev( `! document.querySelector('#import-delete-file').checked` ) );
+        await browser.ev( `document.querySelector('input[name=import_file]:checked').checked = false` );
+    }
+
     await browser.click( '.migrate-db-button' );
     await wait( 600 );
 
@@ -119,14 +140,65 @@ try {
     await browser.ev( `(() => { const d = document.getElementById('syncpilot-dialog'); if ( d && d.open ) d.querySelector('button, .syncpilot-dialog-ok')?.click(); })()` );
     await wait( 300 );
 
-    await browser.click( `.import-files input[value="${ name }"]` );
+    let chosenName = name;
+
+    if ( upload ) {
+
+        section( 'the upload' );
+
+        await browser.click( '#import-source-upload' );
+        check( 'the upload box is shown and the list is hidden', await browser.ev( `document.querySelector('.import-from-upload').offsetParent !== null && document.querySelector('.import-from-folder').offsetParent === null` ) );
+
+        // an upload without a file says so
+        await browser.click( '.import-upload-start' );
+        await wait( 300 );
+        check( 'an upload without a file says that a file is needed', await browser.ev( `document.querySelector('.import-upload-text').textContent.length > 5 && document.querySelector('.import-upload-text').classList.contains('error')` ) );
+
+        if ( plain )
+            await browser.click( '#import-upload-compress' );
+
+        // small parts: the dump is sent in many requests
+        await browser.ev( `window.syncpilot_max_request = '65536'; window.__parts = 0; jQuery(document).ajaxSend( ( e, x, s ) => { if ( s.data instanceof FormData && s.data.get('action') === 'syncpilot_import_upload' ) window.__parts++; } ); true` );
+
+        const doc  = await browser.send( 'DOM.getDocument', {} );
+        const node = await browser.send( 'DOM.querySelector', { nodeId : doc.result.root.nodeId, selector : '#import-upload-file' } );
+
+        await browser.send( 'DOM.setFileInputFiles', { nodeId : node.result.nodeId, files : [ join( source, name ) ] } );
+        await browser.click( '.import-upload-start' );
+
+        const ended = await browser.waitFor( `!!document.querySelector('input[name=import_file]:checked') || document.querySelector('.import-upload-text').classList.contains('error')`, 120000, 200 );
+
+        check( 'the upload ends: the file is in the list and chosen', ended && await browser.ev( `!!document.querySelector('input[name=import_file]:checked')` ), await browser.ev( `document.querySelector('.import-upload-text').textContent` ) );
+
+        chosenName = await browser.ev( `document.querySelector('input[name=import_file]:checked').value` );
+
+        const wanted = name.replace( /(\.sql)(\.gz)?$/, '' ) + '-u';
+
+        check( 'the file has the name of the upload: the name of the file, -u, eight characters, the extension', new RegExp( '^' + wanted.replace( /[.]/g, '\\.' ) + '[0-9a-f]{8}\\.sql(\\.gz)?$' ).test( chosenName ), chosenName );
+        check( 'a .sql file is compressed in the browser and is .sql.gz in the folder, unless that is switched off; a gzip file is sent as it is', ( gzip || ! plain ) === /\.gz$/.test( chosenName ), chosenName );
+
+        const parts = await browser.ev( `window.__parts` );
+
+        check( 'the file was sent in several parts', parts > 2, parts + ' parts of at most 64 KB' );
+
+        const stored = join( importDir, chosenName );
+        const text   = /\.gz$/.test( chosenName ) && ! gzip ? execFileSync( 'gzip', [ '-dc', stored ], { maxBuffer : 1 << 30 } ) : readFileSync( stored );
+        const orig   = gzip ? readFileSync( join( source, name ) ) : readFileSync( join( source, name ) );
+
+        check( 'the file in the folder has the content of the file (' + ( /\.gz$/.test( chosenName ) && ! gzip ? 'after unpacking' : 'byte for byte' ) + ')', Buffer.compare( text, orig ) === 0, text.length + ' / ' + orig.length + ' bytes' );
+        check( 'the page shows the folder again with the file chosen, and the file is marked as uploaded', await browser.ev( `document.querySelector('#import-source-folder').checked && document.querySelector('input[name=import_file]:checked').getAttribute('data-uploaded') === '1' && document.querySelector('.import-files .option-description').textContent.length > 0` ) );
+        check( 'the choice to remove the file after the import is on for an uploaded file', await browser.ev( `document.querySelector('#import-delete-file').checked` ) );
+        check( 'no part of the upload is left in the folder', ! existsSync( join( importDir, '.upload' ) ) || readdirSync( join( importDir, '.upload' ) ).length === 0 );
+        check( 'no error in the page after the upload', browser.takeProblems().length === 0, browser.takeProblems().join( ' | ' ) );
+    } else
+        await browser.click( `.import-files input[value="${ name }"]` );
 
     await browser.ev( `(() => { const set = ( id, v ) => { const e = document.querySelector( id ); e.value = v; e.dispatchEvent( new Event( 'change', { bubbles : true } ) ); }; set( '#old-url', '//${ remoteHost }' ); set( '#old-path', ${ JSON.stringify( remotePath ) } ); })()` );
 
     if ( backup )
         await browser.click( '#create-backup' );
 
-    check( 'the choices for an import are set: the dump, the old address and path, and the backup as asked', await browser.ev( `document.querySelector('input[name=import_file]:checked').value === ${ JSON.stringify( name ) } && document.querySelector('#create-backup').checked === ${ backup }` ) );
+    check( 'the choices for an import are set: the dump, the old address and path, and the backup as asked', await browser.ev( `document.querySelector('input[name=import_file]:checked').value === ${ JSON.stringify( chosenName ) } && document.querySelector('#create-backup').checked === ${ backup }` ) );
 
     if ( shots )
         await browser.shot( 'import-form' );
@@ -221,11 +293,17 @@ try {
 
         const started = log.findLast( e => 'Migration started' === e[0] && 'import' === e[1].intent );
 
-        check( 'a gzip dump is unpacked (the log says so), a plain one is not', started && started[1].scope.unpack === gzip && started[1].scope.gzip === gzip, JSON.stringify( started && started[1].scope ) );
+        check( 'a gzip dump is unpacked (the log says so), a plain one is not', started && started[1].scope.unpack === inFolderGzip && started[1].scope.gzip === inFolderGzip, JSON.stringify( started && started[1].scope ) );
 
         const finished = log.findLast( e => 'Migration finished' === e[0] );
 
         check( 'the end of the migration has intent import, the seconds of the parts and the totals of the load', finished && 'import' === finished[1].intent && finished[1].queries_run > 100 && finished[1].bytes_imported > 100000 && 'finalize_s' in finished[1], JSON.stringify( finished && finished[1] ) );
+
+        check( upload ? 'the uploaded file is removed from the folder after the import' : 'the file that was put into the folder is still there after the import',
+            upload ? ! existsSync( join( importDir, chosenName ) ) : existsSync( join( importDir, name ) ) );
+
+        if ( upload )
+            check( 'the log says that the file was removed', messages.includes( 'Import file removed' ) && messages.includes( 'Dump uploaded' ), messages.filter( m => /file|uploaded/i.test( m ) ).join( ', ' ) );
 
         if ( backup ) {
 

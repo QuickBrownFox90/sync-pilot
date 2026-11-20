@@ -76,6 +76,7 @@ enum SyncPilot_HelpCode: int {
 	case ImportReadFailed        = 304;
 	case ImportPrefixDiffers     = 305;
 	case ImportStateLost         = 306;
+	case ImportUploadFailed      = 307;
 
 	// the numbers of the earlier versions: as the user saw them (#111, #103mf) without # => the code that means it now
 	const LEGACY = array(
@@ -149,6 +150,7 @@ enum SyncPilot_HelpCode: int {
 			self::ImportReadFailed       => array( 'log' => 'Reading dump file failed' ),
 			self::ImportPrefixDiffers    => array( 'log' => 'Dump table prefix differs from this site' ),
 			self::ImportStateLost        => array( 'log' => 'State of the import not found' ),
+			self::ImportUploadFailed     => array( 'log' => 'Upload of dump file failed' ),
 		};
 	}
 
