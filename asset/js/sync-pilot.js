@@ -1170,6 +1170,9 @@ function syncpilot_parse_json( maybe_json ) {
   var connection_info_box;
   var import_file_box;
   var was_import = false;
+  function toggle_keep_collations() {
+    $16(".keep-collations").toggle($16("#push").is(":checked"));
+  }
   function prepare_connection() {
     push_select = $16("#select-tables").clone();
     pull_select = $16("#select-tables").clone();
@@ -1179,6 +1182,7 @@ function syncpilot_parse_json( maybe_json ) {
     pull_select_backup = $16("#select-backup").clone();
     $16(".backup-options").show();
     $16(".keep-active-plugins").show();
+    toggle_keep_collations();
     if ($16("#savefile").is(":checked")) {
       $16(".backup-options").hide();
       $16(".keep-active-plugins").hide();
@@ -1348,6 +1352,7 @@ function syncpilot_parse_json( maybe_json ) {
     move_connection_info_box();
     $16(".migrate-selection.option-group input[type=radio]").change(function() {
       move_connection_info_box();
+      toggle_keep_collations();
       if (state.connection_established || $16("#import").is(":checked") || was_import) {
         change_replace_values();
       }

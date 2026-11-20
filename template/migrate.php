@@ -397,6 +397,18 @@
 							<?php _e( 'Do not migrate the \'active_plugins\' setting (i.e. which plugins are activated/deactivated)', self::TEXT_DOMAIN ); ?>
 							</label>
 						</li>
+						<li class="keep-collations">
+							<label for="keep-collations">
+							<input id="keep-collations" type="checkbox" value="1" autocomplete="off" name="keep_collations"<?php $this->maybe_checked( $loaded_profile['keep_collations'] ); ?> />
+							<?php _e( 'Keep the collations of the tables on the other site', self::TEXT_DOMAIN ); ?>
+							</label>
+
+							<a href="#" class="general-helper keep-collations-helper js-action-link"></a>
+
+							<div class="keep-collations-info helper-message">
+								<?php _e( 'A table that exists on the other site keeps its collation and the collations of its columns, a new table gets the collation of its posts table. Without this choice the tables arrive with the collation that they have on this site, which differs from the other site after a pull from a newer database. Needs SyncPilot 0.4.1 on the other site.', self::TEXT_DOMAIN ); ?>
+							</div>
+						</li>
 						<li class="hide-for-import">
 							<label for="exclude-transients">
 							<input id="exclude-transients" type="checkbox" value="1" autocomplete="off" name="exclude_transients"<?php $this->maybe_checked( $loaded_profile['exclude_transients'] ); ?> />

@@ -1547,3 +1547,22 @@ msgstr "Die Datenbank hat eine Abfrage beim Ersetzen abgelehnt: %s (#152)"
 #: template/migrate.php
 msgid "Stop when the dump has a collation that this database does not know (otherwise a similar one is used, for example utf8mb4_unicode_520_ci for utf8mb4_uca1400_ai_ci)"
 msgstr "Anhalten, wenn der Dump eine Collation enthält, die diese Datenbank nicht kennt (sonst wird eine ähnliche verwendet, zum Beispiel utf8mb4_unicode_520_ci für utf8mb4_uca1400_ai_ci)"
+
+#: template/migrate.php
+msgid "Keep the collations of the tables on the other site"
+msgstr "Collations der Tabellen auf der anderen Seite beibehalten"
+
+#: template/migrate.php
+msgid ""
+"A table that exists on the other site keeps its collation and the collations "
+"of its columns, a new table gets the collation of its posts table. Without "
+"this choice the tables arrive with the collation that they have on this "
+"site, which differs from the other site after a pull from a newer database. "
+"Needs SyncPilot 0.4.1 on the other site."
+msgstr ""
+"Eine Tabelle, die es auf der anderen Seite schon gibt, behält ihre Collation "
+"und die ihrer Spalten, eine neue Tabelle bekommt die Collation der "
+"Beitragstabelle dort. Ohne diese Auswahl kommen die Tabellen mit der "
+"Collation an, die sie auf dieser Seite haben, und die weicht nach einem Pull "
+"von einer neueren Datenbank von der anderen Seite ab. Braucht SyncPilot "
+"0.4.1 auf der anderen Seite."

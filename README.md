@@ -83,7 +83,7 @@ The Diagnostics tab shows the diagnostic info of the site and its log, with the 
 
 ## Status
 
-Version 0.4.0 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged (see [changelog.txt](changelog.txt)).
+Version 0.4.1 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged (see [changelog.txt](changelog.txt)).
 
 **What the 0.2.x versions were for.** Mostly groundwork, not new features. The admin script of WP Sync DB was one big file without any test. It is split into small modules and a short start-up script now, built with esbuild, checked with ESLint and covered by browser tests that click through the admin page. That was necessary to maintain the code at all, and to make the project really forkable: the parts can be developed one at a time without touching everything. You still have to understand how they work together, but not all of it at once. Besides that: fixes for PHP 8.2+ and WordPress 6.7, the first security fixes, several fixes found by pulling real sites (media files, cancelling), and one small feature (a find and replace row for http/https).
 
@@ -91,9 +91,11 @@ Version 0.4.0 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed an
 
 **What 0.4.0 is.** The import of a database dump, built to be safe: it reads the dump statement by statement from any place, so a dump of any size is handled in many short requests, and checks all of it before the first table is made. The replace of the import does not unserialize serialized values (the function of a pull and a push builds them again and copies every object that is used twice: a graph of 764 bytes with a depth of 18 needs 669 MB there, and every level doubles it); it rewrites the text, so references stay and the memory is the size of the text. The choice of the form is Pull, Push, Import, Export.
 
+**What 0.4.1 is.** What the import learned is used by pull and push: the replace in serialized values no longer copies objects (and keeps references), and a database that does not know a collation of the other one (MariaDB 11 to an older server, MySQL 8 to MariaDB) gets a similar one instead of stopping at the first table. A push has the choice to keep the collations of the other site (a table that exists there keeps its collation, a new table gets the one of its posts table), so a deploy does not mix the collations of the live database. A push needs 0.4.1 on both sites for that.
+
 **What is tested.** Pull, push, export, import (also a gzip dump, with a backup and a cancel), backup, media files, pause, cancel and saved profiles, automatically on two test sites (PHP 8.4) and by hand with pulls and imports of live sites, multisites among them; also the cases that go wrong (an exception, a fatal error, the memory and the time limit, an answer that is cut or empty, a firewall that answers instead of WordPress, folders that cannot be written). WP-CLI is not verified yet, multisite only by hand.
 
-**What comes next.** 0.4.1: the find and replace of the import and the handling of collations also for pull and push. 0.4.2: the upload of a dump in the browser (with the choice to remove it after the import). 0.5.x: the overhaul of the admin page, with the log in boxes per migration, its download and the entries of the other site. Use it only between sites you control and only on a trusted connection.
+**What comes next.** 0.4.2: the upload of a dump in the browser (with the choice to remove it after the import). 0.5.x: the overhaul of the admin page, with the log in boxes per migration, its download and the entries of the other site. Use it only between sites you control and only on a trusted connection.
 
 ## Development
 
@@ -128,7 +130,7 @@ The tests run on two test installations of WordPress with wp-cli, named in `test
 - `npm run test:guard`: an exception, a fatal error, the memory limit and the time limit in a request. It copies a mu-plugin from `tests/fault/` into the test site and removes it again
 - `npm run test:faults`: the other site answers wrongly (a web server error, a firewall, an empty or a cut answer, a closed connection, no answer); a proxy in `tests/fault/` spoils the answers, and the log has to say what happened
 - `php tests/help-codes.php`: the help codes and every place that reports one (no WordPress needed)
-- `wp eval-file wp-content/plugins/sync-pilot/tests/logger.php`, `tests/media-preflight.php` (the check of the folders for the media files) and `tests/table-rows.php` (the number of rows per table, answered like MySQL 8) run on a test site; so do the checks of the import: `tests/import.php` (the folder), `tests/import-reader.php` (the reader, the statements that are allowed, the collations, a real dump), `tests/import-load.php` (scan and load in short requests with a new connection each, and what stops the import), `tests/import-replace.php` (the replace for every kind of value, gzip, a real dump compared with the function of a push or a pull), `tests/import-serialized.php` and `tests/import-memory.php` (shared objects, a memory limit)
+- `wp eval-file wp-content/plugins/sync-pilot/tests/logger.php`, `tests/media-preflight.php` (the check of the folders for the media files) and `tests/table-rows.php` (the number of rows per table, answered like MySQL 8) run on a test site; so do the checks of the import: `tests/import.php` (the folder), `tests/import-reader.php` (the reader, the statements that are allowed, the collations, a real dump), `tests/import-load.php` (scan and load in short requests with a new connection each, and what stops the import), `tests/import-replace.php` (the replace for every kind of value, gzip, a real dump compared with the function of a push or a pull), `tests/import-serialized.php` and `tests/import-memory.php` (shared objects, a memory limit); `tests/collation-map.php` and `tests/collation-keep.php` (the collations of a chunk) and `tests/replace-compare.php` (old and new replace on the data of a real site)
 
 ### Logging in the code
 

@@ -57,6 +57,7 @@ const cancel    = process.argv.includes( '--cancel' );
 const broken    = process.argv.includes( '--broken' );
 const stray     = process.argv.includes( '--stray' ) || ( broken && ! process.argv.includes( '--pull' ) );
 const unwritable = process.argv.includes( '--unwritable' );
+const keepCollations = process.argv.includes( '--keep-collations' );
 
 // both end before the tables are replaced: the media check stops the migration (the folders before the first table, a file that cannot be written after them)
 const stops      = unwritable || broken;
@@ -282,6 +283,18 @@ try {
         await browser.click( '#create-backup', 400 );
         await browser.click( '#backup-selected', 300 );
         check( 'the backup is switched on, with the selected tables', await browser.ev( `jQuery('#create-backup').is(':checked') && jQuery('#backup-selected').is(':checked')` ) );
+    }
+
+    // the choice to keep the collations of the other site is for a push only
+    check( pull ? 'the choice to keep the collations is not offered for a pull' : 'the choice to keep the collations is offered for a push (and off)',
+        await browser.ev( pull ? `jQuery('.keep-collations')[0].style.display === 'none'` : `jQuery('.keep-collations')[0].style.display !== 'none' && ! jQuery('#keep-collations').is(':checked')` ) );
+
+    if ( keepCollations && ! pull ) {
+
+        // it is in the advanced options, which are collapsed
+        await browser.ev( `jQuery('#keep-collations').closest('.option-section').find('.header-expand-collapse').first().click()` );
+        await browser.click( '#keep-collations', 600 );
+        check( 'the choice to keep the collations is checked', await browser.ev( `jQuery('#keep-collations').is(':checked')` ) );
     }
 
     check( 'the option for the media files is offered (it is set up by the media files part)', await browser.ev( `jQuery('.media-files').length > 0` ) );

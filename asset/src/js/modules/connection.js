@@ -29,6 +29,14 @@ var import_file_box;
 var was_import = false;
 
 /**
+ * The choice to keep the collations of the other site is only for a push: the other site is the one that receives the tables
+ * @since   0.4.1
+ */
+function toggle_keep_collations() {
+    $( '.keep-collations' ).toggle( $( '#push' ).is( ':checked' ) );
+}
+
+/**
  * The first part of the start of the page: the lists of tables as the page had them are kept, the options for the
  * backup are shown (hidden for an export), and a saved profile connects to the other site
  * @since   0.2.8
@@ -44,6 +52,7 @@ export function prepare_connection() {
 
     $( '.backup-options' ).show();
     $( '.keep-active-plugins' ).show();
+    toggle_keep_collations();
 
     if ( $( '#savefile' ).is( ':checked' ) ) {
         $( '.backup-options' ).hide();
@@ -369,6 +378,7 @@ export function init_connection() {
     $( '.migrate-selection.option-group input[type=radio]' ).change( function () {
 
         move_connection_info_box();
+        toggle_keep_collations();
 
         // the import has no connection: its rows are turned like those of a pull as soon as it is chosen, and back when it is left
         if ( state.connection_established || $( '#import' ).is( ':checked' ) || was_import ) {

@@ -9,6 +9,9 @@ class SyncPilot extends SyncPilot_Base {
 	protected $current_chunk = '';
 	protected $chunk_stats   = array();
 	protected $chunk_queries = 0;
+
+	// a push with the choice to keep the collations of this site: set from the request of the other site, see keep_collations_in_query()
+	protected $keep_collations = false;
 	protected $connection_details;
 	protected $remote_url;
 	protected $remote_key;
@@ -154,7 +157,8 @@ class SyncPilot extends SyncPilot_Base {
 			'exclude_post_types',
 			'import_file',
 			'import_other_prefix',
-			'import_strict_collations'
+			'import_strict_collations',
+			'keep_collations'
 		);
 
 		$this->default_profile = array(
@@ -180,7 +184,8 @@ class SyncPilot extends SyncPilot_Base {
 			'create_backup' => '0',
 			'exclude_post_types' =>'0',
 			'import_other_prefix' => '0',
-			'import_strict_collations' => '0'
+			'import_strict_collations' => '0',
+			'keep_collations' => '0'
 		);
 
 		if ( is_multisite() )
@@ -1001,7 +1006,7 @@ class SyncPilot extends SyncPilot_Base {
 	function ajax_process_chunk() {
 
 		$started       = microtime( true );
-		$filtered_post = $this->filter_post_elements( $_POST, array( 'action', 'table', 'chunk_gzipped' ) );
+		$filtered_post = $this->filter_post_elements( $_POST, array( 'action', 'table', 'chunk_gzipped', 'keep_collations' ) );
 		$gzip          = ( isset( $_POST['chunk_gzipped'] ) && $_POST['chunk_gzipped'] );
 
 		// Read the upload in place: PHP removes it at the end of the request, so nothing is left behind in the temp folder
@@ -1062,6 +1067,8 @@ class SyncPilot extends SyncPilot_Base {
 			}
 		}
 
+		$this->keep_collations = ! empty( $filtered_post['keep_collations'] );
+
 		$process_chunk_result = $this->process_chunk( $filtered_post['chunk'] );
 
 		if ( true === $process_chunk_result && 'verbose' === SyncPilot_Logger::level() ) {
@@ -1118,9 +1125,182 @@ class SyncPilot extends SyncPilot_Base {
 	}
 
 	/**
+	 * A CREATE TABLE of a push with the collations of this site: a table that exists here keeps the collation of the table and
+	 * of its columns, a table that is new gets the collation of the posts table of this site (what a new table of this site
+	 * would have), so that the database is not mixed after the push. Only where the character set is the same (another one
+	 * would cut the data), and a binary collation of the new table stays binary. What is not changed here is left to the
+	 * mapping of the collations that this database does not know.
+	 * @since   0.4.1
+	 *
+	 * @param   string $query  A CREATE TABLE query of a chunk
+	 *
+	 * @return  string
+	 */
+	function keep_collations_in_query( $query ) {
+
+		global $wpdb;
+
+		if ( ! preg_match( '/^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`((?:[^`]|``)*)`/i', $query, $m ) )
+			return $query;
+
+		$temp = str_replace( '``', '`', $m[1] );
+
+		if ( 0 !== strpos( $temp, $this->temp_prefix ) )
+			return $query;
+
+		$name  = substr( $temp, strlen( $this->temp_prefix ) );
+		$table = $wpdb->get_var( $wpdb->prepare( 'SELECT TABLE_COLLATION FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s', $name ) );
+		$new   = null === $table;
+
+		// a table that is new gets the collation of the posts table: the columns that have a collation are taken from it
+		if ( $new )
+			$table = $wpdb->get_var( $wpdb->prepare( 'SELECT TABLE_COLLATION FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s', $wpdb->posts ) );
+
+		if ( ! $table )
+			return $query;
+
+		$columns = array();
+
+		if ( ! $new ) {
+
+			foreach ( (array) $wpdb->get_results( $wpdb->prepare( 'SELECT COLUMN_NAME AS n, CHARACTER_SET_NAME AS cs, COLLATION_NAME AS co FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s', $name ), ARRAY_A ) as $column ) {
+
+				if ( ! empty( $column['co'] ) )
+					$columns[ strtolower( $column['n'] ) ] = array( strtolower( $column['cs'] ), strtolower( $column['co'] ) );
+			}
+		}
+
+		$table_charset = strtolower( substr( $table, 0, strpos( $table, '_' ) ?: strlen( $table ) ) );
+		$pieces        = self::split_code( $query );
+		$last          = count( $pieces ) - 1;
+		$incoming      = 'utf8mb4';
+
+		// the options of the table are in the piece of code that has the engine (a comment of the table comes after them)
+		for ( $i = count( $pieces ) - 1; $i >= 0; $i -= 2 ) {
+
+			if ( preg_match( '/\bENGINE\s*=/i', $pieces[ $i ] ) ) {
+				$last = $i;
+
+				break;
+			}
+		}
+
+		$changed       = array( 'table' => null, 'columns' => 0 );
+
+		if ( preg_match( '/\b(?:DEFAULT\s+)?CHARSET\s*=\s*([A-Za-z0-9_]+)/i', $pieces[ $last ], $c ) )
+			$incoming = strtolower( $c[1] );
+
+		// the columns: a name between backticks that opens a line of the definition, and the code after it
+		foreach ( $pieces as $i => $piece ) {
+
+			if ( ! ( $i % 2 ) || '`' !== $piece[0] || ! isset( $pieces[ $i + 1 ] ) || ! preg_match( '/\n[ \t]*$/', $pieces[ $i - 1 ] ?? '' ) )
+				continue;
+
+			$column = strtolower( str_replace( '``', '`', substr( $piece, 1, -1 ) ) );
+			$code   = $pieces[ $i + 1 ];
+
+			if ( ! preg_match( '/\bCOLLATE\s+([A-Za-z0-9_]+)/i', $code, $c ) )
+				continue;
+
+			$was     = strtolower( $c[1] );
+			$charset = preg_match( '/\bCHARACTER\s+SET\s+([A-Za-z0-9_]+)/i', $code, $cs ) ? strtolower( $cs[1] ) : $incoming;
+
+			// an existing column keeps its own collation, a new column the one of the posts table (not a binary one)
+			if ( isset( $columns[ $column ] ) )
+				$to = $columns[ $column ];
+
+			elseif ( $new && '_bin' !== substr( $was, -4 ) )
+				$to = array( $table_charset, strtolower( $table ) );
+
+			else
+				continue;
+
+			if ( $to[0] !== $charset || $to[1] === $was )
+				continue;
+
+			$pieces[ $i + 1 ] = preg_replace( '/\b(COLLATE\s+)' . preg_quote( $c[1], '/' ) . '\b/i', '${1}' . $to[1], $code, 1 );
+			$changed['columns']++;
+		}
+
+		if ( $incoming === $table_charset && preg_match( '/\bCOLLATE\s*=\s*([A-Za-z0-9_]+)/i', $pieces[ $last ], $c ) && strtolower( $c[1] ) !== strtolower( $table ) && ! ( $new && '_bin' === substr( strtolower( $c[1] ), -4 ) ) ) {
+
+			$pieces[ $last ]  = preg_replace( '/\b(COLLATE\s*=\s*)' . preg_quote( $c[1], '/' ) . '\b/i', '${1}' . $table, $pieces[ $last ], 1 );
+			$changed['table'] = strtolower( $c[1] ) . ' > ' . strtolower( $table );
+		}
+
+		if ( null === $changed['table'] && ! $changed['columns'] )
+			return $query;
+
+		SyncPilot_Logger::event( 'Collation kept', array(
+			'table'   => $name,
+			'new'     => $new,
+			'table_collation' => $changed['table'] ?? '',
+			'columns' => $changed['columns'],
+		) );
+
+		return implode( '', $pieces );
+	}
+
+	/**
+	 * A CREATE TABLE with the collations and character sets that this database does not know replaced by similar ones that it
+	 * knows. The tables of MariaDB 11 have utf8mb4_uca1400_ai_ci and the ones of MySQL 8 utf8mb4_0900_ai_ci, which an older
+	 * database refuses ("Unknown collation"): the migration stopped at the first table, after the backup. Everything else is
+	 * returned as it is, also a CREATE TABLE where everything is known or where nothing fits (the database then gives the
+	 * error). What was replaced is written to the log.
+	 * @since   0.4.1
+	 *
+	 * @param   string $query  A query of a chunk
+	 *
+	 * @return  string
+	 */
+	function map_collations_in_query( $query ) {
+
+		if ( 0 !== stripos( ltrim( $query ), 'CREATE TABLE' ) )
+			return $query;
+
+		if ( $this->keep_collations )
+			$query = $this->keep_collations_in_query( $query );
+
+		$masked = self::mask_literals( $query );
+		$used   = self::unsupported_collations( self::used_collations( $masked ) );
+
+		if ( ! $used['collations'] && ! $used['charsets'] )
+			return $query;
+
+		$known = self::known_collations();
+		$map   = array( 'collations' => array(), 'charsets' => array() );
+
+		foreach ( $used['collations'] as $name ) {
+
+			if ( null !== ( $to = self::map_collation( $name, $known['collations'] ) ) )
+				$map['collations'][ $name ] = $to;
+		}
+
+		foreach ( $used['charsets'] as $name ) {
+
+			if ( null !== ( $to = self::map_charset( $name, $known['charsets'] ) ) )
+				$map['charsets'][ $name ] = $to;
+		}
+
+		if ( ! $map['collations'] && ! $map['charsets'] )
+			return $query;
+
+		preg_match( '/^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`((?:[^`]|``)*)`/i', $query, $m );
+
+		SyncPilot_Logger::event( 'Collation mapped', array(
+			'table'      => isset( $m[1] ) ? str_replace( '``', '`', $m[1] ) : '',
+			'collations' => $map['collations'],
+			'charsets'   => $map['charsets'],
+		) );
+
+		return self::apply_collation_map( $query, $map );
+	}
+
+	/**
 	 * Run the queries of a chunk
 	 * @since   0.0.1
 	 * @since   0.3.1  A query that fails is logged (QueryFailed): the kind of query and its table, the number of the query, its size and the error of the database without the values in it; the number of queries is kept in chunk_queries
+	 * @since   0.4.1  A CREATE TABLE with a collation or character set that this database does not know gets a similar one (map_collations_in_query())
 	 *
 	 * @param   string $chunk  The SQL, the queries separated by a semicolon and a line break
 	 *
@@ -1147,6 +1327,9 @@ class SyncPilot extends SyncPilot_Base {
 		}
 
 		foreach( $queries as $number => $query ) {
+
+			$query = $this->map_collations_in_query( $query );
+
 			if( false === $wpdb->query( $query ) ) {
 
 				$this->log_error( SyncPilot_HelpCode::QueryFailed, $this->describe_failed_query( $query, $number ), site: 1 );
@@ -1443,6 +1626,7 @@ class SyncPilot extends SyncPilot_Base {
 			'exclude_spam'        => ! empty( $form['exclude_spam'] ),
 			'exclude_transients'  => ! empty( $form['exclude_transients'] ),
 			'keep_active_plugins' => ! empty( $form['keep_active_plugins'] ),
+			'keep_collations'     => ! empty( $form['keep_collations'] ),
 			'post_types'          => is_array( $form['select_post_types'] ?? null ) ? count( $form['select_post_types'] ) : 0,
 		);
 
@@ -2124,6 +2308,35 @@ class SyncPilot extends SyncPilot_Base {
 		return $new;
 	}
 
+	/**
+	 * The new value of a value of a table: a serialized text is rewritten without unserializing it (rewrite_serialized()),
+	 * a strings that is serialized inside it the same way, and what is left (a plain text, JSON, a serialized text that cannot
+	 * be read) goes to the function that a push or a pull uses
+	 * @since   0.4.0  In SyncPilot_Import
+	 * @since   0.4.1  Here: the import, a push and a pull use it
+	 *
+	 * @param   string $value  The value
+	 *
+	 * @return  string
+	 */
+	public function replace_value( $value ) {
+
+		if ( ! $this->contains_search_term( $value ) )
+			return $value;
+
+		if ( is_serialized( $value ) ) {
+
+			$new = self::rewrite_serialized( $value, fn( $leaf ) => $this->replace_value( $leaf ) );
+
+			if ( false !== $new )
+				return $new;
+		}
+
+		$new = $this->recursive_unserialize_replace( $value );
+
+		return is_string( $new ) ? $new : $value;
+	}
+
 	// Does the value contain one of the strings that apply_replaces() would replace?
 	function contains_search_term( $subject ) {
 
@@ -2607,7 +2820,7 @@ class SyncPilot extends SyncPilot_Base {
 
 								if ( 'guid' != $key || ( isset( $this->form_data['replace_guids'] ) && $this->table_is( 'posts', $table ) ) ) {
 									if ( $_POST['stage'] != 'backup' )
-										$value = $this->recursive_unserialize_replace( $value );
+										$value = $this->replace_value( $value );
 								}
 
 								$values[] = "'" . str_replace( $search, $replace, $this->sql_addslashes( $value ) ) . "'";
@@ -3082,6 +3295,14 @@ class SyncPilot extends SyncPilot_Base {
 			'chunk_gzipped'	=> $chunk_gzipped,
 			'chunk'         =>  $this->current_chunk // NEEDS TO BE the last element in this array because of adding it back into the array in ajax_process_chunk()
 		);
+
+		// only when it is chosen: a site that does not know the field (before 0.4.1) would not be able to check the signature
+		if ( ! empty( $this->form_data['keep_collations'] ) ) {
+			$chunk                   = $data['chunk'];
+			$data['keep_collations'] = '1';
+			unset( $data['chunk'] );
+			$data['chunk']           = $chunk;   // the chunk stays the last element
+		}
 
 		$data['sig'] = $this->create_signature( $data, $_POST['key'] );
 

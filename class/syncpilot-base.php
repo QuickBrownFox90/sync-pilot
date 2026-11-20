@@ -727,4 +727,406 @@ class SyncPilot_Base {
 		}
 	}
 
+	/**
+	 * Replace in a serialized value without unserializing it. The text is read once from the front to the back and written
+	 * again, the strings that are values (not the keys of an array or the names of the properties of an object) go through
+	 * $leaf and get their new length. Everything else is copied as it is: numbers, references (r: and R:), the class names,
+	 * custom serialized data (C:). So the memory is the size of the text twice, whatever the data look like. The function recursive_unserialize_replace()
+	 * unserializes the text and builds it again, which makes a copy of
+	 * every object that is used twice: a serialized object graph of 764 bytes with a depth of 18 became 22 MB there, and
+	 * every further level doubles it (and the references are gone afterwards).
+	 * @since   0.4.0
+	 * @since   0.4.1  Moved from SyncPilot_Import to SyncPilot_Base: a push and a pull use it too
+	 *
+	 * @param   string   $text  The serialized value
+	 * @param   callable $leaf  Gets a string that is a value and gives the string for its place
+	 *
+	 * @return  string|false  false when the text is not a serialized value that this function reads to the end
+	 */
+	static function rewrite_serialized( $text, $leaf ) {
+
+		$i     = 0;
+		$n     = strlen( $text );
+		$out   = '';
+		$stack = array();   // per open array or object: the items that are still to come (a key and its value count 2)
+
+		while ( $i < $n ) {
+
+			$type = $text[ $i ];
+
+			// the end of an array or an object
+			if ( '}' === $type ) {
+
+				if ( ! $stack || 0 !== end( $stack ) )
+					return false;
+
+				array_pop( $stack );
+
+				$out .= '}';
+				$i++;
+			}
+
+			elseif ( 'N' === $type ) {
+
+				if ( ';' !== ( $text[ $i + 1 ] ?? '' ) )
+					return false;
+
+				$out .= 'N;';
+				$i   += 2;
+			}
+
+			elseif ( 'b' === $type || 'i' === $type || 'd' === $type || 'r' === $type || 'R' === $type ) {
+
+				if ( ! preg_match( '/\G[bidrR]:[^;]*;/', $text, $m, 0, $i ) )
+					return false;
+
+				$out .= $m[0];
+				$i   += strlen( $m[0] );
+			}
+
+			elseif ( 's' === $type ) {
+
+				if ( ! preg_match( '/\Gs:(\d+):"/', $text, $m, 0, $i ) )
+					return false;
+
+				$start  = $i + strlen( $m[0] );
+				$length = (int) $m[1];
+
+				if ( '";' !== substr( $text, $start + $length, 2 ) || $start + $length + 2 > $n )
+					return false;
+
+				$value = substr( $text, $start, $length );
+				$is_key = $stack && 0 === ( end( $stack ) % 2 );
+
+				if ( ! $is_key && '' !== $value ) {
+
+					$new = $leaf( $value );
+
+					if ( $new !== $value ) {
+						$value  = $new;
+						$length = strlen( $value );
+					}
+				}
+
+				$out .= 's:' . $length . ':"' . $value . '";';
+				$i    = $start + (int) $m[1] + 2;
+			}
+
+			elseif ( 'a' === $type || 'O' === $type ) {
+
+				if ( ! preg_match( 'a' === $type ? '/\Ga:(\d+):\{/' : '/\GO:\d+:"[^"]*":(\d+):\{/', $text, $m, 0, $i ) )
+					return false;
+
+				// a key and a value are two items; the container is counted in the one around it when it is closed
+				$stack[] = 2 * (int) $m[1];
+
+				$out .= $m[0];
+				$i   += strlen( $m[0] );
+
+				continue;
+			}
+
+			elseif ( 'C' === $type ) {
+
+				// custom serialized data: its text belongs to the class, not read, not changed
+				if ( ! preg_match( '/\GC:\d+:"[^"]*":(\d+):\{/', $text, $m, 0, $i ) )
+					return false;
+
+				$end = $i + strlen( $m[0] ) + (int) $m[1];
+
+				if ( '}' !== ( $text[ $end ] ?? '' ) )
+					return false;
+
+				$out .= substr( $text, $i, $end + 1 - $i );
+				$i    = $end + 1;
+			}
+
+			elseif ( 'E' === $type ) {
+
+				if ( ! preg_match( '/\GE:\d+:"[^"]*";/', $text, $m, 0, $i ) )
+					return false;
+
+				$out .= $m[0];
+				$i   += strlen( $m[0] );
+			}
+
+			else
+				return false;
+
+			// a value is done: it was an item of the array or object that is open
+			if ( '}' === $type ) {
+				if ( $stack )
+					$stack[ count( $stack ) - 1 ]--;
+			}
+
+			elseif ( 'a' !== $type && 'O' !== $type && $stack )
+				$stack[ count( $stack ) - 1 ]--;
+
+			if ( ! $stack )
+				break;
+		}
+
+		// the value must end where the text ends, with nothing open
+		return $stack || $i !== $n ? false : $out;
+	}
+
+	/**
+	 * The statement with everything replaced that is not code: the text of a string becomes '', the name between backticks
+	 * becomes ``, a comment becomes a space (a comment that a server of some version runs, /*!50100 ... *\/, stays: it is
+	 * code). What is looked for in a statement (SELECT, a variable) is looked for in this text, so that a word in a post
+	 * or in the name of a column is no word of the statement. It is made with a loop like the reader's, not with a
+	 * pattern: a pattern for a string of a megabyte runs into the limits of PCRE.
+	 * @since   0.4.0
+	 * @since   0.4.1  Moved from SyncPilot_Import to SyncPilot_Base: a push and a pull map the collations too
+	 *
+	 * @param   string $sql  A statement
+	 *
+	 * @return  string
+	 */
+	static function mask_literals( $sql ) {
+
+		$out = '';
+		$i   = 0;
+		$len = strlen( $sql );
+
+		while ( $i < $len ) {
+
+			$n    = strcspn( $sql, "'\"`#-/", $i );
+			$out .= substr( $sql, $i, $n );
+			$i   += $n;
+
+			if ( $i >= $len )
+				break;
+
+			$c = $sql[ $i ];
+
+			if ( "'" === $c || '"' === $c || '`' === $c ) {
+
+				$i++;
+
+				while ( $i < $len ) {
+
+					$i += strcspn( $sql, '`' === $c ? '`' : $c . '\\', $i );
+
+					if ( $i >= $len )
+						break;
+
+					if ( '\\' === $sql[ $i ] ) {
+						$i += 2;
+
+						continue;
+					}
+
+					if ( ( $sql[ $i + 1 ] ?? '' ) === $c ) {
+						$i += 2;
+
+						continue;
+					}
+
+					$i++;
+
+					break;
+				}
+
+				$out .= '`' === $c ? '``' : "''";
+			}
+
+			elseif ( '#' === $c || ( '-' === $c && '-' === ( $sql[ $i + 1 ] ?? '' ) && ( $i + 2 >= $len || ctype_space( $sql[ $i + 2 ] ) ) ) ) {
+
+				$newline = strpos( $sql, "\n", $i );
+				$i       = false === $newline ? $len : $newline + 1;
+				$out    .= ' ';
+			}
+
+			elseif ( '/' === $c && '*' === ( $sql[ $i + 1 ] ?? '' ) ) {
+
+				$close = strpos( $sql, '*/', $i + 2 );
+				$end   = false === $close ? $len : $close + 2;
+
+				// the comment that a server runs is code, the others are not
+				$out .= preg_match( '/^\/\*M?!/', substr( $sql, $i, 4 ) ) ? substr( $sql, $i, $end - $i ) : ' ';
+				$i    = $end;
+			}
+
+			else {
+				$out .= $c;
+				$i++;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * The collations and character sets that a CREATE TABLE names
+	 * @since   0.4.0
+	 * @since   0.4.1  Moved from SyncPilot_Import to SyncPilot_Base: a push and a pull map the collations too
+	 *
+	 * @param   string $masked  The statement after mask_literals()
+	 *
+	 * @return  array  collations and charsets: the names in small letters, each once
+	 */
+	static function used_collations( $masked ) {
+
+		preg_match_all( '/\bCOLLATE\s*=?\s*([A-Za-z0-9_]+)/i', $masked, $collations );
+		preg_match_all( '/\b(?:CHARACTER\s+SET|CHARSET)\s*=?\s*([A-Za-z0-9_]+)/i', $masked, $charsets );
+
+		return array(
+			'collations' => array_values( array_unique( array_map( 'strtolower', $collations[1] ) ) ),
+			'charsets'   => array_values( array_unique( array_map( 'strtolower', $charsets[1] ) ) ),
+		);
+	}
+
+	/**
+	 * Which of the collations and character sets of a dump this database does not know. A dump of MySQL 8 has
+	 * utf8mb4_0900_ai_ci, which MariaDB and MySQL 5.7 do not have: every CREATE TABLE with it would fail, so it is found
+	 * before the first table is made.
+	 * @since   0.4.0
+	 * @since   0.4.1  Moved from SyncPilot_Import to SyncPilot_Base: a push and a pull map the collations too
+	 *
+	 * @param   array $used  collations and charsets as used_collations() gives them
+	 *
+	 * @return  array  collations and charsets that are not known
+	 */
+	static function unsupported_collations( $used ) {
+
+		$known = self::known_collations();
+
+		return array(
+			'collations' => array_values( array_diff( $used['collations'] ?? array(), $known['collations'] ) ),
+			'charsets'   => array_values( array_diff( $used['charsets'] ?? array(), $known['charsets'] ) ),
+		);
+	}
+
+	/**
+	 * A collation that this database knows and that is the nearest to one that it does not know. A dump of MariaDB 11 has
+	 * utf8mb4_uca1400_ai_ci, a dump of MySQL 8 utf8mb4_0900_ai_ci: an older MariaDB or MySQL 5.7 does not know them. A binary
+	 * collation stays binary; the others become the collation that WordPress uses for utf8mb4 (utf8mb4_unicode_520_ci), or the
+	 * next one of its kind. utf8mb3 and utf8 are the same character set under two names.
+	 * @since   0.4.0
+	 * @since   0.4.1  Moved from SyncPilot_Import to SyncPilot_Base: a push and a pull map the collations too
+	 *
+	 * @param   string $name        The collation of the dump
+	 * @param   array  $collations  The collations that this database knows, in small letters
+	 *
+	 * @return  string|null  null when there is no collation that fits (the character set is not known either)
+	 */
+	static function map_collation( $name, $collations ) {
+
+		$name = strtolower( $name );
+
+		if ( false === ( $cut = strpos( $name, '_' ) ) )
+			return null;
+
+		$charset = substr( $name, 0, $cut );
+		$rest    = substr( $name, $cut + 1 );
+
+		// the same character set under its other name
+		foreach ( array( 'utf8mb3' => 'utf8', 'utf8' => 'utf8mb3' ) as $from => $to ) {
+
+			if ( $charset === $from && in_array( $to . '_' . $rest, $collations, true ) )
+				return $to . '_' . $rest;
+		}
+
+		if ( '_bin' === substr( $name, -4 ) && in_array( $charset . '_bin', $collations, true ) )
+			return $charset . '_bin';
+
+		$candidates = array( $charset . '_unicode_520_ci', $charset . '_unicode_ci', $charset . '_general_ci' );
+
+		// utf8mb3 is called utf8 by the other server
+		if ( 'utf8mb3' === $charset )
+			$candidates = array_merge( $candidates, array( 'utf8_unicode_520_ci', 'utf8_unicode_ci', 'utf8_general_ci' ) );
+
+		foreach ( $candidates as $candidate ) {
+
+			if ( in_array( $candidate, $collations, true ) )
+				return $candidate;
+		}
+
+		return null;
+	}
+
+	/**
+	 * The character set of a dump that this database does not know, under the name that it knows (utf8mb3 and utf8)
+	 * @since   0.4.0
+	 * @since   0.4.1  Moved from SyncPilot_Import to SyncPilot_Base: a push and a pull map the collations too
+	 *
+	 * @param   string $name      The character set of the dump
+	 * @param   array  $charsets  The character sets that this database knows, in small letters
+	 *
+	 * @return  string|null
+	 */
+	static function map_charset( $name, $charsets ) {
+
+		$other = array( 'utf8mb3' => 'utf8', 'utf8' => 'utf8mb3' )[ strtolower( $name ) ] ?? null;
+
+		return null !== $other && in_array( $other, $charsets, true ) ? $other : null;
+	}
+
+	/**
+	 * The collations and character sets that this database knows
+	 * @since   0.4.0
+	 * @since   0.4.1  Moved from SyncPilot_Import to SyncPilot_Base: a push and a pull map the collations too
+	 *
+	 * @return  array  collations and charsets, in small letters
+	 */
+	static function known_collations() {
+
+		global $wpdb;
+
+		return array(
+			'collations' => array_map( 'strtolower', (array) $wpdb->get_col( 'SELECT COLLATION_NAME FROM information_schema.COLLATIONS' ) ),
+			'charsets'   => array_map( 'strtolower', (array) $wpdb->get_col( 'SELECT CHARACTER_SET_NAME FROM information_schema.CHARACTER_SETS' ) ),
+		);
+	}
+
+	/**
+	 * A statement in pieces: the code and what is not code (a string, a name between backticks) one after the other, the code at
+	 * the even places and the strings and names at the odd ones, so that implode() gives the statement again
+	 * @since   0.4.1
+	 *
+	 * @param   string $sql  A statement, as small as a CREATE TABLE (the pattern is not made for a string of a megabyte)
+	 *
+	 * @return  array
+	 */
+	static function split_code( $sql ) {
+
+		$pieces = preg_split( '/(\'(?:[^\'\\\\]|\\\\.|\'\')*\'|"(?:[^"\\\\]|\\\\.|"")*"|`(?:[^`]|``)*`)/s', $sql, -1, PREG_SPLIT_DELIM_CAPTURE );
+
+		return false === $pieces ? array( $sql ) : $pieces;
+	}
+
+	/**
+	 * The statement with the collations and character sets that were mapped (see map_collation()) in place of the ones of
+	 * the dump. Only the names that are in the map are touched, behind COLLATE, COLLATE=, CHARSET= and CHARACTER SET.
+	 * @since   0.4.0
+	 * @since   0.4.1  Moved from SyncPilot_Import to SyncPilot_Base: a push and a pull map the collations too; strings, comments and names between backticks are not touched
+	 *
+	 * @param   string $sql      A CREATE TABLE statement
+	 * @param   array  $map      collations and charsets: name of the dump => name that this database knows
+	 *
+	 * @return  string
+	 */
+	static function apply_collation_map( $sql, $map ) {
+
+		// the text of a string, a comment of the table or a column and a name between backticks are not code: only the pieces between them are changed
+		$pieces = self::split_code( $sql );
+
+		foreach ( $pieces as $i => $piece ) {
+
+			if ( $i % 2 )
+				continue;
+
+			foreach ( $map['collations'] ?? array() as $from => $to )
+				$piece = preg_replace( '/\b(COLLATE\s*=?\s*)' . preg_quote( $from, '/' ) . '\b/i', '${1}' . $to, $piece );
+
+			foreach ( $map['charsets'] ?? array() as $from => $to )
+				$piece = preg_replace( '/\b((?:CHARACTER\s+SET|CHARSET)\s*=?\s*)' . preg_quote( $from, '/' ) . '\b/i', '${1}' . $to, $piece );
+
+			$pieces[ $i ] = $piece;
+		}
+
+		return implode( '', $pieces );
+	}
+
 }
