@@ -1534,7 +1534,7 @@ class SyncPilot extends SyncPilot_Base {
 		$this->fp                 = $this->open( $sql_dump_file_name );
 
 		if ( ! $file_created )
-			$this->db_backup_header();
+			$this->db_backup_header( 'backup' );
 
 		$result = $this->export_table( $_POST['table'] );
 
@@ -1690,7 +1690,7 @@ class SyncPilot extends SyncPilot_Base {
 
 			$this->fp = $this->open( $this->get_upload_info( 'path' ) . DS . $return['dump_filename'] );
 
-			$this->db_backup_header();
+			$this->db_backup_header( 'export' );
 			$this->close( $this->fp );
 
 			$return['dump_filename'] = $dump_filename_no_extension;
@@ -2911,6 +2911,9 @@ class SyncPilot extends SyncPilot_Base {
 				$this->stow( "#\n\n" );
 				$this->stow( $this->get_alter_queries() );
 
+				// the mark of a dump that is complete: the last table is written to its end (a backup of a migration that stopped does not have it)
+				$this->stow( "# syncpilot-end: " . wp_json_encode( array( 'complete' => true, 'created' => gmdate( 'Y-m-d\TH:i:s\Z' ) ) ) . "\n", false );
+
 				$alter_table_name = $this->get_alter_table_name();
 
 				if ( $this->form_data['action'] == 'savefile' )
@@ -3080,15 +3083,38 @@ class SyncPilot extends SyncPilot_Base {
 		return $data;
 	}
 
-	function db_backup_header() {
+	/**
+	 * The head of a dump that SyncPilot writes (a backup or an export): the lines for a person, and one line for a program,
+	 * `# syncpilot-header: {...}` with the kind (backup or export), the version, the time (UTC), the address of the site, the
+	 * prefix of its tables and the version of its database server. The line has no language and no key: the import reads it
+	 * to list a backup that can be restored (SyncPilot_Import::backup_info()). A dump without the line (before 0.4.3) is still read.
+	 * @since   0.0.1
+	 * @since   0.4.3  Writes the line for programs; $kind says whether it is a backup or an export
+	 *
+	 * @param   string $kind  backup or export
+	 */
+	function db_backup_header( $kind = 'export' ) {
+
+		global $wpdb;
 
 		$charset = ( defined( 'DB_CHARSET' ) ? DB_CHARSET : 'utf8' );
+		$info    = array(
+			'format'    => 1,
+			'kind'      => 'backup' === $kind ? 'backup' : 'export',
+			'version'   => $GLOBALS['syncpilot_meta'][ $this->plugin_slug ]['version'] ?? '',
+			'created'   => gmdate( 'Y-m-d\TH:i:s\Z' ),
+			'home'      => home_url(),
+			'prefix'    => $wpdb->base_prefix,
+			'multisite' => is_multisite(),
+			'server'    => (string) $wpdb->db_version(),
+		);
 
 		$this->stow( "# " . __( 'WordPress MySQL database migration', self::TEXT_DOMAIN ) . "\n", false );
 		$this->stow( "#\n", false );
 		$this->stow( "# " . sprintf( __( 'Generated: %s', self::TEXT_DOMAIN ), date( "l j. F Y H:i T" ) ) . "\n", false );
 		$this->stow( "# " . sprintf( __( 'Hostname: %s', self::TEXT_DOMAIN ), DB_HOST ) . "\n", false );
 		$this->stow( "# " . sprintf( __( 'Database: %s', self::TEXT_DOMAIN ), $this->backquote( DB_NAME ) ) . "\n", false );
+		$this->stow( "# syncpilot-header: " . wp_json_encode( $info, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . "\n", false );
 		$this->stow( "# --------------------------------------------------------\n\n", false );
 		$this->stow( "/*!40101 SET NAMES $charset */;\n\n", false );
 		$this->stow( "SET sql_mode='NO_AUTO_VALUE_ON_ZERO';\n\n", false );
@@ -3487,6 +3513,12 @@ class SyncPilot extends SyncPilot_Base {
 			'import_delete_confirm'					=> __( "Remove this file from the folder?", self::TEXT_DOMAIN ),
 			'import_delete_problem'					=> __( "The file could not be removed.", self::TEXT_DOMAIN ),
 			'import_uploaded'						=> __( "uploaded", self::TEXT_DOMAIN ),
+			'import_no_backups'						=> __( "There is no backup of SyncPilot on this site yet. A backup is made when the option for a backup is on during a migration.", self::TEXT_DOMAIN ),
+			'import_backup_older'					=> __( "older backup, without details", self::TEXT_DOMAIN ),
+			'import_backup_incomplete'				=> __( "not complete (the migration stopped before the last table was written)", self::TEXT_DOMAIN ),
+			'import_backup_other_site'				=> __( "from another address:", self::TEXT_DOMAIN ),
+			'import_backup_export'					=> __( "export", self::TEXT_DOMAIN ),
+			'import_backup_confirm'					=> __( "This backup is not complete: the migration that made it stopped before the last table was written. The tables that are in it are restored, the last one may be cut off. Restore it anyway?", self::TEXT_DOMAIN ),
 			'removing_import_temp_tables'			=> __( "Removing the temporary tables of the import", self::TEXT_DOMAIN ),
 			'migrating'								=> __( "Migrating", self::TEXT_DOMAIN ),
 			'status'								=> __( "Status", self::TEXT_DOMAIN ),

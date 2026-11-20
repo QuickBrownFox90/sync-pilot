@@ -156,6 +156,7 @@
 				<p class="import-source">
 					<label for="import-source-folder"><input id="import-source-folder" type="radio" name="import_source" value="folder" checked="checked" /> <?php _e( 'Choose a file from the folder', self::TEXT_DOMAIN ); ?></label>
 					<label for="import-source-upload"><input id="import-source-upload" type="radio" name="import_source" value="upload" /> <?php _e( 'Upload a file', self::TEXT_DOMAIN ); ?></label>
+					<label for="import-source-backup"><input id="import-source-backup" type="radio" name="import_source" value="backup" /> <?php _e( 'Restore a backup', self::TEXT_DOMAIN ); ?></label>
 				</p>
 
 				<div class="import-source-box import-from-upload" style="display: none;">
@@ -170,6 +171,12 @@
 					</p>
 					<div class="import-upload-bar" style="display: none;"><div class="import-upload-bar-fill"></div></div>
 					<p class="import-upload-text inline-message"></p>
+				</div>
+
+				<div class="import-source-box import-from-backup" style="display: none;">
+					<p class="import-folder"><?php _e( 'Backups of SyncPilot in', self::TEXT_DOMAIN ); ?>: <code class="import-backup-path"></code></p>
+					<ul class="import-files import-backups"></ul>
+					<p class="import-no-backups"></p>
 				</div>
 
 				<div class="import-source-box import-from-folder">

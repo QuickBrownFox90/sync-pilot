@@ -22,6 +22,9 @@ class SyncPilot_Import extends SyncPilot_Base {
 	const UPLOAD_FOLDER = '.upload';
 	const UPLOAD_MAX_AGE = 86400;
 
+	// the name of a backup that SyncPilot made: <database>-backup-<time>-<32 characters>.sql, in the folder of the exports and backups
+	const BACKUP_PATTERN = '/^[A-Za-z0-9._-]+-backup-\d{14}-[0-9a-f]{32}\.sql$/';
+
 	// the files that SyncPilot puts into the folder itself: they are no dumps and are not listed
 	const OWN_FILES = array( '.htaccess', 'index.php', 'web.config' );
 
@@ -278,6 +281,144 @@ class SyncPilot_Import extends SyncPilot_Base {
 			return false;
 
 		return $file;
+	}
+
+	/**
+	 * The folder of the backups and exports of SyncPilot (the same as for the export, see SyncPilot::get_upload_info())
+	 * @since   0.4.3
+	 *
+	 * @return  string  The path without a slash at the end
+	 */
+	static function backup_path() {
+
+		global $syncpilot;
+
+		return untrailingslashit( (string) $syncpilot->get_upload_info( 'path' ) );
+	}
+
+	/**
+	 * What a backup says about itself: the line `# syncpilot-header: {...}` at the beginning (written since 0.4.3, see
+	 * SyncPilot::db_backup_header()) and the line `# syncpilot-end: {...}` at the end, which is only there when the last table was
+	 * written to its end. Only the beginning and the end of the file are read.
+	 * @since   0.4.3
+	 *
+	 * @param   string $file  The path of the backup
+	 *
+	 * @return  array  header (array, or null when the file has none: a backup of an older version), complete (true: the mark
+	 *                 of the end is there; false: the file has a header but no mark, the migration stopped before the last
+	 *                 table was written; null: not known, no header)
+	 */
+	static function backup_info( $file ) {
+
+		$size   = (int) @filesize( $file );
+		$head   = (string) @file_get_contents( $file, false, null, 0, 8192 );
+		$tail   = $size > 8192 ? (string) @file_get_contents( $file, false, null, max( 0, $size - 2048 ), 2048 ) : $head;
+		$header = null;
+
+		if ( preg_match( '/^# syncpilot-header: (\{.*\})\s*$/m', $head, $m ) ) {
+
+			$decoded = json_decode( $m[1], true );
+
+			if ( is_array( $decoded ) && 1 === (int) ( $decoded['format'] ?? 0 ) ) {
+
+				$header = array(
+					'kind'      => 'backup' === ( $decoded['kind'] ?? '' ) ? 'backup' : 'export',
+					'version'   => substr( (string) ( $decoded['version'] ?? '' ), 0, 20 ),
+					'created'   => substr( (string) ( $decoded['created'] ?? '' ), 0, 25 ),
+					'home'      => substr( (string) ( $decoded['home'] ?? '' ), 0, 300 ),
+					'prefix'    => substr( (string) ( $decoded['prefix'] ?? '' ), 0, 60 ),
+					'multisite' => ! empty( $decoded['multisite'] ),
+					'server'    => substr( (string) ( $decoded['server'] ?? '' ), 0, 40 ),
+				);
+			}
+		}
+
+		// the mark is the last line of the file: a line like it inside a value of the data does not count
+		$lines = explode( "\n", rtrim( $tail ) );
+		$ended = 1 === preg_match( '/^# syncpilot-end: \{"complete":true/', (string) end( $lines ) );
+
+		return array(
+			'header'   => $header,
+			'complete' => null === $header ? ( $ended ? true : null ) : $ended,
+		);
+	}
+
+	/**
+	 * The backups that can be restored, the newest first: the files of the folder of the exports and backups that have the name
+	 * of a backup of SyncPilot. A backup of an older version has no header: it is listed without what the header says.
+	 * @since   0.4.3
+	 *
+	 * @return  array  Per backup: name, bytes, modified, header (array or null), complete (true, false or null, see backup_info()), usable
+	 */
+	static function backups() {
+
+		$path  = self::backup_path();
+		$files = array();
+
+		if ( ! is_dir( $path ) || false === ( $names = @scandir( $path ) ) )
+			return $files;
+
+		foreach ( $names as $name ) {
+
+			if ( ! preg_match( self::BACKUP_PATTERN, $name ) || is_link( $path . DS . $name ) || ! is_file( $path . DS . $name ) )
+				continue;
+
+			$file = $path . DS . $name;
+			$info = self::backup_info( $file );
+
+			$files[] = array(
+				'name'     => $name,
+				'bytes'    => (int) @filesize( $file ),
+				'modified' => (int) @filemtime( $file ),
+				'header'   => $info['header'],
+				'complete' => $info['complete'],
+				'usable'   => is_readable( $file ) && filesize( $file ) > 0,
+			);
+		}
+
+		usort( $files, fn( $a, $b ) => array( $b['modified'], $a['name'] ) <=> array( $a['modified'], $b['name'] ) );
+
+		return array_slice( $files, 0, (int) apply_filters( 'syncpilot_import_backups_listed', 100 ) );
+	}
+
+	/**
+	 * The path of a backup of the folder of the backups, the way resolve() does it for a dump: the name must be the name of a
+	 * backup, the file must be a file of the folder itself (no link) and readable
+	 * @since   0.4.3
+	 *
+	 * @param   mixed $name  The name of the file
+	 *
+	 * @return  string|false
+	 */
+	static function resolve_backup( $name ) {
+
+		if ( ! is_string( $name ) || ! preg_match( self::BACKUP_PATTERN, $name ) )
+			return false;
+
+		$folder = realpath( self::backup_path() );
+		$file   = self::backup_path() . DS . $name;
+
+		if ( false === $folder || is_link( $file ) || ! is_file( $file ) || ! is_readable( $file ) )
+			return false;
+
+		$real = realpath( $file );
+
+		return false !== $real && dirname( $real ) === $folder ? $file : false;
+	}
+
+	/**
+	 * The file of an import that is under way (or about to start): a dump of the folder for dumps or a backup
+	 * @since   0.4.3
+	 *
+	 * @param   array $state  The state of the import (file, source)
+	 *
+	 * @return  string|false
+	 */
+	static function state_file_path( $state ) {
+
+		$name = $state['file'] ?? '';
+
+		return 'backup' === ( $state['source'] ?? '' ) ? self::resolve_backup( $name ) : self::resolve( $name );
 	}
 
 	/**
@@ -794,13 +935,23 @@ class SyncPilot_Import extends SyncPilot_Base {
 
 		$this->check_ajax_referer( 'import-start' );
 
-		$file = self::resolve( wp_unslash( $_POST['file'] ?? '' ) );
+		$source = 'backup' === ( $_POST['source'] ?? '' ) ? 'backup' : 'folder';
+		$name   = wp_unslash( $_POST['file'] ?? '' );
+		$file   = 'backup' === $source ? self::resolve_backup( $name ) : self::resolve( $name );
 
 		if ( false === $file ) {
 
 			$this->log_error( SyncPilot_HelpCode::ImportFileInvalid, array( 'name_bytes' => strlen( (string) ( $_POST['file'] ?? '' ) ) ), site: 1 );
 
 			return $this->import_error( __( 'This file is not a dump in the folder for dumps. (#301)', self::TEXT_DOMAIN ) );
+		}
+
+		// a backup of a migration that stopped (its last table was not written to the end) is restored only when the page says so
+		if ( 'backup' === $source && false === self::backup_info( $file )['complete'] && empty( $_POST['confirm_incomplete'] ) ) {
+
+			$this->log_error( SyncPilot_HelpCode::ImportBackupIncomplete, array(), site: 1 );
+
+			return $this->import_error( __( 'This backup is not complete: the migration that made it stopped before the last table was written. (#308)', self::TEXT_DOMAIN ) );
 		}
 
 		SyncPilot_Logger::set_migration_id( SyncPilot_Logger::new_migration_id() );
@@ -821,7 +972,8 @@ class SyncPilot_Import extends SyncPilot_Base {
 				'unpack'       => '' !== $work,
 				'other_prefix' => ! empty( $_POST['other_prefix'] ),
 				'strict_collations' => ! empty( $_POST['strict_collations'] ),
-				'delete_file'  => ! empty( $_POST['delete_file'] ),
+				'delete_file'  => 'folder' === $source && ! empty( $_POST['delete_file'] ),
+				'source'       => $source,
 				'replace_rows' => count( array_filter( (array) ( $this->import_form( (string) ( $_POST['form_data'] ?? '' ) )['replace_old'] ?? array() ), 'strlen' ) ),
 			),
 			'environment' => SyncPilot_Logger::environment(),
@@ -838,7 +990,8 @@ class SyncPilot_Import extends SyncPilot_Base {
 			'form_data'    => (string) ( $_POST['form_data'] ?? '' ),
 			'other_prefix' => ! empty( $_POST['other_prefix'] ),
 			'strict_collations' => ! empty( $_POST['strict_collations'] ),
-			'delete_file'  => ! empty( $_POST['delete_file'] ),
+			'delete_file'  => 'folder' === $source && ! empty( $_POST['delete_file'] ),
+			'source'       => $source,
 			'started'      => time(),
 			'statements'   => 0,
 			'tables'       => array(),
@@ -890,7 +1043,7 @@ class SyncPilot_Import extends SyncPilot_Base {
 
 		$state = self::state_read();
 
-		if ( null === $state || false === ( $file = self::resolve( $state['file'] ?? '' ) ) ) {
+		if ( null === $state || false === ( $file = self::state_file_path( $state ) ) ) {
 
 			$this->log_error( SyncPilot_HelpCode::ImportStateLost, array(), site: 1 );
 
@@ -1796,7 +1949,7 @@ class SyncPilot_Import extends SyncPilot_Base {
 		self::state_remove();
 
 		// the dump is removed when the import was started with the choice, and only now: a cancel, a stop and an error leave it
-		if ( ! empty( $state['delete_file'] ) && ! empty( $state['file'] ) ) {
+		if ( ! empty( $state['delete_file'] ) && ! empty( $state['file'] ) && 'backup' !== ( $state['source'] ?? '' ) ) {
 
 			$deleted = self::delete( $state['file'] );
 
@@ -2159,6 +2312,8 @@ class SyncPilot_Import extends SyncPilot_Base {
 			'files'    => self::files(),
 			'folder'   => self::path(),
 			'writable' => $writable,
+			'backups'  => self::backups(),
+			'backup_folder' => self::backup_path(),
 		) ) );
 
 		return $result;

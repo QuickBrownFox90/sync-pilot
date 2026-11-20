@@ -20,6 +20,9 @@ var scanned = null;
 // the upload that is under way: the ID of the server, a flag to stop it, and the request that is sent
 var upload = null;
 
+// the backup that is not complete was asked about and confirmed (for this start only)
+var confirmed_incomplete = false;
+
 // the name that the server gave to the file that was uploaded last: it is chosen when the list is shown
 var uploaded_name = '';
 
@@ -46,10 +49,18 @@ export function init_import() {
     // the file comes from the folder or from an upload
     $( 'input[name=import_source]' ).change( function () {
 
-        var from_upload = 'upload' === $( 'input[name=import_source]:checked' ).val();
+        var source      = $( 'input[name=import_source]:checked' ).val();
 
-        $( '.import-from-upload' ).toggle( from_upload );
-        $( '.import-from-folder' ).toggle( ! from_upload );
+        $( '.import-from-upload' ).toggle( 'upload' === source );
+        $( '.import-from-folder' ).toggle( 'folder' === source );
+        $( '.import-from-backup' ).toggle( 'backup' === source );
+
+        // what is chosen in a box that is not shown is not chosen
+        $( 'input[name=import_file]' ).filter( function () {
+            return ! $( this ).closest( '.import-source-box' ).is( ':visible' );
+        } ).prop( 'checked', false );
+
+        file_chosen();
     } );
 
     $( '.import-upload-start' ).click( start_upload );
@@ -68,7 +79,7 @@ export function init_import() {
     $( 'body' ).on( 'change', 'input[name=import_file]', function () {
 
         delete_touched = false;
-        $( '#import-delete-file' ).prop( 'checked', '1' === $( this ).attr( 'data-uploaded' ) );
+        file_chosen();
     } );
 
     $( 'body' ).on( 'click', '.import-file-delete', function ( e ) {
@@ -142,8 +153,76 @@ function load_files() {
 
             files_loaded = true;
             show_files( data );
+            show_backups( data );
+            file_chosen();
         }
     } );
+}
+
+/**
+ * What follows from the file that is chosen: the choice to remove it after the import (on for an uploaded file, off for a file
+ * that was put into the folder, not offered for a backup)
+ * @since   0.4.3
+ */
+function file_chosen() {
+
+    var $now = $( 'input[name=import_file]:checked' );
+
+    $( '.import-delete-file' ).toggle( 'backup' !== $now.attr( 'data-source' ) );
+
+    if ( $now.length && ! delete_touched )
+        $( '#import-delete-file' ).prop( 'checked', '1' === $now.attr( 'data-uploaded' ) );
+}
+
+/**
+ * Show the backups that can be restored: the time, the address of the site the backup was made on (when it is not this one), the
+ * size, and whether it is complete. A radio button for each; they belong to the group of the files (a single choice).
+ * @since   0.4.3
+ * @param   {object} data  The answer of the server: backups, backup_folder
+ */
+function show_backups( data ) {
+
+    var chosen = $( 'input[name=import_file]:checked' ).val();
+    var $list  = $( '.import-backups' ).empty();
+
+    $( '.import-backup-path' ).text( data.backup_folder || '' );
+
+    $.each( data.backups || [], function ( n, backup ) {
+
+        if ( ! backup.usable )
+            return;
+
+        var header = backup.header;
+        var when   = header && header.created ? new Date( header.created ) : new Date( backup.modified * 1000 );
+        var text   = when.toLocaleString();
+        var $radio = $( '<input type="radio" name="import_file">' ).attr( { id : 'import-backup-' + n, value : backup.name, 'data-source' : 'backup', 'data-complete' : null === backup.complete ? '' : ( backup.complete ? '1' : '0' ) } );
+        var $label = $( '<label>' ).attr( 'for', 'import-backup-' + n );
+
+        if ( backup.name === chosen )
+            $radio.prop( 'checked', true );
+
+        if ( header ) {
+
+            if ( 'export' === header.kind )
+                text += ', ' + syncpilot_i10n.import_backup_export;
+
+            if ( header.home && header.home !== syncpilot_this_url )
+                text += ', ' + syncpilot_i10n.import_backup_other_site + ' ' + header.home;
+        } else {
+            text += ', ' + syncpilot_i10n.import_backup_older;
+        }
+
+        text += ', ' + format_size( backup.bytes );
+
+        $label.append( $radio ).append( document.createTextNode( ' ' + text ) );
+
+        if ( false === backup.complete )
+            $label.append( $( '<span class="option-description import-backup-incomplete">' ).text( syncpilot_i10n.import_backup_incomplete ) );
+
+        $list.append( $( '<li>' ).append( $label ) );
+    } );
+
+    $( '.import-no-backups' ).text( $list.children().length ? '' : syncpilot_i10n.import_no_backups );
 }
 
 /**
@@ -158,7 +237,7 @@ function show_files( data ) {
 
     uploaded_name = '';
 
-    var $list  = $( '.import-files' ).empty();
+    var $list  = $( '.import-from-folder .import-files' ).empty();
     var usable = $.grep( data.files, function ( file ) {
         return file.usable;
     } );
@@ -173,7 +252,7 @@ function show_files( data ) {
         if ( file.usable ) {
 
             var $label = $( '<label>' ).attr( 'for', 'import-file-' + n );
-            var $radio = $( '<input type="radio" name="import_file">' ).attr( { id : 'import-file-' + n, value : file.name, 'data-uploaded' : file.uploaded ? '1' : '0' } );
+            var $radio = $( '<input type="radio" name="import_file">' ).attr( { id : 'import-file-' + n, value : file.name, 'data-source' : 'folder', 'data-uploaded' : file.uploaded ? '1' : '0' } );
 
             if ( file.name === chosen || ( ! chosen && 1 === usable.length ) )
                 $radio.prop( 'checked', true );
@@ -191,11 +270,6 @@ function show_files( data ) {
 
     $( '.import-no-files' ).text( usable.length ? '' : syncpilot_i10n.import_no_files );
 
-    // a file that is chosen at once (the only one, or the one that was uploaded) has its choice for the removal
-    var $now = $( 'input[name=import_file]:checked' );
-
-    if ( $now.length && ! delete_touched )
-        $( '#import-delete-file' ).prop( 'checked', '1' === $now.attr( 'data-uploaded' ) );
 }
 
 /**
@@ -209,35 +283,35 @@ function upload_text( text, error ) {
 }
 
 /**
- * Remove a file of the folder (the link behind it), after a question
+ * Remove a file of the folder (the link behind it), after a question (in the dialog of the page, not a native pop-up)
  * @since   0.4.2
  * @param   {string} name  The name of the file
  */
 function delete_file( name ) {
 
-    if ( ! window.confirm( syncpilot_i10n.import_delete_confirm + '\n' + name ) )
-        return;
+    syncpilot_confirm( syncpilot_i10n.import_delete_confirm + '\n' + name, function () {
 
-    $.ajax( {
-        url      : ajaxurl,
-        type     : 'POST',
-        dataType : 'json',
-        cache    : false,
-        data     : {
-            action : 'syncpilot_import_delete',
-            file   : name,
-            nonce  : syncpilot_nonces.import_delete,
-        },
-        success : function ( data ) {
+        $.ajax( {
+            url      : ajaxurl,
+            type     : 'POST',
+            dataType : 'json',
+            cache    : false,
+            data     : {
+                action : 'syncpilot_import_delete',
+                file   : name,
+                nonce  : syncpilot_nonces.import_delete,
+            },
+            success : function ( data ) {
 
-            if ( data && data.deleted )
-                load_files();
-            else
-                window.alert( ( data && data.body ) || syncpilot_i10n.import_delete_problem );
-        },
-        error : function () {
-            window.alert( syncpilot_i10n.import_delete_problem );
-        }
+                if ( data && data.deleted )
+                    load_files();
+                else
+                    syncpilot_alert( ( data && data.body ) || syncpilot_i10n.import_delete_problem );
+            },
+            error : function () {
+                syncpilot_alert( syncpilot_i10n.import_delete_problem );
+            }
+        } );
     } );
 }
 
@@ -596,6 +670,24 @@ function show_progress( answer ) {
  */
 export function start_import() {
 
+    var $chosen = $( 'input[name=import_file]:checked' );
+
+    // a backup that is not complete is only restored when it is said again
+    if ( 'backup' === $chosen.attr( 'data-source' ) && '0' === $chosen.attr( 'data-complete' ) && ! confirmed_incomplete ) {
+
+        syncpilot_confirm( syncpilot_i10n.import_backup_confirm, function () {
+
+            confirmed_incomplete = true;
+            start_import();
+        } );
+
+        return;
+    }
+
+    var confirmed = confirmed_incomplete;
+
+    confirmed_incomplete = false;
+
     state.stage = 'import';
     scanned     = null;
 
@@ -608,13 +700,15 @@ export function start_import() {
         cache    : false,
         timeout  : 0,
         data     : {
-            action            : 'syncpilot_import_start',
-            file              : $( 'input[name=import_file]:checked' ).val(),
-            form_data         : state.form_data,
-            other_prefix      : $( '#import-other-prefix' ).is( ':checked' ) ? 1 : 0,
-            strict_collations : $( '#import-strict-collations' ).is( ':checked' ) ? 1 : 0,
-            delete_file       : $( '#import-delete-file' ).is( ':checked' ) ? 1 : 0,
-            nonce             : syncpilot_nonces.import_start,
+            action             : 'syncpilot_import_start',
+            file               : $chosen.val(),
+            source             : 'backup' === $chosen.attr( 'data-source' ) ? 'backup' : 'folder',
+            confirm_incomplete : confirmed ? 1 : 0,
+            form_data          : state.form_data,
+            other_prefix       : $( '#import-other-prefix' ).is( ':checked' ) ? 1 : 0,
+            strict_collations  : $( '#import-strict-collations' ).is( ':checked' ) ? 1 : 0,
+            delete_file        : $( '#import-delete-file' ).is( ':checked' ) ? 1 : 0,
+            nonce              : syncpilot_nonces.import_start,
         },
         error : function ( jqXHR, textStatus, errorThrown ) {
 

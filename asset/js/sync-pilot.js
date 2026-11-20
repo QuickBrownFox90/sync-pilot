@@ -1910,6 +1910,7 @@ function syncpilot_parse_json( maybe_json ) {
   var files_loaded = false;
   var scanned = null;
   var upload = null;
+  var confirmed_incomplete = false;
   var uploaded_name = "";
   var delete_touched = false;
   var UPLOAD_TRIES = 3;
@@ -1920,9 +1921,14 @@ function syncpilot_parse_json( maybe_json ) {
     });
     $18(".migrate-selection.option-group input[type=radio]").change(import_chosen_changed);
     $18("input[name=import_source]").change(function() {
-      var from_upload = "upload" === $18("input[name=import_source]:checked").val();
-      $18(".import-from-upload").toggle(from_upload);
-      $18(".import-from-folder").toggle(!from_upload);
+      var source = $18("input[name=import_source]:checked").val();
+      $18(".import-from-upload").toggle("upload" === source);
+      $18(".import-from-folder").toggle("folder" === source);
+      $18(".import-from-backup").toggle("backup" === source);
+      $18("input[name=import_file]").filter(function() {
+        return !$18(this).closest(".import-source-box").is(":visible");
+      }).prop("checked", false);
+      file_chosen();
     });
     $18(".import-upload-start").click(start_upload);
     $18(".import-upload-cancel").click(function(e) {
@@ -1934,7 +1940,7 @@ function syncpilot_parse_json( maybe_json ) {
     });
     $18("body").on("change", "input[name=import_file]", function() {
       delete_touched = false;
-      $18("#import-delete-file").prop("checked", "1" === $18(this).attr("data-uploaded"));
+      file_chosen();
     });
     $18("body").on("click", ".import-file-delete", function(e) {
       e.preventDefault();
@@ -1977,13 +1983,51 @@ function syncpilot_parse_json( maybe_json ) {
         }
         files_loaded = true;
         show_files(data);
+        show_backups(data);
+        file_chosen();
       }
     });
+  }
+  function file_chosen() {
+    var $now = $18("input[name=import_file]:checked");
+    $18(".import-delete-file").toggle("backup" !== $now.attr("data-source"));
+    if ($now.length && !delete_touched)
+      $18("#import-delete-file").prop("checked", "1" === $now.attr("data-uploaded"));
+  }
+  function show_backups(data) {
+    var chosen = $18("input[name=import_file]:checked").val();
+    var $list = $18(".import-backups").empty();
+    $18(".import-backup-path").text(data.backup_folder || "");
+    $18.each(data.backups || [], function(n, backup) {
+      if (!backup.usable)
+        return;
+      var header = backup.header;
+      var when = header && header.created ? new Date(header.created) : new Date(backup.modified * 1e3);
+      var text = when.toLocaleString();
+      var $radio = $18('<input type="radio" name="import_file">').attr({ id: "import-backup-" + n, value: backup.name, "data-source": "backup", "data-complete": null === backup.complete ? "" : backup.complete ? "1" : "0" });
+      var $label = $18("<label>").attr("for", "import-backup-" + n);
+      if (backup.name === chosen)
+        $radio.prop("checked", true);
+      if (header) {
+        if ("export" === header.kind)
+          text += ", " + syncpilot_i10n.import_backup_export;
+        if (header.home && header.home !== syncpilot_this_url)
+          text += ", " + syncpilot_i10n.import_backup_other_site + " " + header.home;
+      } else {
+        text += ", " + syncpilot_i10n.import_backup_older;
+      }
+      text += ", " + format_size(backup.bytes);
+      $label.append($radio).append(document.createTextNode(" " + text));
+      if (false === backup.complete)
+        $label.append($18('<span class="option-description import-backup-incomplete">').text(syncpilot_i10n.import_backup_incomplete));
+      $list.append($18("<li>").append($label));
+    });
+    $18(".import-no-backups").text($list.children().length ? "" : syncpilot_i10n.import_no_backups);
   }
   function show_files(data) {
     var chosen = uploaded_name || $18("input[name=import_file]:checked").val() || (typeof syncpilot_loaded_import_file != "undefined" ? syncpilot_loaded_import_file : "");
     uploaded_name = "";
-    var $list = $18(".import-files").empty();
+    var $list = $18(".import-from-folder .import-files").empty();
     var usable = $18.grep(data.files, function(file) {
       return file.usable;
     });
@@ -1993,7 +2037,7 @@ function syncpilot_parse_json( maybe_json ) {
       var $item = $18("<li>");
       if (file.usable) {
         var $label = $18("<label>").attr("for", "import-file-" + n);
-        var $radio = $18('<input type="radio" name="import_file">').attr({ id: "import-file-" + n, value: file.name, "data-uploaded": file.uploaded ? "1" : "0" });
+        var $radio = $18('<input type="radio" name="import_file">').attr({ id: "import-file-" + n, value: file.name, "data-source": "folder", "data-uploaded": file.uploaded ? "1" : "0" });
         if (file.name === chosen || !chosen && 1 === usable.length)
           $radio.prop("checked", true);
         $label.append($radio).append(document.createTextNode(" " + file.name));
@@ -2006,35 +2050,32 @@ function syncpilot_parse_json( maybe_json ) {
       $list.append($item);
     });
     $18(".import-no-files").text(usable.length ? "" : syncpilot_i10n.import_no_files);
-    var $now = $18("input[name=import_file]:checked");
-    if ($now.length && !delete_touched)
-      $18("#import-delete-file").prop("checked", "1" === $now.attr("data-uploaded"));
   }
   function upload_text(text, error) {
     $18(".import-upload-text").text(text).toggleClass("error", !!error).toggleClass("notification-message", !!error);
   }
   function delete_file(name) {
-    if (!window.confirm(syncpilot_i10n.import_delete_confirm + "\n" + name))
-      return;
-    $18.ajax({
-      url: ajaxurl,
-      type: "POST",
-      dataType: "json",
-      cache: false,
-      data: {
-        action: "syncpilot_import_delete",
-        file: name,
-        nonce: syncpilot_nonces.import_delete
-      },
-      success: function(data) {
-        if (data && data.deleted)
-          load_files();
-        else
-          window.alert(data && data.body || syncpilot_i10n.import_delete_problem);
-      },
-      error: function() {
-        window.alert(syncpilot_i10n.import_delete_problem);
-      }
+    syncpilot_confirm(syncpilot_i10n.import_delete_confirm + "\n" + name, function() {
+      $18.ajax({
+        url: ajaxurl,
+        type: "POST",
+        dataType: "json",
+        cache: false,
+        data: {
+          action: "syncpilot_import_delete",
+          file: name,
+          nonce: syncpilot_nonces.import_delete
+        },
+        success: function(data) {
+          if (data && data.deleted)
+            load_files();
+          else
+            syncpilot_alert(data && data.body || syncpilot_i10n.import_delete_problem);
+        },
+        error: function() {
+          syncpilot_alert(syncpilot_i10n.import_delete_problem);
+        }
+      });
     });
   }
   function upload_parts(file, size, compress) {
@@ -2248,6 +2289,16 @@ function syncpilot_parse_json( maybe_json ) {
     $18(".progress-text").html(text);
   }
   function start_import() {
+    var $chosen = $18("input[name=import_file]:checked");
+    if ("backup" === $chosen.attr("data-source") && "0" === $chosen.attr("data-complete") && !confirmed_incomplete) {
+      syncpilot_confirm(syncpilot_i10n.import_backup_confirm, function() {
+        confirmed_incomplete = true;
+        start_import();
+      });
+      return;
+    }
+    var confirmed = confirmed_incomplete;
+    confirmed_incomplete = false;
     state.stage = "import";
     scanned = null;
     state.doing_ajax = true;
@@ -2259,7 +2310,9 @@ function syncpilot_parse_json( maybe_json ) {
       timeout: 0,
       data: {
         action: "syncpilot_import_start",
-        file: $18("input[name=import_file]:checked").val(),
+        file: $chosen.val(),
+        source: "backup" === $chosen.attr("data-source") ? "backup" : "folder",
+        confirm_incomplete: confirmed ? 1 : 0,
         form_data: state.form_data,
         other_prefix: $18("#import-other-prefix").is(":checked") ? 1 : 0,
         strict_collations: $18("#import-strict-collations").is(":checked") ? 1 : 0,

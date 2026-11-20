@@ -7,6 +7,7 @@
 //   node tests/browser/import.mjs --yes --cancel   cancel while the dump is loaded: nothing is changed, nothing is left
 //   node tests/browser/import.mjs --yes --upload   the dump is uploaded in the page (in parts of 64 KB, compressed in the browser) and removed after the import
 //   node tests/browser/import.mjs --yes --upload --plain   the same without the compression (--gzip: a gzip file is uploaded as it is)
+//   node tests/browser/import.mjs --yes --restore   import with a backup, then restore that backup from the list of backups: the first site is as before
 //   node tests/browser/import.mjs --yes --shots    screenshots of the form and the progress box (folder: see lib.mjs)
 //
 // The first test site is overwritten (and put back), so --yes is required. The folder for the dumps of that site is not
@@ -27,7 +28,8 @@ if ( ! process.argv.includes( '--yes' ) ) {
 }
 
 const gzip   = process.argv.includes( '--gzip' );
-const backup = process.argv.includes( '--gzip' ) || process.argv.includes( '--backup' );
+const restore = process.argv.includes( '--restore' );
+const backup  = process.argv.includes( '--gzip' ) || process.argv.includes( '--backup' ) || restore;
 const cancel = process.argv.includes( '--cancel' );
 const shots  = process.argv.includes( '--shots' );
 const upload = process.argv.includes( '--upload' );
@@ -115,12 +117,12 @@ try {
     if ( upload )
         await wait( 1500 );
     else
-        await browser.waitFor( `document.querySelectorAll('.import-files li').length > 0`, 10000 );
+        await browser.waitFor( `document.querySelectorAll('.import-from-folder .import-files li').length > 0`, 10000 );
 
     check( 'the dump box is where the connection data are for pull and push, in the list of the import', await browser.ev( `!!document.querySelector('.import-list .import-file-wrapper') && getComputedStyle(document.querySelector('.import-file-wrapper')).display !== 'none'` ) );
     check( 'the connection box and the choice of tables are not shown', await browser.ev( `['.connection-info-wrapper', '.table-select-wrap', '.hide-for-import', '.media-files-options', '.connection-status'].every(s => Array.from(document.querySelectorAll(s)).every(e => e.offsetParent === null))` ) );
     check( 'the second step (find and replace, options) is open at once', await browser.ev( `document.querySelector('.step-two').offsetParent !== null && document.querySelector('#find-and-replace-sort').offsetParent !== null` ) );
-    check( 'the folder is shown' + ( upload ? ', the list is empty' : ', and the dump is in the list' ), await browser.ev( `document.querySelector('.import-folder-path').textContent.includes(${ JSON.stringify( importDir ) }) && ` + ( upload ? `document.querySelectorAll('.import-files input[name=import_file]').length === 0` : `Array.from(document.querySelectorAll('.import-files input[name=import_file]')).some(i => i.value === ${ JSON.stringify( name ) })` ) ) );
+    check( 'the folder is shown' + ( upload ? ', the list is empty' : ', and the dump is in the list' ), await browser.ev( `document.querySelector('.import-folder-path').textContent.includes(${ JSON.stringify( importDir ) }) && ` + ( upload ? `document.querySelectorAll('.import-from-folder .import-files input[name=import_file]').length === 0` : `Array.from(document.querySelectorAll('.import-from-folder .import-files input[name=import_file]')).some(i => i.value === ${ JSON.stringify( name ) })` ) ) );
     check( 'the choice between the folder and the upload is there, the folder is the one that is shown', await browser.ev( `document.querySelector('#import-source-folder').checked && document.querySelector('.import-from-folder').offsetParent !== null && document.querySelector('.import-from-upload').offsetParent === null` ) );
     check( 'the rows of find and replace are turned: this site is the new value, the old value is empty', await browser.ev( `document.querySelector('#old-url').value === '' && document.querySelector('#new-url').value !== '' && document.querySelector('#old-path').value === '' && document.querySelector('#new-path').value !== ''` ) );
 
@@ -186,12 +188,12 @@ try {
         const orig   = gzip ? readFileSync( join( source, name ) ) : readFileSync( join( source, name ) );
 
         check( 'the file in the folder has the content of the file (' + ( /\.gz$/.test( chosenName ) && ! gzip ? 'after unpacking' : 'byte for byte' ) + ')', Buffer.compare( text, orig ) === 0, text.length + ' / ' + orig.length + ' bytes' );
-        check( 'the page shows the folder again with the file chosen, and the file is marked as uploaded', await browser.ev( `document.querySelector('#import-source-folder').checked && document.querySelector('input[name=import_file]:checked').getAttribute('data-uploaded') === '1' && document.querySelector('.import-files .option-description').textContent.length > 0` ) );
+        check( 'the page shows the folder again with the file chosen, and the file is marked as uploaded', await browser.ev( `document.querySelector('#import-source-folder').checked && document.querySelector('input[name=import_file]:checked').getAttribute('data-uploaded') === '1' && document.querySelector('.import-from-folder .import-files .option-description').textContent.length > 0` ) );
         check( 'the choice to remove the file after the import is on for an uploaded file', await browser.ev( `document.querySelector('#import-delete-file').checked` ) );
         check( 'no part of the upload is left in the folder', ! existsSync( join( importDir, '.upload' ) ) || readdirSync( join( importDir, '.upload' ) ).length === 0 );
         check( 'no error in the page after the upload', browser.takeProblems().length === 0, browser.takeProblems().join( ' | ' ) );
     } else
-        await browser.click( `.import-files input[value="${ name }"]` );
+        await browser.click( `.import-from-folder .import-files input[value="${ name }"]` );
 
     await browser.ev( `(() => { const set = ( id, v ) => { const e = document.querySelector( id ); e.value = v; e.dispatchEvent( new Event( 'change', { bubbles : true } ) ); }; set( '#old-url', '//${ remoteHost }' ); set( '#old-path', ${ JSON.stringify( remotePath ) } ); })()` );
 
@@ -315,6 +317,50 @@ try {
             check( 'the backup is a file with a CREATE TABLE for the tables that the dump replaced', files.length === 1 && made > 20 && made <= wanted, files.length + ' file(s), ' + made + ' tables' );
         }
     }
+
+    if ( restore && ! cancel ) {
+
+        section( 'restore the backup that the import made' );
+
+        const made  = readdirSync( logDir ).filter( f => /-backup-.*\.sql$/.test( f ) && ! backupsBefore.includes( f ) );
+        const bname = made[0];
+        const btext = made.length ? readFileSync( join( logDir, bname ), 'utf8' ) : '';
+
+        check( 'the backup has the line for programs (kind backup, the address of this site) and the mark of the end as its last line', made.length === 1 && /^# syncpilot-header: \{.*"kind":"backup".*\}$/m.test( btext ) && btext.includes( '"home":' + JSON.stringify( config.site ) ) && /^# syncpilot-end: \{"complete":true/.test( btext.trimEnd().split( '\n' ).pop() ), made.join( ', ' ) );
+
+        // the dump that was imported has the users, the sessions and the scheme (https) of the second site: the browser logs in again
+        // on the address that the site has now
+        const nowSite = wp( config.wp, 'echo home_url();' );
+
+        await browser.login( config.wp, nowSite );
+        await browser.goto( nowSite + '/wp-admin/tools.php?page=sync-pilot&syncpilot-profile=-1' );
+        await browser.click( '#import' );
+        await browser.click( '#import-source-backup' );
+        await browser.waitFor( `Array.from(document.querySelectorAll('.import-backups input')).some(i => i.value === ${ JSON.stringify( bname ) })`, 20000 );
+
+        check( 'the list of backups shows the backup: complete, and the address it was made on (the second site changed the scheme of this one, so it is named)', await browser.ev( `(() => { const l = Array.from(document.querySelectorAll('.import-backups input')).find(i => i.value === ${ JSON.stringify( bname ) }); return !!l && l.dataset.complete === '1' && l.parentNode.textContent.includes(${ JSON.stringify( config.site ) }) && l.dataset.source === 'backup'; })()` ) );
+        check( 'the box of the folder and the upload are hidden, the choice to remove the file is not offered', await browser.ev( `document.querySelector('.import-from-folder').offsetParent === null && document.querySelector('.import-from-upload').offsetParent === null && document.querySelector('.import-from-backup').offsetParent !== null` ) );
+
+        await browser.click( `.import-backups input[value="${ bname }"]` );
+
+        check( 'a backup is chosen, the removal of the file is not offered and the rows of find and replace are empty', await browser.ev( `document.querySelector('input[name=import_file]:checked').value === ${ JSON.stringify( bname ) } && getComputedStyle(document.querySelector('.import-delete-file')).display === 'none' && document.querySelector('#old-url').value === ''` ) );
+
+        await browser.click( '.migrate-db-button' );
+        await browser.waitFor( `!!document.querySelector('.progress-content')`, 20000, 100 );
+        await browser.waitFor( `getComputedStyle(document.querySelector('.close-progress-content')).display !== 'none'`, 300000, 200 );
+
+        const back = await browser.ev( `({ title : document.querySelector('.progress-title').textContent, error : document.querySelector('.progress-text').classList.contains('migration-error') })` );
+
+        check( 'the restore ends without an error', /complete|abgeschlossen/i.test( back.title ) && ! back.error, back.title );
+
+        const after = sums( config.wp );
+        const diff  = Object.keys( before ).filter( t => ! /usermeta$|options$/.test( t ) && before[t] !== after[t] );
+
+        check( 'every table that the backup holds is as it was before the import (the checksum of every table, the login and the options aside)', diff.length === 0, diff.slice( 0, 5 ).join( ', ' ) );
+        check( 'no temporary table is left', ! tables( config.wp ).some( t => t.startsWith( '_mig_' ) ) );
+        check( 'the backup is still there', existsSync( join( logDir, bname ) ) );
+        check( 'no error in the page', browser.takeProblems().length === 0, browser.takeProblems().join( ' | ' ) );
+    }
 } finally {
 
     section( 'put the first site back' );
@@ -331,7 +377,10 @@ try {
     for ( const t of extra )
         query( config.wp, 'DROP TABLE IF EXISTS `' + t + '`' );
 
-    check( 'the first site is as before (the checksum of every table)', JSON.stringify( sums( config.wp ) ) === JSON.stringify( before ), extra.length + ' extra tables dropped' );
+    const putBack = sums( config.wp );
+    const unlike  = Object.keys( { ...before, ...putBack } ).filter( t => before[t] !== putBack[t] );
+
+    check( 'the first site is as before (the checksum of every table)', unlike.length === 0, extra.length + ' extra tables dropped' + ( unlike.length ? ', different: ' + unlike.join( ', ' ) : '' ) );
 
     rmSync( work, { recursive : true, force : true } );
     rmSync( reference, { force : true } );

@@ -1686,3 +1686,39 @@ msgstr "Die Datei konnte nicht in den Ordner für Dumps gelegt werden."
 #: class/syncpilot-import.php
 msgid "This file is read by an import that is under way."
 msgstr "Diese Datei wird von einem laufenden Import gelesen."
+
+#: class/syncpilot-import.php
+msgid "Restore a backup"
+msgstr "Ein Backup wiederherstellen"
+
+#: class/syncpilot-import.php
+msgid "Backups of SyncPilot in"
+msgstr "Backups von SyncPilot in"
+
+#: class/syncpilot-import.php
+msgid "There is no backup of SyncPilot on this site yet. A backup is made when the option for a backup is on during a migration."
+msgstr "Auf dieser Website gibt es noch kein Backup von SyncPilot. Ein Backup entsteht, wenn bei einer Migration die Option für ein Backup an ist."
+
+#: class/syncpilot-import.php
+msgid "older backup, without details"
+msgstr "älteres Backup, ohne Angaben"
+
+#: class/syncpilot-import.php
+msgid "not complete (the migration stopped before the last table was written)"
+msgstr "nicht vollständig (die Migration wurde angehalten, bevor die letzte Tabelle geschrieben war)"
+
+#: class/syncpilot-import.php
+msgid "from another address:"
+msgstr "von einer anderen Adresse:"
+
+#: class/syncpilot-import.php
+msgid "export"
+msgstr "Export"
+
+#: class/syncpilot-import.php
+msgid "This backup is not complete: the migration that made it stopped before the last table was written. The tables that are in it are restored, the last one may be cut off. Restore it anyway?"
+msgstr "Dieses Backup ist nicht vollständig: Die Migration, die es erstellt hat, wurde angehalten, bevor die letzte Tabelle geschrieben war. Die Tabellen darin werden wiederhergestellt, die letzte kann abgeschnitten sein. Trotzdem wiederherstellen?"
+
+#: class/syncpilot-import.php
+msgid "This backup is not complete: the migration that made it stopped before the last table was written. (#308)"
+msgstr "Dieses Backup ist nicht vollständig: Die Migration, die es erstellt hat, wurde angehalten, bevor die letzte Tabelle geschrieben war. (#308)"
