@@ -1944,7 +1944,7 @@ function syncpilot_parse_json( maybe_json ) {
     });
     $18("body").on("click", ".import-file-delete", function(e) {
       e.preventDefault();
-      delete_file($18(this).attr("data-file"));
+      delete_file($18(this).attr("data-file"), $18(this).attr("data-source"));
     });
     import_chosen_changed();
   }
@@ -2020,7 +2020,7 @@ function syncpilot_parse_json( maybe_json ) {
       $label.append($radio).append(document.createTextNode(" " + text));
       if (false === backup.complete)
         $label.append($18('<span class="option-description import-backup-incomplete">').text(syncpilot_i10n.import_backup_incomplete));
-      $list.append($18("<li>").append($label));
+      $list.append($18("<li>").append($label).append($18('<a href="#" class="js-action-link import-file-delete" data-source="backup">').attr("data-file", backup.name).text(syncpilot_i10n.import_delete)));
     });
     $18(".import-no-backups").text($list.children().length ? "" : syncpilot_i10n.import_no_backups);
   }
@@ -2054,8 +2054,9 @@ function syncpilot_parse_json( maybe_json ) {
   function upload_text(text, error) {
     $18(".import-upload-text").text(text).toggleClass("error", !!error).toggleClass("notification-message", !!error);
   }
-  function delete_file(name) {
-    syncpilot_confirm(syncpilot_i10n.import_delete_confirm + "\n" + name, function() {
+  function delete_file(name, source) {
+    var backup = "backup" === source;
+    syncpilot_confirm((backup ? syncpilot_i10n.import_delete_backup_confirm : syncpilot_i10n.import_delete_confirm) + "\n" + name, function() {
       $18.ajax({
         url: ajaxurl,
         type: "POST",
@@ -2064,6 +2065,7 @@ function syncpilot_parse_json( maybe_json ) {
         data: {
           action: "syncpilot_import_delete",
           file: name,
+          source: backup ? "backup" : "folder",
           nonce: syncpilot_nonces.import_delete
         },
         success: function(data) {

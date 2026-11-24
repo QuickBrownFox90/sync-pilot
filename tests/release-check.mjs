@@ -8,6 +8,8 @@
 //   - the plugin header, syncpilot_meta, the MU compatibility plugin, the README and the top of the changelog all name
 //     the same version, and that this is the version of the tag you are about to make,
 //   - the built files in asset/ are up to date (npm run build changes nothing),
+//   - the guard for an older PHP in sync-pilot.php comes before the first line that loads a class, and the part above it has no
+//     syntax that PHP 5 cannot read (tests/php-guard.php looks at it with the tokens of PHP),
 //   - the tag does not exist yet.
 
 import { execFileSync } from 'node:child_process';
@@ -50,6 +52,15 @@ for ( const name of names )
     check( name.padEnd( 25 ) + ' ' + ( versions[name] || 'not found' ), versions[name] === versions[names[0]] && !! versions[name] );
 
 check( 'all the same', same );
+
+{
+    const main  = read( 'sync-pilot.php' );
+    const guard = main.indexOf( 'if ( syncpilot_php_too_old() )' );
+    const load  = main.search( /require(_once)?\b/ );
+
+    check( 'the guard for an older PHP is in sync-pilot.php, before the first require', guard > 0 && ( load === -1 || guard < load ) );
+    check( 'its minimum is the one of the header (Requires PHP)', first( main, /define\( 'SYNCPILOT_MIN_PHP', '([^']+)'/ ) === first( main, /Requires PHP:\s*(\S+)/ ) );
+}
 
 if ( wanted )
     check( `the same as the tag you are about to make (${ wanted })`, same && versions[names[0]] === wanted );

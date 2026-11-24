@@ -114,7 +114,7 @@ const remove   = ( path, list ) => wp( path, '$d = wp_upload_dir()["basedir"]; $
 const counts   = path => JSON.parse( wp( path, 'global $wpdb; $o = array(); foreach ( $wpdb->get_col( "SHOW TABLES" ) as $t ) $o[$t] = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `$t`" ); echo json_encode( $o );' ) );
 
 // the backups that a site made (the plugin writes them into its folder in the uploads)
-const backupDir   = path => join( wp( path, 'echo wp_upload_dir()["basedir"];' ), 'sync-pilot' );
+const backupDir   = path => wp( path, 'global $syncpilot; echo $syncpilot->get_upload_info( "path" );' ); // the folder of the exports and backups (since 0.4.4)
 const backupFiles = path => existsSync( backupDir( path ) ) ? readdirSync( backupDir( path ) ).filter( f => /-backup-.*\.sql(\.gz)?$/.test( f ) ) : [];
 
 section( 'reference backup (' + dir + ')' );

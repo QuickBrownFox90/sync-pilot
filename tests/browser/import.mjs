@@ -96,7 +96,8 @@ const logDir     = join( wp( config.wp, 'echo wp_upload_dir()["basedir"];' ), 's
 // states of earlier imports that were not finished (a browser that was closed): they are not of this test
 const statesBefore  = existsSync( join( logDir, 'logs' ) ) ? readdirSync( join( logDir, 'logs' ) ).filter( f => f.startsWith( 'import-' ) ) : [];
 const newStates     = () => readdirSync( join( logDir, 'logs' ) ).filter( f => f.startsWith( 'import-' ) && ! statesBefore.includes( f ) );
-const backupsBefore = existsSync( logDir ) ? readdirSync( logDir ).filter( f => /-backup-.*\.sql/.test( f ) ) : [];
+const exportDir     = wp( config.wp, 'global $syncpilot; echo $syncpilot->get_upload_info( "path" );' ); // exports and backups (since 0.4.4)
+const backupsBefore = existsSync( exportDir ) ? readdirSync( exportDir ).filter( f => /-backup-.*\.sql/.test( f ) ) : [];
 
 check( 'the dump is in the folder of the test', existsSync( join( dumpDir, name ) ) && statSync( join( dumpDir, name ) ).size > 100000, name );
 
@@ -309,8 +310,8 @@ try {
 
         if ( backup ) {
 
-            const files = readdirSync( logDir ).filter( f => /-backup-.*\.sql$/.test( f ) && ! backupsBefore.includes( f ) );
-            const text  = files.length ? readFileSync( join( logDir, files[0] ), 'utf8' ) : '';
+            const files = readdirSync( exportDir ).filter( f => /-backup-.*\.sql$/.test( f ) && ! backupsBefore.includes( f ) );
+            const text  = files.length ? readFileSync( join( exportDir, files[0] ), 'utf8' ) : '';
             const made  = ( text.match( /^CREATE TABLE `/gm ) || [] ).length;
             const wanted = Object.keys( remoteSums ).filter( t => tables( config.wp ).includes( t ) ).length;
 
@@ -322,9 +323,9 @@ try {
 
         section( 'restore the backup that the import made' );
 
-        const made  = readdirSync( logDir ).filter( f => /-backup-.*\.sql$/.test( f ) && ! backupsBefore.includes( f ) );
+        const made  = readdirSync( exportDir ).filter( f => /-backup-.*\.sql$/.test( f ) && ! backupsBefore.includes( f ) );
         const bname = made[0];
-        const btext = made.length ? readFileSync( join( logDir, bname ), 'utf8' ) : '';
+        const btext = made.length ? readFileSync( join( exportDir, bname ), 'utf8' ) : '';
 
         check( 'the backup has the line for programs (kind backup, the address of this site) and the mark of the end as its last line', made.length === 1 && /^# syncpilot-header: \{.*"kind":"backup".*\}$/m.test( btext ) && btext.includes( '"home":' + JSON.stringify( config.site ) ) && /^# syncpilot-end: \{"complete":true/.test( btext.trimEnd().split( '\n' ).pop() ), made.join( ', ' ) );
 
@@ -358,7 +359,38 @@ try {
 
         check( 'every table that the backup holds is as it was before the import (the checksum of every table, the login and the options aside)', diff.length === 0, diff.slice( 0, 5 ).join( ', ' ) );
         check( 'no temporary table is left', ! tables( config.wp ).some( t => t.startsWith( '_mig_' ) ) );
-        check( 'the backup is still there', existsSync( join( logDir, bname ) ) );
+        check( 'the backup is still there', existsSync( join( exportDir, bname ) ) );
+
+        // the link "Remove" behind a backup: the dialog asks, a cancel keeps it, a backup that is too new is refused, then it is gone
+        // (the restore replaced the users and the sessions: the browser logs in again)
+        await browser.login( config.wp, nowSite );
+        await browser.goto( nowSite + '/wp-admin/tools.php?page=sync-pilot&syncpilot-profile=-1' );
+        await browser.click( '#import' );
+        await browser.click( '#import-source-backup' );
+        await browser.waitFor( `Array.from(document.querySelectorAll('.import-backups input')).some(i => i.value === ${ JSON.stringify( bname ) })`, 20000 );
+
+        const link = `.import-backups .import-file-delete[data-file="${ bname }"]`;
+
+        check( 'a link "Remove" is behind the backup', await browser.ev( `!!document.querySelector(${ JSON.stringify( link ) })` ) );
+
+        await browser.click( link, 300 );
+        check( 'it asks in the dialog of the page', await browser.ev( `(() => { const d = document.getElementById('syncpilot-dialog'); return !! d && d.open && d.querySelector('.syncpilot-dialog-message').textContent.includes(${ JSON.stringify( bname ) }); })()` ) );
+        await browser.click( '.syncpilot-dialog-cancel', 300 );
+        check( 'a cancel keeps the backup', existsSync( join( exportDir, bname ) ) );
+
+        await browser.click( link, 300 );
+        await browser.click( '.syncpilot-dialog-ok', 600 );
+        check( 'a backup that was written a moment ago is refused (the answer is an alert) and stays', existsSync( join( exportDir, bname ) ) && await browser.ev( `(() => { const d = document.getElementById('syncpilot-dialog'); return !! d && d.open; })()` ) );
+        await browser.click( '.syncpilot-dialog-ok', 300 );
+
+        // the file belongs to the web server, so its time cannot be set from here: the minimum age is taken away for the site
+        writeFileSync( muPlugin, readFileSync( muPlugin, 'utf8' ) + `add_filter( 'syncpilot_import_backup_min_age', fn() => 0 );\n` );
+        await wait( 3000 ); // the web server reads a changed file of its cache every two seconds
+
+        await browser.click( link, 300 );
+        await browser.click( '.syncpilot-dialog-ok', 800 );
+        const gone = ! existsSync( join( exportDir, bname ) );
+        check( 'an older backup is removed: the file is gone and the list no longer has it', gone && await browser.ev( `!Array.from(document.querySelectorAll('.import-backups input')).some(i => i.value === ${ JSON.stringify( bname ) })` ), `file gone: ${ gone }` );
         check( 'no error in the page', browser.takeProblems().length === 0, browser.takeProblems().join( ' | ' ) );
     }
 } finally {

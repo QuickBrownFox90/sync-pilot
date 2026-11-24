@@ -28,7 +28,7 @@ This is a side project maintained by one person in their spare time — not a pr
 ## Requirements
 
 - WordPress 6.0 or later
-- PHP 8.2 or later
+- PHP 8.2 or later (an older PHP gets a notice in the admin, the plugin is not loaded; a WordPress with several domains that are vhosts of their own can run under several PHP versions)
 - For full functionality: PHP extensions mysqli, curl
 
 Features that cannot run due to your server configuration will not appear in the admin area.
@@ -85,7 +85,7 @@ The Diagnostics tab shows the diagnostic info of the site and its log, with the 
 
 ## Status
 
-Version 0.4.3 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged (see [changelog.txt](changelog.txt)).
+Version 0.4.4 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed and merged (see [changelog.txt](changelog.txt)).
 
 **What the 0.2.x versions were for.** Mostly groundwork, not new features. The admin script of WP Sync DB was one big file without any test. It is split into small modules and a short start-up script now, built with esbuild, checked with ESLint and covered by browser tests that click through the admin page. That was necessary to maintain the code at all, and to make the project really forkable: the parts can be developed one at a time without touching everything. You still have to understand how they work together, but not all of it at once. Besides that: fixes for PHP 8.2+ and WordPress 6.7, the first security fixes, several fixes found by pulling real sites (media files, cancelling), and one small feature (a find and replace row for http/https).
 
@@ -98,6 +98,8 @@ Version 0.4.3 (alpha): based on WP Sync DB 1.5 + Media Files 1.1.4b1, renamed an
 **What 0.4.2 is.** The upload of a dump in the page, which completes the import: the file goes up in many small requests, compressed in the browser, under a name with a part that cannot be guessed, and is removed after the import if you want that.
 
 **What 0.4.3 is.** A backup of SyncPilot can be restored: the head of a backup (and of an export) says what it is, when it was made and on which address, the end mark says that it is complete, and the import lists the backups of the site and restores one like any other dump ("Restore a backup" in the dump box).
+
+**What 0.4.4 is.** Exports and backups are no longer where a web server can hand them out: they are in a folder with a name that cannot be guessed, closed for every `.sql` and `.sql.gz` file, and the plugin hands them out through a link with a nonce (an export once, a backup stays). The backups of the versions before are still found and can be restored, and a backup can be removed from the list. The diagnostics say whether the web server serves the folder (nginx does not read the rule of the folder and needs its own: deny `/exports-`).
 
 **What is tested.** Pull, push, export, import (also a gzip dump, with a backup and a cancel), backup, media files, pause, cancel and saved profiles, automatically on two test sites (PHP 8.4) and by hand with pulls and imports of live sites, multisites among them; also the cases that go wrong (an exception, a fatal error, the memory and the time limit, an answer that is cut or empty, a firewall that answers instead of WordPress, folders that cannot be written). WP-CLI is not verified yet, multisite only by hand.
 
@@ -136,7 +138,7 @@ The tests run on two test installations of WordPress with wp-cli, named in `test
 - `npm run test:guard`: an exception, a fatal error, the memory limit and the time limit in a request. It copies a mu-plugin from `tests/fault/` into the test site and removes it again
 - `npm run test:faults`: the other site answers wrongly (a web server error, a firewall, an empty or a cut answer, a closed connection, no answer); a proxy in `tests/fault/` spoils the answers, and the log has to say what happened
 - `php tests/help-codes.php`: the help codes and every place that reports one (no WordPress needed)
-- `wp eval-file wp-content/plugins/sync-pilot/tests/logger.php`, `tests/media-preflight.php` (the check of the folders for the media files) and `tests/table-rows.php` (the number of rows per table, answered like MySQL 8) run on a test site; so do the checks of the import: `tests/import.php` (the folder), `tests/import-upload.php` (the names of uploads, the removal), `tests/import-backup.php` (the head and the end of a backup, the list), `tests/import-reader.php` (the reader, the statements that are allowed, the collations, a real dump), `tests/import-load.php` (scan and load in short requests with a new connection each, and what stops the import), `tests/import-replace.php` (the replace for every kind of value, gzip, a real dump compared with the function of a push or a pull), `tests/import-serialized.php` and `tests/import-memory.php` (shared objects, a memory limit); `tests/collation-map.php` and `tests/collation-keep.php` (the collations of a chunk) and `tests/replace-compare.php` (old and new replace on the data of a real site)
+- `wp eval-file wp-content/plugins/sync-pilot/tests/logger.php`, `tests/media-preflight.php` (the check of the folders for the media files) and `tests/table-rows.php` (the number of rows per table, answered like MySQL 8) run on a test site; so do the checks of the import: `tests/import.php` (the folder), `tests/import-upload.php` (the names of uploads, the removal), `tests/import-backup.php` (the head and the end of a backup, the list), `tests/import-reader.php` (the reader, the statements that are allowed, the collations, a real dump), `tests/import-load.php` (scan and load in short requests with a new connection each, and what stops the import), `tests/import-replace.php` (the replace for every kind of value, gzip, a real dump compared with the function of a push or a pull), `tests/import-serialized.php` and `tests/import-memory.php` (shared objects, a memory limit); `tests/php-guard.php` (the guard for an older PHP), `tests/export-folder.php` (the folder of the exports and backups, the links, the old folder) and `tests/browser/download.mjs` (the download of an export), `tests/collation-map.php` and `tests/collation-keep.php` (the collations of a chunk) and `tests/replace-compare.php` (old and new replace on the data of a real site)
 
 ### Logging in the code
 

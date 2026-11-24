@@ -319,39 +319,71 @@ class SyncPilot extends SyncPilot_Base {
 		$upload_info['url'] = $upload_dir['baseurl'];
 
 		$upload_dir_name = apply_filters( 'syncpilot_upload_dir_name', self::TEXT_DOMAIN );
+		$plugin_folder   = $upload_dir['basedir'] . DS . $upload_dir_name;
 
-		if ( ! file_exists( $upload_dir['basedir'] . DS . $upload_dir_name ) ) {
-			$url = wp_nonce_url( $this->plugin_base, 'sync-pilot-nonce' );
+		// exports and backups: a folder with a name that cannot be guessed, nothing in it is served by the web server, the
+		// files are handed out by download_file(). The folder of the versions before 0.4.4 (the plugin folder itself) is
+		// closed the same way, its files are still found (see legacy_upload_path()).
+		$folder = $plugin_folder . DS . self::EXPORT_FOLDER . '-' . substr( wp_hash( 'syncpilot-exports' ), 0, 16 );
 
-			if ( false === @mkdir( $upload_dir['basedir'] . DS . $upload_dir_name, 0755 ) )
+		$upload_info['path'] = $folder;
+		$upload_info['url']  .= '/' . $upload_dir_name . '/' . basename( $folder );
+
+		// when a folder cannot be made the path stays the one of the folder: it is reported as not writeable, and nothing is
+		// put into the uploads folder itself (which the web server hands out)
+		if ( ! file_exists( $plugin_folder ) ) {
+
+			if ( false === @mkdir( $plugin_folder, 0755 ) )
 				return $upload_info[$type];
 
-			$filename = $upload_dir['basedir'] . DS . $upload_dir_name . DS . 'index.php';
-
-			if ( false === @file_put_contents( $filename, "<?php\r\n// Silence is golden\r\n?>" ) )
+			if ( false === @file_put_contents( $plugin_folder . DS . 'index.php', "<?php\r\n// Silence is golden\r\n?>" ) )
 				return $upload_info[ $type ];
 		}
 
-		$upload_info['path'] .= DS . $upload_dir_name;
-		$upload_info['url'] .= '/' . $upload_dir_name;
+		if ( ! is_dir( $folder ) && ! @wp_mkdir_p( $folder ) )
+			return $upload_info[ $type ];
 
-		$this->protect_dump_directory( $upload_info['path'] );
+		$this->protect_dump_directory( $folder );
+		$this->protect_dump_directory( $plugin_folder );
 
 		return $upload_info[$type];
 	}
 
-	// Exports (…-migrate-…) are only handed out by download_file(), so the web server must not serve them directly.
-	// Backups (…-backup-…) stay reachable, the page links to them after a migration; they have a long random name.
-	// Also done for folders that already exist, so installs of older versions get the rule too.
+	/**
+	 * The folder where exports and backups were put before 0.4.4: the folder of the plugin in the uploads folder. Nothing is
+	 * written there any more, but the backups in it can still be restored and the exports in it downloaded.
+	 * @since   0.4.4
+	 *
+	 * @return  string|false  The path without a slash at the end, false when a filter sets the folder
+	 */
+	function legacy_upload_path() {
+
+		if ( ! empty( apply_filters( 'syncpilot_upload_info', array() ) ) )
+			return false;
+
+		$upload_dir = wp_upload_dir( null, false );
+
+		return $upload_dir['basedir'] . DS . apply_filters( 'syncpilot_upload_dir_name', self::TEXT_DOMAIN );
+	}
+
+	/**
+	 * Close a folder with dumps for the web server: no listing, no access to anything, an index.php for the case of neither
+	 * rule working (nginx reads neither: the diagnostics say so). Done for folders that already exist too, so installs of
+	 * older versions get the rule.
+	 * @since   0.2.8
+	 * @since   0.4.4   Denies every file (before: the exports only, the backups were linked directly)
+	 *
+	 * @param   string $path  The folder
+	 */
 	function protect_dump_directory( $path ) {
 
 		if ( ! is_dir( $path ) || ! is_writable( $path ) )
 			return;
 
 		$htaccess = $path . DS . '.htaccess';
-		$rules    = "# SyncPilot: exports are handed out by the plugin only\n"
+		$rules    = "# SyncPilot: dumps are handed out by the plugin only\n"
 			. "Options -Indexes\n"
-			. "<FilesMatch \"-migrate-[0-9]{14}-[a-z0-9]+\\.sql(\\.gz)?\$\">\n"
+			. "<FilesMatch \"\\.sql(\\.gz)?\$\">\n"
 			. "\t<IfModule mod_authz_core.c>\n\t\tRequire all denied\n\t</IfModule>\n"
 			. "\t<IfModule !mod_authz_core.c>\n\t\tOrder allow,deny\n\t\tDeny from all\n\t</IfModule>\n"
 			. "</FilesMatch>\n";
@@ -360,9 +392,30 @@ class SyncPilot extends SyncPilot_Base {
 			@file_put_contents( $htaccess, $rules );
 
 		$webconfig = $path . DS . 'web.config';
+		$config    = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration><system.webServer><security><requestFiltering><fileExtensions><add fileExtension=\".sql\" allowed=\"false\" /><add fileExtension=\".gz\" allowed=\"false\" /></fileExtensions></requestFiltering></security></system.webServer></configuration>\n";
 
-		if ( ! file_exists( $webconfig ) )
-			@file_put_contents( $webconfig, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration><system.webServer><security><requestFiltering><denyUrlSequences><add sequence=\"-migrate-\" /></denyUrlSequences></requestFiltering></security></system.webServer></configuration>\n" );
+		if ( ! file_exists( $webconfig ) || false !== strpos( (string) @file_get_contents( $webconfig ), '-migrate-' ) )
+			@file_put_contents( $webconfig, $config );
+
+		if ( ! file_exists( $path . DS . 'index.php' ) )
+			@file_put_contents( $path . DS . 'index.php', "<?php\r\n// Silence is golden\r\n?>" );
+	}
+
+	/**
+	 * Where an export or a backup is downloaded: the plugin hands it out (download_file()), the web server does not
+	 * @since   0.4.4
+	 *
+	 * @param   string $name  The name of the file with or without .sql / .sql.gz
+	 *
+	 * @return  string  The address in the admin, with a nonce
+	 */
+	function dump_download_url( $name ) {
+
+		$gzip = (bool) preg_match( '/\.sql\.gz$/', $name );
+		$name = preg_replace( '/\.sql(\.gz)?$/', '', $name );
+		$url  = network_admin_url( $this->plugin_base . '&_wpnonce=' . wp_create_nonce( 'syncpilot-download' ) . '&download=' . rawurlencode( $name ) );
+
+		return $gzip ? $url . '&gzip=1' : $url;
 	}
 
 	function ajax_update_max_request_size() {
@@ -396,7 +449,13 @@ class SyncPilot extends SyncPilot_Base {
 		$datetime = date('YmdHis');
 		$ds       = ( $info_type == 'path' ? DS : '/' );
 
-		return sprintf( '%s%s%s-%s-%s-%s.sql', $this->get_upload_info( $info_type ), $ds, sanitize_title_with_dashes( DB_NAME ), $migration_type, $datetime, $this->session_salt );
+		$name = sprintf( '%s-%s-%s-%s.sql', sanitize_title_with_dashes( DB_NAME ), $migration_type, $datetime, $this->session_salt );
+
+		// the address is the link that hands the file out (since 0.4.4 the web server serves nothing from the folder)
+		if ( 'url' === $info_type )
+			return $this->dump_download_url( $name );
+
+		return $this->get_upload_info( $info_type ) . $ds . $name;
 	}
 
 	function parse_migration_form_data( $data ) {
@@ -1685,7 +1744,7 @@ class SyncPilot extends SyncPilot_Base {
 
 			if ( $this->gzip() && isset( $this->form_data['gzip_file'] ) ) {
 				$return['dump_filename'] .= '.gz';
-				$return['dump_url']      .= '.gz';
+				$return['dump_url']      .= '&gzip=1';
 			}
 
 			$this->fp = $this->open( $this->get_upload_info( 'path' ) . DS . $return['dump_filename'] );
@@ -3511,6 +3570,7 @@ class SyncPilot extends SyncPilot_Base {
 			'import_upload_compressing'				=> __( "compressed", self::TEXT_DOMAIN ),
 			'import_delete'							=> __( "Remove", self::TEXT_DOMAIN ),
 			'import_delete_confirm'					=> __( "Remove this file from the folder?", self::TEXT_DOMAIN ),
+			'import_delete_backup_confirm'			=> __( "Remove this backup? It cannot be restored afterwards.", self::TEXT_DOMAIN ),
 			'import_delete_problem'					=> __( "The file could not be removed.", self::TEXT_DOMAIN ),
 			'import_uploaded'						=> __( "uploaded", self::TEXT_DOMAIN ),
 			'import_no_backups'						=> __( "There is no backup of SyncPilot on this site yet. A backup is made when the option for a backup is on during a migration.", self::TEXT_DOMAIN ),
@@ -3570,8 +3630,20 @@ class SyncPilot extends SyncPilot_Base {
 
 	}
 
+	/**
+	 * Hand out an export or a backup of the folder of the exports (or of the folder of versions before 0.4.4). An export is
+	 * deleted after it was sent, a backup stays. Only names of exports and backups are accepted, and only with the nonce
+	 * that dump_download_url() puts into the link.
+	 * @since   0.2.8
+	 * @since   0.4.4   Nonce, the name must be the name of an export or a backup, backups are handed out too and kept, the
+	 *                  old folder is searched as well, the answer no longer names the path
+	 */
 	function download_file() {
-		// dont need to check for user permissions as our 'add_management_page' already takes care of this
+
+		// the page is only reachable for those who may use it (add_management_page), the nonce keeps a link of somebody else from deleting an export
+		if ( ! current_user_can( 'export' ) && ! current_user_can( 'manage_options' ) || ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'syncpilot-download' ) )
+			wp_die( __( 'Could not find the file to download.', self::TEXT_DOMAIN ), '', array( 'response' => 403 ) );
+
 		$this->set_time_limit();
 
 		$dump_name = $this->format_dump_name( $_GET['download'] );
@@ -3579,25 +3651,42 @@ class SyncPilot extends SyncPilot_Base {
 		if( isset( $_GET['gzip'] ) )
 			$dump_name .= '.gz';
 
-		$diskfile         = $this->get_upload_info( 'path' ) . DS . $dump_name;
+		$diskfile = false;
+
+		if ( preg_match( '/-(migrate|backup)-\d{14}-[a-z0-9]+\.sql(\.gz)?$/', $dump_name ) ) {
+
+			$folders = array_filter( array( $this->get_upload_info( 'path' ), $this->legacy_upload_path() ) );
+
+			foreach ( $folders as $folder ) {
+
+				$file = $folder . DS . $dump_name;
+
+				if ( is_file( $file ) && ! is_link( $file ) ) {
+					$diskfile = $file;
+					break;
+				}
+			}
+		}
+
+		if ( ! $diskfile )
+			wp_die( __( 'Could not find the file to download.', self::TEXT_DOMAIN ), '', array( 'response' => 404 ) );
+
 		$filename         = basename( $diskfile );
 		$filename_no_salt = preg_replace( '/-[a-z0-9]{5,64}(\.sql(\.gz)?)$/', '$1', $filename ); // without the random part
 
-		if ( file_exists( $diskfile ) ) {
-			header( 'Content-Description: File Transfer' );
-			header( 'Content-Type: application/octet-stream' );
-			header( 'Content-Length: ' . filesize( $diskfile ) );
-			header( 'Content-Disposition: attachment; filename=' . $filename_no_salt );
+		header( 'Content-Description: File Transfer' );
+		header( 'Content-Type: application/octet-stream' );
+		header( 'X-Content-Type-Options: nosniff' );
+		header( 'Content-Length: ' . filesize( $diskfile ) );
+		header( 'Content-Disposition: attachment; filename=' . $filename_no_salt );
 
-			$success = readfile( $diskfile );
+		readfile( $diskfile );
 
-			unlink( $diskfile );
+		// an export is made to be downloaded once, a backup is the way back and stays
+		if ( false !== strpos( $filename, '-migrate-' ) )
+			@unlink( $diskfile );
 
-			exit;
-		}
-
-		else
-			wp_die( __( 'Could not find the file to download:', self::TEXT_DOMAIN ) . '<br />' . $diskfile );
+		exit;
 	}
 
 	function admin_head_connection_info() {
@@ -3637,7 +3726,7 @@ class SyncPilot extends SyncPilot_Base {
 			var syncpilot_this_upload_url      = '<?php echo addslashes( trailingslashit( $this->get_upload_info( 'url' ) ) ); ?>';
 			var syncpilot_this_upload_dir_long = '<?php echo addslashes( trailingslashit( $this->get_upload_info( 'path' ) ) ); ?>';
 			var syncpilot_this_website_name    = '<?php echo sanitize_title_with_dashes( DB_NAME ); ?>';
-			var syncpilot_this_download_url    = '<?php echo network_admin_url( $this->plugin_base . '&download=' ); ?>';
+			var syncpilot_this_download_url    = '<?php echo network_admin_url( $this->plugin_base . '&_wpnonce=' . wp_create_nonce( 'syncpilot-download' ) . '&download=' ); ?>';
 			var syncpilot_this_prefix          = '<?php echo $table_prefix; ?>';
 			var syncpilot_is_multisite         = <?php echo ( is_multisite() ? 'true' : 'false' ); ?>;
 			var syncpilot_openssl_available    = <?php echo ( $this->open_ssl_enabled() ? 'true' : 'false' ); ?>;

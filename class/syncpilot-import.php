@@ -297,6 +297,26 @@ class SyncPilot_Import extends SyncPilot_Base {
 	}
 
 	/**
+	 * The folders that hold backups: the folder of the exports and backups, and the folder of the versions before 0.4.4 (the
+	 * plugin folder in the uploads folder), where older backups still are
+	 * @since   0.4.4
+	 *
+	 * @return  array  The paths without a slash at the end, the current folder first
+	 */
+	static function backup_paths() {
+
+		global $syncpilot;
+
+		$paths  = array( self::backup_path() );
+		$legacy = $syncpilot->legacy_upload_path();
+
+		if ( $legacy && untrailingslashit( $legacy ) !== $paths[0] )
+			$paths[] = untrailingslashit( $legacy );
+
+		return $paths;
+	}
+
+	/**
 	 * What a backup says about itself: the line `# syncpilot-header: {...}` at the beginning (written since 0.4.3, see
 	 * SyncPilot::db_backup_header()) and the line `# syncpilot-end: {...}` at the end, which is only there when the last table was
 	 * written to its end. Only the beginning and the end of the file are read.
@@ -352,28 +372,30 @@ class SyncPilot_Import extends SyncPilot_Base {
 	 */
 	static function backups() {
 
-		$path  = self::backup_path();
 		$files = array();
 
-		if ( ! is_dir( $path ) || false === ( $names = @scandir( $path ) ) )
-			return $files;
+		foreach ( self::backup_paths() as $path ) {
 
-		foreach ( $names as $name ) {
-
-			if ( ! preg_match( self::BACKUP_PATTERN, $name ) || is_link( $path . DS . $name ) || ! is_file( $path . DS . $name ) )
+			if ( ! is_dir( $path ) || false === ( $names = @scandir( $path ) ) )
 				continue;
 
-			$file = $path . DS . $name;
-			$info = self::backup_info( $file );
+			foreach ( $names as $name ) {
 
-			$files[] = array(
-				'name'     => $name,
-				'bytes'    => (int) @filesize( $file ),
-				'modified' => (int) @filemtime( $file ),
-				'header'   => $info['header'],
-				'complete' => $info['complete'],
-				'usable'   => is_readable( $file ) && filesize( $file ) > 0,
-			);
+				if ( ! preg_match( self::BACKUP_PATTERN, $name ) || is_link( $path . DS . $name ) || ! is_file( $path . DS . $name ) )
+					continue;
+
+				$file = $path . DS . $name;
+				$info = self::backup_info( $file );
+
+				$files[] = array(
+					'name'     => $name,
+					'bytes'    => (int) @filesize( $file ),
+					'modified' => (int) @filemtime( $file ),
+					'header'   => $info['header'],
+					'complete' => $info['complete'],
+					'usable'   => is_readable( $file ) && filesize( $file ) > 0,
+				);
+			}
 		}
 
 		usort( $files, fn( $a, $b ) => array( $b['modified'], $a['name'] ) <=> array( $a['modified'], $b['name'] ) );
@@ -395,15 +417,21 @@ class SyncPilot_Import extends SyncPilot_Base {
 		if ( ! is_string( $name ) || ! preg_match( self::BACKUP_PATTERN, $name ) )
 			return false;
 
-		$folder = realpath( self::backup_path() );
-		$file   = self::backup_path() . DS . $name;
+		foreach ( self::backup_paths() as $path ) {
 
-		if ( false === $folder || is_link( $file ) || ! is_file( $file ) || ! is_readable( $file ) )
-			return false;
+			$folder = realpath( $path );
+			$file   = $path . DS . $name;
 
-		$real = realpath( $file );
+			if ( false === $folder || is_link( $file ) || ! is_file( $file ) || ! is_readable( $file ) )
+				continue;
 
-		return false !== $real && dirname( $real ) === $folder ? $file : false;
+			$real = realpath( $file );
+
+			if ( false !== $real && dirname( $real ) === $folder )
+				return $file;
+		}
+
+		return false;
 	}
 
 	/**
@@ -434,6 +462,25 @@ class SyncPilot_Import extends SyncPilot_Base {
 		$file = self::resolve( $name );
 
 		return false !== $file && @unlink( $file );
+	}
+
+	/**
+	 * Remove a backup of the folder of the backups. A backup that was written a moment ago (a migration may still be writing
+	 * it) is not removed.
+	 * @since   0.4.4
+	 *
+	 * @param   mixed $name  The name of the backup
+	 *
+	 * @return  bool  false when it is no backup of the folder, is too new, or could not be removed
+	 */
+	static function delete_backup( $name ) {
+
+		$file = self::resolve_backup( $name );
+
+		if ( false === $file || time() - (int) @filemtime( $file ) < (int) apply_filters( 'syncpilot_import_backup_min_age', 120 ) )
+			return false;
+
+		return @unlink( $file );
 	}
 
 	/**
@@ -643,20 +690,29 @@ class SyncPilot_Import extends SyncPilot_Base {
 	 * by its address and removed; the folder is closed when the answer is not that file. The rule of the folder works with
 	 * Apache; nginx ignores it and needs a rule of its own (deny the folder).
 	 * @since   0.4.0
+	 * @since   0.4.4   The folder and the extension of the probe can be given (the folder of the exports closes .sql and .sql.gz)
+	 *
+	 * @param   string|null $folder     The folder to look at; null: the folder for dumps of the import
+	 * @param   string      $extension  The extension of the probe file
 	 *
 	 * @return  bool|null  true: the file was handed out; false: it was not; null: not known (the folder is outside of the
 	 *                     uploads folder and has no address, it cannot be written, or the request failed)
 	 */
-	static function is_reachable() {
+	static function is_reachable( $folder = null, $extension = 'txt' ) {
+
+		global $syncpilot;
 
 		$upload = wp_upload_dir( null, false );
 		$base   = wp_normalize_path( $upload['basedir'] ) . '/';
-		$path   = wp_normalize_path( self::path() ) . '/';
+		$path   = wp_normalize_path( null === $folder ? self::path() : $folder ) . '/';
 
-		if ( 0 !== strpos( $path, $base ) || false === ( $dir = self::dir() ) )
+		// the folder of the exports is made (and closed) by get_upload_info(), the folder for dumps by dir()
+		$dir = null === $folder ? self::dir() : ( $syncpilot->get_upload_info( 'path' ) === $folder ? $folder : false );
+
+		if ( 0 !== strpos( $path, $base ) || false === $dir || ! is_dir( $dir ) || ! is_writable( $dir ) )
 			return null;
 
-		$name    = 'probe-' . bin2hex( random_bytes( 6 ) ) . '.txt';
+		$name    = 'probe-' . bin2hex( random_bytes( 6 ) ) . '.' . $extension;
 		$content = bin2hex( random_bytes( 16 ) );
 		$file    = $dir . DS . $name;
 
@@ -678,29 +734,41 @@ class SyncPilot_Import extends SyncPilot_Base {
 	}
 
 	/**
-	 * The lines of the diagnostic info of this site: the folder of the dumps, and whether the web server hands out its files
+	 * The lines of the diagnostic info of this site: the folder of the dumps and the folder of the exports and backups, and
+	 * whether the web server hands out their files
 	 * @since   0.4.0
+	 * @since   0.4.4   The folder of the exports and backups; the line says "Protected From The Web" (YES is the good answer),
+	 *                  not "Reachable" (No was the good answer and read as if the plugin could not reach its folder)
 	 */
 	function output_diagnostic_info() {
 
-		$reachable = self::is_reachable();
+		global $syncpilot;
 
-		echo 'Import Folder: ';
-		echo esc_html( self::path() );
-		echo "\r\n";
+		$folders = array(
+			'Import' => array( self::path(), self::is_reachable(), 'imports' ),
+			'Export' => array( $syncpilot->get_upload_info( 'path' ), self::is_reachable( $syncpilot->get_upload_info( 'path' ), 'sql' ), 'exports' ),
+		);
 
-		echo 'Import Folder Reachable: ';
+		foreach ( $folders as $name => $folder ) {
 
-		if ( true === $reachable )
-			echo 'YES - the web server hands out files of this folder, deny the access to it (nginx: location ~ /imports-)';
+			echo $name . ' Folder: ';
+			echo esc_html( $folder[0] );
+			echo "\r\n";
 
-		elseif ( false === $reachable )
-			echo 'No';
+			// protected: the web server does not hand out a file of the folder (the probe was not served)
+			echo $name . ' Folder Protected From The Web: ';
 
-		else
-			echo 'Unknown';
+			if ( true === $folder[1] )
+				echo 'NO - the web server hands out files of this folder, deny the access to it (nginx: location ~ /' . $folder[2] . '-)';
 
-		echo "\r\n";
+			elseif ( false === $folder[1] )
+				echo 'YES';
+
+			else
+				echo 'Unknown (could not be checked)';
+
+			echo "\r\n";
+		}
 	}
 
 	/**
@@ -2269,8 +2337,9 @@ class SyncPilot_Import extends SyncPilot_Base {
 	}
 
 	/**
-	 * Remove a dump of the folder (the link of the list)
+	 * Remove a dump of the folder or a backup (the link of the list; `source` is "backup" for a backup)
 	 * @since   0.4.2
+	 * @since   0.4.4   Backups
 	 *
 	 * @return  string|void  The answer as JSON (only in tests, otherwise the request ends here)
 	 */
@@ -2286,7 +2355,7 @@ class SyncPilot_Import extends SyncPilot_Base {
 		if ( ! empty( $state['file'] ) && $state['file'] === $name )
 			return $this->import_error( __( 'This file is read by an import that is under way.', self::TEXT_DOMAIN ) );
 
-		$deleted = self::delete( $name );
+		$deleted = 'backup' === ( $_POST['source'] ?? '' ) ? self::delete_backup( $name ) : self::delete( $name );
 
 		$result = $this->end_ajax( json_encode( array( 'deleted' => $deleted ? 1 : 0 ) ) );
 

@@ -117,6 +117,15 @@ $I::state_write( array( 'file' => basename( $file ), 'source' => 'backup', 'dele
 $syncpilot_import->finalized( 'import' );
 $check( 'the file of a backup is never removed after the import', file_exists( $file ) );
 
+// -- the removal of a backup
+$fresh = $base . '/fresh-backup-20261120120008-' . str_repeat( '4', 32 ) . '.sql';
+file_put_contents( $fresh, 'x' );
+$check( 'a backup that was written a moment ago is not removed (a migration may be writing it)', false === $I::delete_backup( basename( $fresh ) ) && file_exists( $fresh ) );
+
+touch( $fresh, time() - 600 );
+$check( 'an older one is removed', true === $I::delete_backup( basename( $fresh ) ) && ! file_exists( $fresh ) );
+$check( 'a dump of the folder for dumps, a name with a folder, a link and a file that is not there are not removed', false === $I::delete_backup( 'notes.sql' ) && false === $I::delete_backup( '../' . basename( $old ) ) && false === $I::delete_backup( 'link-backup-20261120120005-' . str_repeat( '1', 32 ) . '.sql' ) && false === $I::delete_backup( basename( $fresh ) ) && is_link( $base . '/link-backup-20261120120005-' . str_repeat( '1', 32 ) . '.sql' ) && file_exists( $file ) );
+
 // -- clean up
 $_POST = $post;
 $I::state_remove();

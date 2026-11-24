@@ -644,8 +644,8 @@ msgid "Migration cancelled"
 msgstr "Migration abgebrochen"
 
 #: class/syncpilot.php:2553
-msgid "Could not find the file to download:"
-msgstr "Die herunterzuladende Datei wurde nicht gefunden:"
+msgid "Could not find the file to download."
+msgstr "Die herunterzuladende Datei wurde nicht gefunden."
 
 #: class/syncpilot.php:2762
 msgid "MySQL export file not found."
@@ -1722,3 +1722,7 @@ msgstr "Dieses Backup ist nicht vollständig: Die Migration, die es erstellt hat
 #: class/syncpilot-import.php
 msgid "This backup is not complete: the migration that made it stopped before the last table was written. (#308)"
 msgstr "Dieses Backup ist nicht vollständig: Die Migration, die es erstellt hat, wurde angehalten, bevor die letzte Tabelle geschrieben war. (#308)"
+
+#: class/syncpilot.php
+msgid "Remove this backup? It cannot be restored afterwards."
+msgstr "Dieses Backup entfernen? Es lässt sich danach nicht mehr wiederherstellen."

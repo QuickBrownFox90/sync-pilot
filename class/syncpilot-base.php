@@ -2,6 +2,9 @@
 class SyncPilot_Base {
 	const TEXT_DOMAIN = 'sync-pilot';
 
+	// the folder of the exports and backups in the folder of the plugin gets this name, a dash and a part that cannot be guessed (@since 0.4.4)
+	const EXPORT_FOLDER = 'exports';
+
 	// the tables that are replaced are renamed to <this prefix><name> first and dropped when the migration has worked
 	const OLD_TABLE_PREFIX = '_old_';
 

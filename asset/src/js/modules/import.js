@@ -85,7 +85,7 @@ export function init_import() {
     $( 'body' ).on( 'click', '.import-file-delete', function ( e ) {
 
         e.preventDefault();
-        delete_file( $( this ).attr( 'data-file' ) );
+        delete_file( $( this ).attr( 'data-file' ), $( this ).attr( 'data-source' ) );
     } );
 
     import_chosen_changed();
@@ -219,7 +219,7 @@ function show_backups( data ) {
         if ( false === backup.complete )
             $label.append( $( '<span class="option-description import-backup-incomplete">' ).text( syncpilot_i10n.import_backup_incomplete ) );
 
-        $list.append( $( '<li>' ).append( $label ) );
+        $list.append( $( '<li>' ).append( $label ).append( $( '<a href="#" class="js-action-link import-file-delete" data-source="backup">' ).attr( 'data-file', backup.name ).text( syncpilot_i10n.import_delete ) ) );
     } );
 
     $( '.import-no-backups' ).text( $list.children().length ? '' : syncpilot_i10n.import_no_backups );
@@ -285,11 +285,15 @@ function upload_text( text, error ) {
 /**
  * Remove a file of the folder (the link behind it), after a question (in the dialog of the page, not a native pop-up)
  * @since   0.4.2
- * @param   {string} name  The name of the file
+ * @since   0.4.4   Also a backup (source "backup")
+ * @param   {string} name    The name of the file
+ * @param   {string} source  "backup" for a backup, otherwise a dump of the folder
  */
-function delete_file( name ) {
+function delete_file( name, source ) {
 
-    syncpilot_confirm( syncpilot_i10n.import_delete_confirm + '\n' + name, function () {
+    var backup = 'backup' === source;
+
+    syncpilot_confirm( ( backup ? syncpilot_i10n.import_delete_backup_confirm : syncpilot_i10n.import_delete_confirm ) + '\n' + name, function () {
 
         $.ajax( {
             url      : ajaxurl,
@@ -299,6 +303,7 @@ function delete_file( name ) {
             data     : {
                 action : 'syncpilot_import_delete',
                 file   : name,
+                source : backup ? 'backup' : 'folder',
                 nonce  : syncpilot_nonces.import_delete,
             },
             success : function ( data ) {
